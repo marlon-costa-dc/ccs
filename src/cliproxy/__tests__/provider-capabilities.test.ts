@@ -67,6 +67,8 @@ describe('provider-capabilities', () => {
   it('returns providers by OAuth flow capability', () => {
     expect(getProvidersByOAuthFlow('device_code')).toEqual([
       'xai',
+      'zai',
+      'opencode',
       'qwen',
       'kiro',
       'ghcp',
@@ -75,14 +77,10 @@ describe('provider-capabilities', () => {
       'codebuddy',
       'kilo',
       'qoder',
-      'zai',
-      'opencode',
     ]);
     expect(getProvidersByOAuthFlow('authorization_code')).toEqual([
       'gemini',
       'codex',
-      'zai',
-      'opencode',
       'agy',
       'iflow',
       'claude',
@@ -93,6 +91,8 @@ describe('provider-capabilities', () => {
   it('separates browser URL auth providers from verification-code device flows', () => {
     expect(getDeviceCodeVerificationProviders()).toEqual([
       'xai',
+      'zai',
+      'opencode',
       'qwen',
       'kiro',
       'ghcp',
@@ -100,8 +100,6 @@ describe('provider-capabilities', () => {
       'codebuddy',
       'kilo',
       'qoder',
-      'zai',
-      'opencode',
     ]);
   });
 

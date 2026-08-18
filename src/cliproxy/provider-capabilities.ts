@@ -85,7 +85,7 @@ export const PROVIDER_CAPABILITIES: Record<CLIProxyProvider, ProviderCapabilitie
     authStartSupport: 'cliproxy-cli',
     authFilePrefixes: ['zai-'],
     tokenTypeValues: ['zai'],
-    aliases: ['glm'],
+    aliases: [],
   },
   opencode: {
     displayName: 'OpenCode Zen',

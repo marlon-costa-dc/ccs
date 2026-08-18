@@ -205,6 +205,8 @@ export const BUILTIN_PROVIDER_SHORTCUTS: readonly ShortcutEntry[] = CLIPROXY_PRO
         gemini: 'Google Gemini via CLIProxy OAuth',
         codex: 'OpenAI Codex via CLIProxy OAuth',
         xai: 'xAI Grok via CLIProxy OAuth (alias: grok)',
+        zai: 'Z.AI GLM via CLIProxy OAuth',
+        opencode: 'OpenCode Zen via CLIProxy OAuth',
         agy: 'Antigravity via CLIProxy OAuth',
         qwen: 'Qwen Code via CLIProxy; account linking unsupported',
         iflow: 'iFlow via CLIProxy OAuth',
