@@ -236,6 +236,20 @@ export const OAUTH_CONFIGS: Record<CLIProxyProvider, ProviderOAuthConfig> = {
     scopes: ['openid', 'profile', 'email', 'offline_access', 'grok-cli:access', 'api:access'],
     authFlag: '--xai-login',
   },
+  zai: {
+    provider: 'zai',
+    displayName: 'Z.AI (GLM)',
+    authUrl: 'https://auth.z.ai/device',
+    scopes: ['openid', 'profile', 'email', 'offline_access', 'zai:access', 'api:access'],
+    authFlag: '--zai-login',
+  },
+  opencode: {
+    provider: 'opencode',
+    displayName: 'OpenCode Zen',
+    authUrl: 'https://opencode.ai/zen/v1/auth',
+    scopes: ['openid', 'profile', 'email'],
+    authFlag: '--opencode-login',
+  },
   agy: {
     provider: 'agy',
     displayName: 'Antigravity',

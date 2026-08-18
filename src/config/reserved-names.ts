@@ -10,6 +10,8 @@ export const RESERVED_PROFILE_NAMES = [
   'codex',
   'xai',
   'grok',
+  'zai',
+  'opencode',
   'agy',
   'qwen',
   'iflow',

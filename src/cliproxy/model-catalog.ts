@@ -83,7 +83,7 @@ export interface ProviderCatalog {
 }
 
 /**
- * Model catalog for providers that support interactive configuration
+ * Model catalog for providers that support interactive model configuration
  *
  * Models listed in order of recommendation (top = best)
  */
@@ -668,6 +668,80 @@ export const MODEL_CATALOG: Partial<Record<CLIProxyProvider, ProviderCatalog>> =
         contextWindow: 200000,
         nativeImageInput: true,
         thinking: { type: 'none' },
+      },
+    ],
+  },
+  zai: {
+    provider: 'zai',
+    displayName: 'Z.AI (GLM)',
+    defaultModel: 'glm-4',
+    models: [
+      {
+        id: 'glm-4',
+        name: 'GLM-4',
+        description: 'Z.AI GLM-4 general purpose model',
+        contextWindow: 128000,
+      },
+      {
+        id: 'glm-4-air',
+        name: 'GLM-4 Air',
+        description: 'Z.AI GLM-4 Air lightweight model',
+        contextWindow: 128000,
+      },
+      {
+        id: 'glm-4.5',
+        name: 'GLM-4.5',
+        description: 'Z.AI GLM-4.5 flagship model',
+        contextWindow: 131072,
+      },
+      {
+        id: 'glm-4.5-air',
+        name: 'GLM-4.5 Air',
+        description: 'Z.AI GLM-4.5 Air lightweight model',
+        contextWindow: 131072,
+      },
+      {
+        id: 'glm-4.6',
+        name: 'GLM-4.6',
+        description: 'Z.AI GLM-4.6 enhanced model',
+        contextWindow: 131072,
+      },
+      {
+        id: 'glm-4.7',
+        name: 'GLM-4.7',
+        description: 'Z.AI GLM-4.7 enhanced model',
+        contextWindow: 131072,
+      },
+      {
+        id: 'glm-5',
+        name: 'GLM-5',
+        description: 'Z.AI GLM-5 latest model',
+        contextWindow: 131072,
+      },
+      {
+        id: 'glm-5.1',
+        name: 'GLM-5.1',
+        description: 'Z.AI GLM-5.1 enhanced model',
+        contextWindow: 131072,
+      },
+      {
+        id: 'glm-5-turbo',
+        name: 'GLM-5 Turbo',
+        description: 'Z.AI GLM-5 Turbo fast model',
+        contextWindow: 131072,
+      },
+    ],
+  },
+  opencode: {
+    provider: 'opencode',
+    displayName: 'OpenCode Zen',
+    defaultModel: 'zen',
+    models: [
+      {
+        id: 'zen',
+        name: 'OpenCode Zen',
+        description: 'OpenCode/Zen completion model',
+        contextWindow: 100000,
       },
     ],
   },

@@ -7,6 +7,8 @@ export type CLIProxyProvider =
   | 'gemini'
   | 'codex'
   | 'xai'
+  | 'zai'
+  | 'opencode'
   | 'agy'
   | 'qwen'
   | 'iflow'
