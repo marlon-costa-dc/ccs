@@ -95,6 +95,10 @@ let ccsDir: string;
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-test-'));
   process.env.CCS_HOME = tmpDir;
+  // Hermeticity: the ambient shell may export CODEX_HOME / CCS_CODEX_PROFILE.
+  // Clear them so active-resolution tests start from a clean state.
+  delete process.env.CODEX_HOME;
+  delete process.env.CCS_CODEX_PROFILE;
   ccsDir = path.join(tmpDir, '.ccs');
   fs.mkdirSync(ccsDir, { recursive: true });
   // Clear module cache so cache state doesn't bleed between tests
