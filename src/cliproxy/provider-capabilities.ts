@@ -85,7 +85,10 @@ export const PROVIDER_CAPABILITIES: Record<CLIProxyProvider, ProviderCapabilitie
     authStartSupport: 'cliproxy-cli',
     authFilePrefixes: ['zai-'],
     tokenTypeValues: ['zai'],
-    aliases: ['zcode', 'glm'],
+    // 'glm' MUST stay out of aliases/cliAliases: it is a legacy CCS settings
+    // profile name (direct z.ai API-key profiles) and aliasing it here would
+    // hijack profile detection and image-analysis backend resolution.
+    aliases: ['zcode'],
   },
   opencode: {
     displayName: 'OpenCode Zen/Go',
@@ -272,7 +275,7 @@ export const PROVIDER_CAPABILITIES: Record<CLIProxyProvider, ProviderCapabilitie
     authStartUnsupportedReason: 'Go provider requires manual token management',
     authFilePrefixes: ['go-'],
     tokenTypeValues: ['go'],
-    aliases: ['go'],
+    aliases: [],
   },
 };
 
