@@ -652,9 +652,9 @@
       ]
     },
     "hotpathConsoleErrors": {
-      "totalOccurrences": 592,
+      "totalOccurrences": 593,
       "exemptOccurrences": 326,
-      "hotpathOccurrences": 266,
+      "hotpathOccurrences": 267,
       "filesAffected": 81,
       "topFiles": [
         {
@@ -710,11 +710,11 @@
           "count": 7
         },
         {
-          "file": "src/targets/droid-detector.ts",
+          "file": "src/cliproxy/auth/oauth-handler.ts",
           "count": 6
         },
         {
-          "file": "src/utils/hooks/image-analyzer-hook-installer.ts",
+          "file": "src/targets/droid-detector.ts",
           "count": 6
         }
       ]
@@ -733,7 +733,7 @@
         },
         {
           "file": "src/cliproxy/auth/oauth-handler.ts",
-          "loc": 1510
+          "loc": 1520
         },
         {
           "file": "src/cursor/cursor-executor.ts",

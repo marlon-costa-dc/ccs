@@ -58,7 +58,7 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 |---|---:|
 | typed-error adoption (typed/total throws) | 18.3% (83/454) |
 | typed-error adoption (P4 locked subdomains) | 93.3% (28/30), target 40% |
-| hotpath console.error/warn occurrences | 266 (592 total, 326 CLI-UX exempt) |
+| hotpath console.error/warn occurrences | 267 (593 total, 326 CLI-UX exempt) |
 | hotpath console.error/warn files | 81 |
 | files with createLogger | 65/764 |
 | subdomains with zero createLogger | 15 (api, bin, channels, cliproxy, cliproxy/accounts, cliproxy/ai-providers, cliproxy/binary, cliproxy/config, cliproxy/management, cliproxy/sync, cliproxy/types, config, dispatcher, shared, types) |
@@ -82,8 +82,8 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | `src/targets/claude-adapter.ts` | 7 |
 | `src/utils/shell-executor.ts` | 7 |
 | `src/utils/websearch/hook-config.ts` | 7 |
+| `src/cliproxy/auth/oauth-handler.ts` | 6 |
 | `src/targets/droid-detector.ts` | 6 |
-| `src/utils/hooks/image-analyzer-hook-installer.ts` | 6 |
 
 ### Files > 400 LOC (top 15)
 
@@ -91,7 +91,7 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 |---|---:|
 | `src/web-server/usage/native-quota-collector.ts` | 1758 |
 | `src/web-server/routes/cliproxy-auth-routes.ts` | 1531 |
-| `src/cliproxy/auth/oauth-handler.ts` | 1510 |
+| `src/cliproxy/auth/oauth-handler.ts` | 1520 |
 | `src/cursor/cursor-executor.ts` | 1234 |
 | `src/web-server/model-pricing.ts` | 1127 |
 | `src/cliproxy/config/generator.ts` | 1109 |
