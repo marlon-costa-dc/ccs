@@ -84,7 +84,7 @@ import {
 import { maybeOfferPoolRouting } from '../routing/pool-opt-in-prompt';
 import { checkCrossLaneEmailOverlap } from '../accounts/account-safety-cross-lane';
 import { ensureCliAntigravityResponsibility } from '../auth/antigravity-responsibility';
-import { getUnsupportedAuthStartReason } from '../provider-capabilities';
+import { getOAuthFlowType, getUnsupportedAuthStartReason } from '../provider-capabilities';
 import { InteractivePrompt } from '../../utils/prompt';
 import { getCcsDir } from '../../utils/config-manager';
 import { generateSessionId } from './project-selection-handler';
@@ -1205,7 +1205,7 @@ export async function triggerOAuth(
   const isDeviceCodeFlow =
     provider === 'kiro'
       ? isKiroDeviceCodeMethod(resolvedKiroMethod, { idcFlow: resolvedKiroIDCFlow })
-      : callbackPort === null;
+      : getOAuthFlowType(provider) === 'device_code';
   let selectedPasteCallback = options.pasteCallback === true;
 
   if (provider === 'kiro' && !isKiroCLIAuthMethod(resolvedKiroMethod)) {
