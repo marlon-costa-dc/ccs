@@ -306,8 +306,8 @@
     ]
   },
   "legacyShim": {
-    "totalMarkers": 465,
-    "filesAffected": 176,
+    "totalMarkers": 466,
+    "filesAffected": 177,
     "topFiles": [
       {
         "file": "src/auth/profile-detector.ts",

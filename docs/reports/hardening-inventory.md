@@ -10,8 +10,8 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | Sync fs files affected (all) | 261 |
 | Sync fs occurrences (runtime hotpaths) | 1186 |
 | Sync fs files affected (runtime hotpaths) | 155 |
-| Legacy shim markers | 465 |
-| Legacy shim files affected | 176 |
+| Legacy shim markers | 466 |
+| Legacy shim files affected | 177 |
 
 ## Top Runtime Hotpath Sync fs Files
 
