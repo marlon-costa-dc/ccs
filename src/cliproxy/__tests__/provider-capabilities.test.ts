@@ -53,6 +53,7 @@ describe('provider-capabilities', () => {
       'codebuddy',
       'kilo',
       'qoder',
+      'go',
     ]);
   });
 
@@ -77,6 +78,7 @@ describe('provider-capabilities', () => {
       'codebuddy',
       'kilo',
       'qoder',
+      'go',
     ]);
     expect(getProvidersByOAuthFlow('authorization_code')).toEqual([
       'gemini',
@@ -100,6 +102,7 @@ describe('provider-capabilities', () => {
       'codebuddy',
       'kilo',
       'qoder',
+      'go',
     ]);
   });
 

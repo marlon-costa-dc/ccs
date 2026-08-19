@@ -20,7 +20,8 @@ export type CLIProxyProvider =
   | 'gitlab'
   | 'codebuddy'
   | 'kilo'
-  | 'qoder';
+  | 'qoder'
+  | 'go';
 
 /** CLIProxy backend selection */
 export type CLIProxyBackend = 'original' | 'plus';

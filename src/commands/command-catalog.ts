@@ -212,6 +212,7 @@ export const BUILTIN_PROVIDER_SHORTCUTS: readonly ShortcutEntry[] = CLIPROXY_PRO
         iflow: 'iFlow via CLIProxy OAuth',
         kiro: 'Kiro via CLIProxy OAuth',
         ghcp: 'Deprecated GitHub Copilot via CLIProxy OAuth',
+        go: 'Go CLI via CLIProxy OAuth',
         claude: 'Claude via CLIProxy OAuth',
         kimi: 'Kimi via CLIProxy OAuth',
         cursor: 'Cursor via CLIProxy OAuth',

@@ -142,6 +142,7 @@ export const PROVIDER_FALLBACK_VISUALS: Record<ProviderVisualId, ProviderFallbac
   kilo: { textClass: 'text-rose-600', letter: 'K' },
   qoder: { textClass: 'text-amber-600', letter: 'Q' },
   ghcp: { textClass: 'text-green-600', letter: 'C' },
+  go: { textClass: 'text-gray-600', letter: 'G' },
   kimi: { textClass: 'text-orange-500', letter: 'K' },
   openai: { textClass: 'text-slate-900', letter: 'O' },
   vertex: { textClass: 'text-blue-600', letter: 'V' },

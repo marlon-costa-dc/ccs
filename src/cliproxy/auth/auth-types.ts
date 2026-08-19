@@ -239,16 +239,23 @@ export const OAUTH_CONFIGS: Record<CLIProxyProvider, ProviderOAuthConfig> = {
   zai: {
     provider: 'zai',
     displayName: 'Z.AI (GLM)',
-    authUrl: 'https://auth.z.ai/device',
-    scopes: ['openid', 'profile', 'email', 'offline_access', 'zai:access', 'api:access'],
+    authUrl: 'https://zcode.z.ai/api/v1',
+    scopes: [],
     authFlag: '--zai-login',
   },
   opencode: {
     provider: 'opencode',
-    displayName: 'OpenCode Zen',
-    authUrl: 'https://opencode.ai/zen/v1/auth',
+    displayName: 'OpenCode Zen/Go',
+    authUrl: '',
+    scopes: [],
+    authFlag: '',
+  },
+  go: {
+    provider: 'go',
+    displayName: 'Go CLI',
+    authUrl: 'https://go.example.com/auth',
     scopes: ['openid', 'profile', 'email'],
-    authFlag: '--opencode-login',
+    authFlag: '--go-login',
   },
   agy: {
     provider: 'agy',

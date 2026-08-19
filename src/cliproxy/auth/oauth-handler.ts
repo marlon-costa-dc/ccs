@@ -15,7 +15,7 @@ import * as path from 'path';
 import { fail, info, warn, color, ok } from '../../utils/ui';
 import { createLogger } from '../../services/logging';
 import { ensureCLIProxyBinary, getConfiguredBackend } from '../binary-manager';
-import { generateConfig } from '../config/config-generator';
+import { generateConfig, CLIPROXY_DEFAULT_PORT } from '../config/config-generator';
 import { AuthError, BinaryError, ConfigError } from '../../errors/error-types';
 import { CLIProxyBackend, CLIProxyProvider } from '../types';
 import {
@@ -1342,6 +1342,16 @@ export async function triggerOAuth(
     const killed = killProcessOnPort(localCallbackPort, verbose);
     if (killed && verbose) {
       console.error(`[auth] Freed port ${localCallbackPort} for OAuth callback`);
+    }
+  } else if (isDeviceCodeFlow) {
+    // Device code flows still need the CLIProxy API server on the default port.
+    // If a CLIProxy daemon is already bound to 8317, free it so the auth binary
+    // can start its own instance for the duration of the OAuth flow.
+    // This happens both when running from the dashboard (fromUI=true) and from
+    // the CLI when a daemon is already running.
+    const killedDefaultPort = killProcessOnPort(CLIPROXY_DEFAULT_PORT, verbose);
+    if (killedDefaultPort && verbose) {
+      console.error(`[auth] Freed port ${CLIPROXY_DEFAULT_PORT} for OAuth device code flow`);
     }
   }
 
