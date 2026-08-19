@@ -69,7 +69,7 @@ describe('installCliproxyVersion', () => {
 
     expect(writes.join('')).toContain('optional community-maintained CLIProxyAPIPlus backend');
     expect(writes.join('')).toContain('backend: original');
-    expect(writes.join('')).toContain('kaitranntt/CLIProxyAPIPlus');
+    expect(writes.join('')).toContain('marlon-costa-dc/CLIProxyAPI');
   });
 
   it('uses plus binary and pin state when local runtime is configured for plus', async () => {

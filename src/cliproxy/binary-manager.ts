@@ -44,7 +44,7 @@ import { loadOrCreateUnifiedConfig } from '../config/config-loader-facade';
 
 export const CLIPROXY_DELETED_PLUS_REPO = 'router-for-me/CLIProxyAPIPlus';
 export const CLIPROXY_PLUS_FALLBACK_TRACKING_URL = 'https://github.com/kaitranntt/ccs/issues/1062';
-export const CLIPROXY_PLUS_FORK_URL = 'https://github.com/kaitranntt/CLIProxyAPIPlus';
+export const CLIPROXY_PLUS_FORK_URL = 'https://github.com/marlon-costa-dc/CLIProxyAPI';
 export const CLIPROXY_PLUS_TRACKING_URL = 'https://github.com/kaitranntt/ccs/issues/1065';
 
 /**

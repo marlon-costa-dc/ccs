@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { isValidVersionFormat } from '../../services/binary-service';
 import { compareCliproxyVersions, isNewerVersion } from '../version-checker';
 
 describe('cliproxy version comparison', () => {
@@ -17,5 +18,18 @@ describe('cliproxy version comparison', () => {
   it('lets core version precedence win before fork release suffixes', () => {
     expect(compareCliproxyVersions('7.1.32-0', '7.1.31-99')).toBe(1);
     expect(isNewerVersion('7.1.31-99', '7.1.32-0')).toBe(false);
+  });
+
+  it('orders dcN fork suffixes numerically after core version equality', () => {
+    expect(compareCliproxyVersions('7.2.136-dc6', '7.2.136-dc5')).toBe(1);
+    expect(compareCliproxyVersions('7.2.136-dc6', '7.2.136-dc7')).toBe(-1);
+    expect(isNewerVersion('7.2.136-dc7', '7.2.136-dc6')).toBe(true);
+  });
+
+  it('accepts dcN tags as installable version formats', () => {
+    expect(isValidVersionFormat('7.2.136-dc6')).toBe(true);
+    expect(isValidVersionFormat('7.2.136-dc7')).toBe(true);
+    expect(isValidVersionFormat('7.1.68-2')).toBe(true);
+    expect(isValidVersionFormat('7.2.136-dc')).toBe(false);
   });
 });

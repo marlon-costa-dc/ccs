@@ -22,10 +22,10 @@ export const BACKEND_CONFIG = {
     fallbackVersion: '6.9.45',
   },
   plus: {
-    repo: 'kaitranntt/CLIProxyAPIPlus',
-    binaryPrefix: 'CLIProxyAPIPlus',
+    repo: 'marlon-costa-dc/CLIProxyAPI',
+    binaryPrefix: 'CLIProxyAPI',
     executable: 'cli-proxy-api-plus',
-    fallbackVersion: '6.9.45-0',
+    fallbackVersion: '7.2.136-dc6',
   },
 } as const;
 
@@ -39,9 +39,9 @@ export const BACKEND_CONFIG = {
 export const DEFAULT_BACKEND: CLIProxyBackend = 'original';
 
 /**
- * CLIProxyAPIPlus fallback version (used when GitHub API unavailable)
- * Auto-update fetches latest from GitHub; this is only a safety net
- * Note: CLIProxyAPIPlus uses v6.6.X-0 suffix pattern
+ * Plus fallback version (used when GitHub API unavailable).
+ * Auto-update fetches latest from GitHub; this is only a safety net.
+ * DC fork tags use the v7.2.136-dcN suffix.
  * @deprecated Use getFallbackVersion() or BACKEND_CONFIG instead
  */
 export const CLIPROXY_FALLBACK_VERSION = BACKEND_CONFIG[DEFAULT_BACKEND].fallbackVersion;
@@ -91,12 +91,20 @@ export function mapNodeArchToReleaseArch(nodeArch: string): SupportedArch | unde
   return arch ? RELEASE_ARCH_MAP[arch] : undefined;
 }
 
+export function parseForkRelease(value: string): number {
+  if (/^\d+$/.test(value)) return parseInt(value, 10) || 0;
+  const dcMatch = value.match(/^dc(\d+)$/i);
+  return dcMatch ? parseInt(dcMatch[1], 10) || 0 : 0;
+}
+
+export const CLIPROXY_VERSION_TAG_PATTERN = /^\d+\.\d+\.\d+(-(dc)?\d+)?$/;
+
 function parseVersionParts(version: string): [number, number, number, number] {
   const [coreVersion, forkRelease = '0'] = version.replace(/^v/, '').split('-', 2);
   const [major = 0, minor = 0, patch = 0] = coreVersion
     .split('.')
     .map((part) => parseInt(part, 10) || 0);
-  return [major, minor, patch, parseInt(forkRelease, 10) || 0];
+  return [major, minor, patch, parseForkRelease(forkRelease)];
 }
 
 function isAtLeastVersion(version: string, minimum: string): boolean {

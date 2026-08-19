@@ -14,10 +14,6 @@ name: Bar Release
 # PR when you want a new number; the asset is always "latest" regardless.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'macos-bar/**'
   workflow_dispatch:
 
 # Least privilege: only the release-asset write the publish step needs.
