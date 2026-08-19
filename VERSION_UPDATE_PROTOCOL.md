@@ -116,12 +116,10 @@ git push origin v0.12.0-dev
 
 # 2. Create a GitHub Release (via GitHub UI or API)
 # - Tag: v0.12.0-dev
-# - Title: "v0.12.0-dev - GLM + Opencode Zen + Go CLI Support"
+# - Title: "v0.12.0-dev - GLM + OpenCode Zen + OpenCode Go + Poolside Support"
 # - Release notes: Summarize changes from the bead/worktree
-
-# 3. The release automatically includes:
-# - dist/ccs.js and all dist/ artifacts
-# - Updated provider-capabilities with zai/opencode/go
+# 
+# - Updated provider-capabilities with zai/opencode/opencode-go/poolside
 # - Updated model-catalog with GLM and Zen models
 ```
 
@@ -160,15 +158,15 @@ ccs list      # Fewer providers available
 ### After Update
 ```bash
 ccs --version  # v0.12.0-dev
-ccs list      # Includes: gemini, codex, xai, zai, opencode, agy, qwen, iflow, kiro, ghcp, claude, kimi, cursor, gitlab, codebuddy, kilo, qoder, go
+ccs list      # Includes: gemini, codex, xai, zai, opencode, opencode-go, poolside, agy, qwen, iflow, kiro, ghcp, claude, kimi, cursor, gitlab, codebuddy, kilo, qoder
 ```
 
 ## ⚠️ Known Migration Notes
 
-1. **Test expectations**: 3 tests in `provider-capabilities.test.ts` need updating to include `'go'` in provider ID arrays
+1. **Test expectations**: 3 tests in `provider-capabilities.test.ts` updated to include `'opencode-go'` and `'poolside'` instead of `'go'` in provider ID arrays
 2. **Line-length warnings**: 53 pre-existing max-lines warnings unchanged (not introduced by this update)
-3. **Quota providers**: `'go'` is added to `CLIProxyProvider` but NOT to `MANAGED_QUOTA_PROVIDERS` (quota rotation not implemented for Go yet)
-4. **OAuth**: New `--go-login` flag added for device_code flow authentication
+3. **Quota providers**: `'opencode-go'` and `'poolside'` are added to `CLIProxyProvider` but NOT to `MANAGED_QUOTA_PROVIDERS` (quota rotation not implemented for these API-key providers yet)
+4. **OAuth**: OpenCode Zen, OpenCode Go, and Poolside use API key authentication. No OAuth flags — configure via AI Providers with API keys
 
 ## ✅ Validation Checklist
 - [ ] `bun run build` completes without errors
@@ -176,6 +174,6 @@ ccs list      # Includes: gemini, codex, xai, zai, opencode, agy, qwen, iflow, k
 - [ ] `bun run format:check` passes (Prettier clean)
 - [ ] `bun run lint` passes (0 errors, 53 pre-existing warnings)
 - [ ] `ccs --version` shows new version
-- [ ] `ccs auth list` includes all 17 providers (+ go)
+- [ ] `ccs auth list` includes all 19 providers + opencode-go, poolside
 - [ ] `ccs config show backend` shows `plus`
 - [ ] `ccs config show management_panel_repository` shows `marlon-costa-dc/cliproxyapi`

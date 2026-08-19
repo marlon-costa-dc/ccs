@@ -245,17 +245,24 @@ export const OAUTH_CONFIGS: Record<CLIProxyProvider, ProviderOAuthConfig> = {
   },
   opencode: {
     provider: 'opencode',
-    displayName: 'OpenCode Zen/Go',
+    displayName: 'OpenCode Zen',
     authUrl: '',
     scopes: [],
     authFlag: '',
   },
-  go: {
-    provider: 'go',
-    displayName: 'Go CLI',
-    authUrl: 'https://go.example.com/auth',
-    scopes: ['openid', 'profile', 'email'],
-    authFlag: '--go-login',
+  'opencode-go': {
+    provider: 'opencode-go',
+    displayName: 'OpenCode Go',
+    authUrl: '',
+    scopes: [],
+    authFlag: '',
+  },
+  poolside: {
+    provider: 'poolside',
+    displayName: 'Poolside',
+    authUrl: '',
+    scopes: [],
+    authFlag: '',
   },
   agy: {
     provider: 'agy',

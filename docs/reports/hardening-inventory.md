@@ -62,7 +62,7 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | hotpath console.error/warn files | 81 |
 | files with createLogger | 65/764 |
 | subdomains with zero createLogger | 15 (api, bin, channels, cliproxy, cliproxy/accounts, cliproxy/ai-providers, cliproxy/binary, cliproxy/config, cliproxy/management, cliproxy/sync, cliproxy/types, config, dispatcher, shared, types) |
-| files > 400 LOC | 91 |
+| files > 400 LOC | 92 |
 | files > 600 LOC | 42 |
 
 ### Top Hotpath console.error/warn Files
@@ -100,8 +100,8 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | `src/web-server/routes/settings-routes.ts` | 1042 |
 | `src/cliproxy/proxy/tool-sanitization-proxy.ts` | 1020 |
 | `src/commands/cliproxy/variant-subcommand.ts` | 997 |
+| `src/cliproxy/model-catalog.ts` | 955 |
 | `src/cliproxy/quota/quota-manager.ts` | 954 |
 | `src/web-server/services/codex-dashboard-service.ts` | 940 |
 | `src/glmt/glmt-proxy.ts` | 939 |
-| `src/cliproxy/model-catalog.ts` | 929 |
 

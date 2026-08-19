@@ -25,7 +25,7 @@ export const BACKEND_CONFIG = {
     repo: 'marlon-costa-dc/CLIProxyAPI',
     binaryPrefix: 'CLIProxyAPI',
     executable: 'cli-proxy-api-plus',
-    fallbackVersion: '7.2.136-dc6',
+    fallbackVersion: '7.2.136-dc7',
   },
 } as const;
 

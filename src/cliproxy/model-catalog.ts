@@ -735,13 +735,39 @@ export const MODEL_CATALOG: Partial<Record<CLIProxyProvider, ProviderCatalog>> =
   opencode: {
     provider: 'opencode',
     displayName: 'OpenCode Zen',
-    defaultModel: 'zen',
+    defaultModel: 'kimi-k2',
     models: [
       {
-        id: 'zen',
-        name: 'OpenCode Zen',
-        description: 'OpenCode/Zen completion model',
-        contextWindow: 100000,
+        id: 'kimi-k2',
+        name: 'Kimi K2',
+        description: 'OpenCode Zen Kimi K2 model',
+        contextWindow: 131072,
+      },
+    ],
+  },
+  'opencode-go': {
+    provider: 'opencode-go',
+    displayName: 'OpenCode Go',
+    defaultModel: 'claude-3-7-sonnet-latest',
+    models: [
+      {
+        id: 'claude-3-7-sonnet-latest',
+        name: 'Claude 3.7 Sonnet',
+        description: 'OpenCode Go Claude 3.7 Sonnet model',
+        contextWindow: 200000,
+      },
+    ],
+  },
+  poolside: {
+    provider: 'poolside',
+    displayName: 'Poolside',
+    defaultModel: 'nemotron-4-340b-reward',
+    models: [
+      {
+        id: 'nemotron-4-340b-reward',
+        name: 'Nemotron 4 340B Reward',
+        description: 'Poolside Nemotron 4 340B Reward model',
+        contextWindow: 131072,
       },
     ],
   },

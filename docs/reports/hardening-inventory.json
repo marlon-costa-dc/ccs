@@ -720,7 +720,7 @@
       ]
     },
     "largeFiles": {
-      "countOver400": 91,
+      "countOver400": 92,
       "countOver600": 42,
       "topOver400": [
         {
@@ -768,6 +768,10 @@
           "loc": 997
         },
         {
+          "file": "src/cliproxy/model-catalog.ts",
+          "loc": 955
+        },
+        {
           "file": "src/cliproxy/quota/quota-manager.ts",
           "loc": 954
         },
@@ -778,10 +782,6 @@
         {
           "file": "src/glmt/glmt-proxy.ts",
           "loc": 939
-        },
-        {
-          "file": "src/cliproxy/model-catalog.ts",
-          "loc": 929
         }
       ]
     }
