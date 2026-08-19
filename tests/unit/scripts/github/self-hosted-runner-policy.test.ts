@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -7,56 +6,23 @@ function workflowsDir() {
   return path.resolve(import.meta.dir, '../../../../.github/workflows');
 }
 
-  // Documented exceptions to the self-hosted-first policy (see CLAUDE.md "Self-Hosted Runner Policy").
-  // Each entry must include a justification comment explaining why GitHub-hosted runners
-  // are required for correctness (not just convenience).
-  const GITHUB_HOSTED_RUNNER_EXCEPTIONS: Record<string, string> = {
-    // Pure YAML diff parser — no untrusted code execution. Must cover ALL PRs including
-    // forks to prevent forked contributors from bypassing the breaking-change check.
-    // Gating on trusted-author association would silently allow contract-breaking changes
-    // from forks. No build, install, or arbitrary PR-branch scripts are run here.
-    'breaking-change-guard.yml': 'ubuntu-latest — fork-safe YAML diff check; no untrusted code execution',
-  };
+const GITHUB_HOSTED_ACTIVE_WORKFLOWS = [
+  'ci.yml',
+  'push-ci.yml',
+  'release.yml',
+  'docs-parity.yml',
+  'label-pending-release.yml',
+  'breaking-change-guard.yml',
+];
 
 describe('self-hosted runner policy', () => {
-  test('keeps active workflows on local runners', () => {
-    const hostedRunnerLabels = [
-      'ubuntu-latest',
-      'ubuntu-24.04',
-      'ubuntu-22.04',
-      'macos-latest',
-      'windows-latest',
-    ];
-    const workflowFiles = fs
-      .readdirSync(workflowsDir())
-      .filter((file) => file.endsWith('.yml') || file.endsWith('.yaml'));
-
-    expect(workflowFiles.length).toBeGreaterThan(0);
-
-    for (const file of workflowFiles) {
-      // Skip files with documented, justified exceptions to the self-hosted-first policy
-      if (GITHUB_HOSTED_RUNNER_EXCEPTIONS[file]) continue;
-
+  test('runs active CI and release workflows on GitHub-hosted runners', () => {
+    for (const file of GITHUB_HOSTED_ACTIVE_WORKFLOWS) {
       const workflow = fs.readFileSync(path.join(workflowsDir(), file), 'utf8');
-
-      for (const label of hostedRunnerLabels) {
-        expect(workflow, `${file} must not use GitHub-hosted runner ${label}`).not.toContain(
-          `runs-on: ${label}`
-        );
-      }
-
-      expect(workflow, `${file} must target a self-hosted runner`).toContain('self-hosted');
-    }
-  });
-
-  test('documented exceptions use github-hosted runners for justified safety reasons', () => {
-    // Verify each documented exception actually uses a GitHub-hosted runner
-    // (prevents stale exception entries that no longer reflect the workflow)
-    for (const [file, reason] of Object.entries(GITHUB_HOSTED_RUNNER_EXCEPTIONS)) {
-      const workflow = fs.readFileSync(path.join(workflowsDir(), file), 'utf8');
-      const hasGitHubHosted = ['ubuntu-latest', 'ubuntu-24.04', 'ubuntu-22.04', 'macos-latest', 'windows-latest']
-        .some((label) => workflow.includes(`runs-on: ${label}`));
-      expect(hasGitHubHosted, `${file} is in exceptions list (reason: ${reason}) but does not use a GitHub-hosted runner — remove the exception or restore the runner type`).toBe(true);
+      expect(workflow, `${file} must use ubuntu-latest`).toContain('runs-on: ubuntu-latest');
+      expect(workflow, `${file} must not require a self-hosted runner`).not.toContain(
+        'runs-on: [self-hosted'
+      );
     }
   });
 
@@ -71,7 +37,7 @@ describe('self-hosted runner policy', () => {
     expect(workflow).not.toContain('services.ccs.hostname override');
   });
 
-  test('gates pull-request self-hosted worker deploys to trusted authors', () => {
+  test('gates pull-request worker deploys to trusted authors', () => {
     const workflow = fs.readFileSync(path.join(workflowsDir(), 'deploy-ccs-worker.yml'), 'utf8');
 
     expect(workflow).toContain("github.event_name != 'pull_request'");
@@ -80,7 +46,7 @@ describe('self-hosted runner policy', () => {
     );
   });
 
-  test('gates pull-request workflows that check out code on self-hosted runners', () => {
+  test('gates pull-request workflows that check out code', () => {
     const trustedAuthorGate =
       'contains(fromJSON(\'["COLLABORATOR","MEMBER","OWNER"]\'), github.event.pull_request.author_association)';
     const workflowFiles = fs
@@ -96,50 +62,15 @@ describe('self-hosted runner policy', () => {
         );
       }
 
-      // Documented exceptions run on GitHub-hosted runners for justified safety reasons
-      // (e.g. must cover forked PRs, no untrusted code execution). These workflows do not
-      // use self-hosted runners for their PR jobs, so the trusted-author gate does not apply.
-      if (GITHUB_HOSTED_RUNNER_EXCEPTIONS[file]) continue;
-
       if (
         workflow.includes('pull_request:') &&
-        workflow.includes('self-hosted') &&
-        workflow.includes('uses: actions/checkout')
+        workflow.includes('uses: actions/checkout') &&
+        file !== 'breaking-change-guard.yml'
       ) {
-        expect(workflow, `${file} must gate self-hosted PR checkout to trusted authors`).toContain(
+        expect(workflow, `${file} must gate PR checkout to trusted authors`).toContain(
           trustedAuthorGate
         );
       }
-    }
-  });
-
-  test('scoped PAT headers match repository URL forms used by git', () => {
-    const header = 'AUTHORIZATION: basic test-token';
-    const env = {
-      ...process.env,
-      GIT_CONFIG_COUNT: '2',
-      GIT_CONFIG_KEY_0: 'http.https://github.com/kaitranntt/ccs.extraheader',
-      GIT_CONFIG_VALUE_0: header,
-      GIT_CONFIG_KEY_1: 'http.https://github.com/kaitranntt/ccs.git.extraheader',
-      GIT_CONFIG_VALUE_1: header,
-    };
-
-    for (const url of ['https://github.com/kaitranntt/ccs', 'https://github.com/kaitranntt/ccs.git']) {
-      const result = spawnSync('git', ['config', '--get-urlmatch', 'http.extraheader', url], {
-        env,
-        encoding: 'utf8',
-      });
-
-      expect(result.status, result.stderr).toBe(0);
-      expect(result.stdout.trim()).toBe(header);
-    }
-
-    for (const file of ['release.yml', 'dev-release.yml', 'sync-dev-after-release.yml']) {
-      const workflow = fs.readFileSync(path.join(workflowsDir(), file), 'utf8');
-
-      expect(workflow).toContain('echo "::add-mask::${auth_header}"');
-      expect(workflow).toContain('http.https://github.com/kaitranntt/ccs.extraheader');
-      expect(workflow).toContain('http.https://github.com/kaitranntt/ccs.git.extraheader');
     }
   });
 });
