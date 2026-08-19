@@ -41,6 +41,8 @@ describe('provider-capabilities', () => {
       'xai',
       'zai',
       'opencode',
+      'opencode-go',
+      'poolside',
       'agy',
       'qwen',
       'iflow',
@@ -53,7 +55,6 @@ describe('provider-capabilities', () => {
       'codebuddy',
       'kilo',
       'qoder',
-      'go',
     ]);
   });
 
@@ -70,6 +71,8 @@ describe('provider-capabilities', () => {
       'xai',
       'zai',
       'opencode',
+      'opencode-go',
+      'poolside',
       'qwen',
       'kiro',
       'ghcp',
@@ -78,7 +81,6 @@ describe('provider-capabilities', () => {
       'codebuddy',
       'kilo',
       'qoder',
-      'go',
     ]);
     expect(getProvidersByOAuthFlow('authorization_code')).toEqual([
       'gemini',
@@ -95,6 +97,8 @@ describe('provider-capabilities', () => {
       'xai',
       'zai',
       'opencode',
+      'opencode-go',
+      'poolside',
       'qwen',
       'kiro',
       'ghcp',
@@ -102,7 +106,6 @@ describe('provider-capabilities', () => {
       'codebuddy',
       'kilo',
       'qoder',
-      'go',
     ]);
   });
 

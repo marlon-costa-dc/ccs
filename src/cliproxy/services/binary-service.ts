@@ -20,7 +20,11 @@ import {
   isVersionPinned,
   resolveLocalBackend,
 } from '../binary-manager';
-import { BACKEND_CONFIG, DEFAULT_BACKEND } from '../binary/platform-detector';
+import {
+  BACKEND_CONFIG,
+  CLIPROXY_VERSION_TAG_PATTERN,
+  DEFAULT_BACKEND,
+} from '../binary/platform-detector';
 import { CLIProxyBackend } from '../types';
 import { loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
 
@@ -100,10 +104,10 @@ export async function checkLatestVersion(backend?: CLIProxyBackend): Promise<Lat
 }
 
 /**
- * Validate version format (supports X.Y.Z or X.Y.Z-N suffix)
+ * Validate version format (X.Y.Z, X.Y.Z-N, or X.Y.Z-dcN)
  */
 export function isValidVersionFormat(version: string): boolean {
-  return /^\d+\.\d+\.\d+(-\d+)?$/.test(version);
+  return CLIPROXY_VERSION_TAG_PATTERN.test(version);
 }
 
 /**
@@ -118,7 +122,7 @@ export async function installVersion(
     return {
       success: false,
       version,
-      error: 'Invalid version format. Expected format: X.Y.Z (e.g., 6.5.53)',
+      error: 'Invalid version format. Expected format: X.Y.Z, X.Y.Z-N, or X.Y.Z-dcN',
     };
   }
 

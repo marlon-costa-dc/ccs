@@ -21,7 +21,8 @@ export type CLIProxyProvider =
   | 'codebuddy'
   | 'kilo'
   | 'qoder'
-  | 'go';
+  | 'opencode-go'
+  | 'poolside';
 
 /** CLIProxy backend selection */
 export type CLIProxyBackend = 'original' | 'plus';

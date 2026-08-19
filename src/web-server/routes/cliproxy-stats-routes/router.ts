@@ -22,6 +22,7 @@ import { isNewerVersion, isVersionFaulty } from '../../../cliproxy/binary/versio
 import {
   CLIPROXY_MAX_STABLE_VERSION,
   CLIPROXY_FAULTY_RANGE,
+  CLIPROXY_VERSION_TAG_PATTERN,
 } from '../../../cliproxy/binary/platform-detector';
 import { resolveLifecyclePort } from '../../../cliproxy/config/port-manager';
 import { installDashboardCliproxyVersion } from '../../services/cliproxy-dashboard-install-service';
@@ -240,8 +241,10 @@ router.post('/install', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (!/^\d+\.\d+\.\d+(-\d+)?$/.test(version)) {
-      res.status(400).json({ error: 'Invalid version format. Expected: X.Y.Z or X.Y.Z-N' });
+    if (!CLIPROXY_VERSION_TAG_PATTERN.test(version)) {
+      res
+        .status(400)
+        .json({ error: 'Invalid version format. Expected: X.Y.Z, X.Y.Z-N, or X.Y.Z-dcN' });
       return;
     }
 

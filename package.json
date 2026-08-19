@@ -1,6 +1,6 @@
 {
   "name": "@kaitranntt/ccs",
-  "version": "8.9.0-dc1",
+  "version": "8.9.0-dc3",
   "description": "Claude Codex Switch - Instant profile switching between Claude, GLM, Kimi, and more",
   "keywords": [
     "cli",
@@ -10,13 +10,13 @@
     "profile",
     "switch"
   ],
-  "homepage": "https://github.com/kaitranntt/ccs",
+  "homepage": "https://github.com/marlon-costa-dc/ccs",
   "bugs": {
-    "url": "https://github.com/kaitranntt/ccs/issues"
+    "url": "https://github.com/marlon-costa-dc/ccs/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kaitranntt/ccs.git"
+    "url": "git+https://github.com/marlon-costa-dc/ccs.git"
   },
   "license": "MIT",
   "author": {
