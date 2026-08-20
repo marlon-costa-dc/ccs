@@ -210,14 +210,44 @@ function shouldVerifyRunFileCount(run) {
   return run.selected.every((file) => usesBunTestRunner(file));
 }
 
-const requiredBuildArtifacts = [
-  path.join('dist', 'ccs.js'),
-  path.join('dist', 'types', 'utils.js'),
-  path.join('dist', 'proxy', 'server', 'proxy-server.js'),
-];
+function getRequiredBuildArtifacts(baseDir = rootDir) {
+  const srcDir = path.join(baseDir, 'src');
+  if (!fs.existsSync(srcDir)) {
+    return [];
+  }
+
+  return collectFilesByExtension(srcDir, '.ts')
+    .filter((sourcePath) => !sourcePath.endsWith('.d.ts'))
+    .filter((sourcePath) => !isTestSourcePath(sourcePath))
+    .map((sourcePath) =>
+      path.join('dist', path.relative(srcDir, sourcePath).replace(/\.ts$/, '.js'))
+    )
+    .sort();
+}
+
+function collectFilesByExtension(dir, extension, files = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectFilesByExtension(fullPath, extension, files);
+    } else if (entry.isFile() && entry.name.endsWith(extension)) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+function isTestSourcePath(sourcePath) {
+  const normalized = sourcePath.split(path.sep).join('/');
+  return (
+    normalized.includes('/__tests__/') ||
+    /\.(?:test|spec)\.ts$/.test(normalized)
+  );
+}
 
 function hasCompleteBuildArtifacts(baseDir = rootDir) {
-  return requiredBuildArtifacts.every((relativePath) =>
+  const requiredBuildArtifacts = getRequiredBuildArtifacts(baseDir);
+  return requiredBuildArtifacts.length > 0 && requiredBuildArtifacts.every((relativePath) =>
     fs.existsSync(path.join(baseDir, relativePath))
   );
 }
@@ -372,6 +402,7 @@ module.exports = {
   parseBunFileCount,
   verifyReportedFileCount,
   shouldVerifyRunFileCount,
+  getRequiredBuildArtifacts,
   hasCompleteBuildArtifacts,
   main,
 };

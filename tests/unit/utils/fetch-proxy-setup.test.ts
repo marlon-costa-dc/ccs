@@ -69,7 +69,7 @@ describe('global fetch proxy setup', () => {
 
     Agent.prototype.dispatch = function mockAgentDispatch(
       _options: Dispatcher.DispatchOptions,
-      _handler: Dispatcher.DispatchHandler
+      _handler: Parameters<Dispatcher['dispatch']>[1]
     ): boolean {
       directCalls += 1;
       return true;
@@ -77,7 +77,7 @@ describe('global fetch proxy setup', () => {
 
     ProxyAgent.prototype.dispatch = function mockProxyDispatch(
       _options: Dispatcher.DispatchOptions,
-      _handler: Dispatcher.DispatchHandler
+      _handler: Parameters<Dispatcher['dispatch']>[1]
     ): boolean {
       proxyCalls += 1;
       return true;
@@ -90,7 +90,7 @@ describe('global fetch proxy setup', () => {
           method: 'GET',
           path: '/',
         } as Dispatcher.DispatchOptions,
-        {} as Dispatcher.DispatchHandler
+        {} as Parameters<Dispatcher['dispatch']>[1]
       );
     } finally {
       Agent.prototype.dispatch = originalAgentDispatch;
@@ -164,6 +164,51 @@ describe('global fetch proxy setup', () => {
     expect(typeof globalThis.fetch).toBe('function');
     expect(globalThis.fetch.preconnect).toBe(originalFetch.preconnect);
     expect(getGlobalDispatcher()).not.toBe(originalDispatcher);
+  });
+
+  it('preserves Request method, headers, and body through the proxied global fetch', async () => {
+    process.env.HTTP_PROXY = 'http://127.0.0.1:9';
+    process.env.NO_PROXY = '127.0.0.1';
+
+    const server = http.createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+      req.on('end', () => {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            method: req.method,
+            header: req.headers['x-ccs-request'],
+            body: Buffer.concat(chunks).toString('utf8'),
+          })
+        );
+      });
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Failed to bind test server');
+    }
+
+    try {
+      expect(applyGlobalFetchProxy()).toEqual({ enabled: true });
+      const request = new Request(`http://127.0.0.1:${address.port}/request`, {
+        method: 'POST',
+        headers: { 'x-ccs-request': 'preserved' },
+        body: 'payload',
+      });
+      const response = await globalThis.fetch(request);
+      expect(await response.json()).toEqual({
+        method: 'POST',
+        header: 'preserved',
+        body: 'payload',
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
   });
 
   it('routes HTTPS requests through HTTPS_PROXY', async () => {

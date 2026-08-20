@@ -2,6 +2,7 @@ import {
   Agent,
   fetch as undiciFetch,
   type Dispatcher,
+  type RequestInfo as UndiciRequestInfo,
   type RequestInit as UndiciRequestInit,
 } from 'undici';
 import type { LogErrorInfo } from '../../services/logging';
@@ -57,8 +58,10 @@ export async function fetchWithUpstreamTransport(
   options: { dispatcher?: Dispatcher; insecureTls?: boolean } = {}
 ): Promise<Response> {
   if (!isBunRuntime()) {
-    const requestUrl = typeof input === 'string' || input instanceof URL ? input : input.url;
-    const response = await undiciFetch(requestUrl, init as UndiciRequestInit);
+    const response = await undiciFetch(
+      input as unknown as UndiciRequestInfo,
+      init as UndiciRequestInit
+    );
     return response as unknown as Response;
   }
 

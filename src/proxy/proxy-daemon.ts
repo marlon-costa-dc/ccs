@@ -59,14 +59,19 @@ interface OpenAICompatProxyHealthPayload {
 
 type DaemonOwnershipStatus = 'owned' | 'not-owned' | 'not-running' | 'unknown';
 
-function getProcessCommandLine(pid: number): string | null {
-  if (process.platform === 'linux') {
+type ProcessCommandRunner = typeof spawnSync;
+type ProcessCommandReader = typeof fs.readFileSync;
+
+export function getProcessCommandLineForPlatform(
+  pid: number,
+  platform: NodeJS.Platform,
+  runCommand: ProcessCommandRunner = spawnSync,
+  readFile: ProcessCommandReader = fs.readFileSync
+): string | null {
+  if (platform === 'linux') {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const commandLine = fs
-          .readFileSync(`/proc/${pid}/cmdline`, 'utf8')
-          .replace(/\0/g, ' ')
-          .trim();
+        const commandLine = readFile(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' ').trim();
         if (commandLine) {
           return commandLine;
         }
@@ -76,9 +81,9 @@ function getProcessCommandLine(pid: number): string | null {
     }
     return null;
   }
-  if (process.platform === 'darwin') {
+  if (platform === 'darwin') {
     try {
-      const result: SpawnSyncReturns<string> = spawnSync(
+      const result: SpawnSyncReturns<string> = runCommand(
         'ps',
         ['-p', String(pid), '-o', 'command='],
         {
@@ -93,7 +98,31 @@ function getProcessCommandLine(pid: number): string | null {
       return null;
     }
   }
+  if (platform === 'win32') {
+    try {
+      const result: SpawnSyncReturns<string> = runCommand(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").CommandLine`,
+        ],
+        { encoding: 'utf8', windowsHide: true }
+      );
+      if (result.error || result.status !== 0) {
+        return null;
+      }
+      return result.stdout.trim() || null;
+    } catch {
+      return null;
+    }
+  }
   return null;
+}
+
+function getProcessCommandLine(pid: number): string | null {
+  return getProcessCommandLineForPlatform(pid, process.platform);
 }
 
 function verifyProcessOwnership(

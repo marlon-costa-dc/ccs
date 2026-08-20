@@ -159,13 +159,27 @@ describe('run-test-bucket', () => {
 
   test('requires complete built runtime artifacts before reusing dist', () => {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-test-bucket-build-'));
-    const requiredArtifacts = [
-      path.join('dist', 'ccs.js'),
-      path.join('dist', 'types', 'utils.js'),
-      path.join('dist', 'proxy', 'server', 'proxy-server.js'),
-    ];
 
     try {
+      const sourceFiles = [
+        path.join('src', 'ccs.ts'),
+        path.join('src', 'types', 'utils.ts'),
+        path.join('src', 'proxy', 'server', 'proxy-server.ts'),
+        path.join('src', 'proxy', '__tests__', 'ignored.test.ts'),
+        path.join('src', 'types', 'external.d.ts'),
+      ];
+      for (const relativePath of sourceFiles) {
+        const absolutePath = path.join(tempDir, relativePath);
+        fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+        fs.writeFileSync(absolutePath, 'export {};\n');
+      }
+
+      const requiredArtifacts = bucket.getRequiredBuildArtifacts(tempDir);
+      expect(requiredArtifacts).toEqual([
+        path.join('dist', 'ccs.js'),
+        path.join('dist', 'proxy', 'server', 'proxy-server.js'),
+        path.join('dist', 'types', 'utils.js'),
+      ]);
       for (const relativePath of requiredArtifacts) {
         const absolutePath = path.join(tempDir, relativePath);
         fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
@@ -173,7 +187,7 @@ describe('run-test-bucket', () => {
       }
 
       expect(bucket.hasCompleteBuildArtifacts(tempDir)).toBe(true);
-      fs.rmSync(path.join(tempDir, 'dist', 'types', 'utils.js'));
+      fs.rmSync(path.join(tempDir, 'dist', 'proxy', 'server', 'proxy-server.js'));
       expect(bucket.hasCompleteBuildArtifacts(tempDir)).toBe(false);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });

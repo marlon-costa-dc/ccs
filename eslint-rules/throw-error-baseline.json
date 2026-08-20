@@ -159,7 +159,7 @@
   "src/proxy/proxy-daemon-entry.ts:67",
   "src/proxy/proxy-daemon-entry.ts:78",
   "src/proxy/proxy-daemon-entry.ts:88",
-  "src/proxy/proxy-daemon.ts:153",
+  "src/proxy/proxy-daemon.ts:182",
   "src/proxy/transformers/request-transformer.ts:144",
   "src/proxy/transformers/request-transformer.ts:185",
   "src/proxy/transformers/request-transformer.ts:192",

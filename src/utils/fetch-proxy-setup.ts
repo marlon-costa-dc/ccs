@@ -11,6 +11,7 @@ import {
   ProxyAgent,
   fetch as undiciFetch,
   setGlobalDispatcher,
+  type RequestInfo as UndiciRequestInfo,
   type RequestInit as UndiciRequestInit,
 } from 'undici';
 import { getProxyResolution, shouldBypassProxy } from './proxy-env';
@@ -171,8 +172,10 @@ export function applyGlobalFetchProxy(): { enabled: boolean; error?: string } {
       input: Parameters<typeof globalThis.fetch>[0],
       init?: Parameters<typeof globalThis.fetch>[1]
     ): Promise<Response> => {
-      const requestUrl = typeof input === 'string' || input instanceof URL ? input : input.url;
-      const response = await undiciFetch(requestUrl, init as UndiciRequestInit);
+      const response = await undiciFetch(
+        input as unknown as UndiciRequestInfo,
+        init as UndiciRequestInit
+      );
       return response as unknown as Response;
     };
     globalThis.fetch = Object.assign(proxyFetch, {
