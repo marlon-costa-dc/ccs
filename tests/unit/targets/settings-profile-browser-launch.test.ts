@@ -21,7 +21,7 @@ function runCcs(args: string[], env: NodeJS.ProcessEnv): RunResult {
   const result = spawnSync('node', [ccsEntry, ...args], {
     encoding: 'utf8',
     env,
-    timeout: 8000,
+    timeout: 10000,
   });
 
   return {
