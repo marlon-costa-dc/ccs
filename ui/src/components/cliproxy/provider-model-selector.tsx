@@ -310,7 +310,7 @@ export function ModelMappingSelector({
 
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      <span className="text-xs font-medium text-muted-foreground block">{label}</span>
       <SearchableSelect
         value={value || undefined}
         onChange={onChange}
@@ -610,7 +610,7 @@ export function FlexibleModelSelector({
   return (
     <div className="space-y-1.5">
       <div>
-        <label className="text-xs font-medium">{label}</label>
+        <span className="text-xs font-medium block">{label}</span>
         {description && <p className="text-[10px] text-muted-foreground">{description}</p>}
       </div>
       <div className="flex gap-2">
@@ -723,17 +723,13 @@ export function FlexibleModelSelector({
           </Select>
         )}
         {showFastToggle && (
-          <label className="flex h-9 shrink-0 items-center gap-1.5">
-            <Switch
-              checked={currentServiceTier === 'fast'}
-              onCheckedChange={(checked) => onChange(applyCodexServiceTierSuffix(value, checked))}
-              disabled={disabled || !value}
-              aria-label={t('providerModelSelector.fastTier')}
-            />
-            <span className="text-xs text-muted-foreground">
-              {t('providerModelSelector.fastTier')}
-            </span>
-          </label>
+          <Switch
+            id="codex-fast-tier"
+            checked={currentServiceTier === 'fast'}
+            onCheckedChange={(checked) => onChange(applyCodexServiceTierSuffix(value, checked))}
+            disabled={disabled || !value}
+            aria-label={t('providerModelSelector.fastTier')}
+          />
         )}
       </div>
       {selectedRoutingHint ? (

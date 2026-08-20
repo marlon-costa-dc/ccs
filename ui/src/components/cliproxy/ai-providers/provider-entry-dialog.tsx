@@ -174,6 +174,75 @@ function getDialogGuide(family: AiProviderFamilyId): DialogGuide {
           'Format: requested=upstream. Leave blank unless the connector expects a different model ID.',
         headersPlaceholder: 'HTTP-Referer: https://your-app.example',
       };
+    case 'opencode-api-key':
+      return {
+        familyName: 'OpenCode Zen',
+        description:
+          'Store the OpenCode Zen API key here so CLIProxy can route OpenCode Zen requests without duplicating the setup in API Profiles.',
+        requiredNow: [
+          'Paste the OpenCode Zen API key.',
+          'Leave Base URL empty unless this route should target another OpenCode endpoint.',
+        ],
+        optionalLater: [
+          'Model mappings only when the upstream model ID differs.',
+          'Headers only when the provider setup requires them.',
+        ],
+        keyLabel: 'OpenCode Zen API Key',
+        keyPlaceholder: 'sk-...',
+        keyHelper: 'This is the only field most OpenCode Zen setups need.',
+        baseUrlPlaceholder: 'https://api.opencode.ai/v1',
+        baseUrlHelper: 'Optional. Leave blank to keep the default OpenCode Zen endpoint.',
+        aliasesPlaceholder: 'claude-sonnet-4-5=kimi-k2',
+        aliasesHelper:
+          'Format: requested=upstream. Add a mapping only when the upstream model name should differ.',
+        headersPlaceholder: 'X-Project: internal-routing',
+      };
+    case 'opencode-go-api-key':
+      return {
+        familyName: 'OpenCode Go',
+        description:
+          'Store the OpenCode Go API key here so CLIProxy can route OpenCode Go requests without duplicating the setup in API Profiles.',
+        requiredNow: [
+          'Paste the OpenCode Go API key.',
+          'Leave Base URL empty unless this route should target another endpoint.',
+        ],
+        optionalLater: [
+          'Model mappings only when the upstream model ID differs.',
+          'Headers only when the provider setup requires them.',
+        ],
+        keyLabel: 'OpenCode Go API Key',
+        keyPlaceholder: 'sk-...',
+        keyHelper: 'This is the only field most OpenCode Go setups need.',
+        baseUrlPlaceholder: 'https://api.opencode.ai/v1',
+        baseUrlHelper: 'Optional. Leave blank to keep the default OpenCode Go endpoint.',
+        aliasesPlaceholder: 'claude-sonnet-4-5=claude-3-7-sonnet-latest',
+        aliasesHelper:
+          'Format: requested=upstream. Add a mapping only when the upstream model name should differ.',
+        headersPlaceholder: 'X-Project: internal-routing',
+      };
+    case 'poolside-api-key':
+      return {
+        familyName: 'Poolside',
+        description:
+          'Store the Poolside API key here so CLIProxy can route Poolside requests without duplicating the setup in API Profiles.',
+        requiredNow: [
+          'Paste the Poolside API key.',
+          'Leave Base URL empty unless this route should target another endpoint.',
+        ],
+        optionalLater: [
+          'Model mappings only when the upstream model ID differs.',
+          'Headers only when the provider setup requires them.',
+        ],
+        keyLabel: 'Poolside API Key',
+        keyPlaceholder: 'sk-...',
+        keyHelper: 'This is the only field most Poolside setups need.',
+        baseUrlPlaceholder: 'https://inference.poolside.ai/v1',
+        baseUrlHelper: 'Optional. Leave blank to keep the default Poolside endpoint.',
+        aliasesPlaceholder: 'claude-sonnet-4-5=nemotron-4-340b-reward',
+        aliasesHelper:
+          'Format: requested=upstream. Add a mapping only when the upstream model name should differ.',
+        headersPlaceholder: 'X-Project: internal-routing',
+      };
   }
 }
 

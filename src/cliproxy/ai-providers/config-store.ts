@@ -18,6 +18,9 @@ type FamilyEntriesMap = {
   'claude-api-key': AiProviderApiKeyEntry[];
   'vertex-api-key': AiProviderApiKeyEntry[];
   'openai-compatibility': OpenAICompatEntry[];
+  'opencode-api-key': AiProviderApiKeyEntry[];
+  'opencode-go-api-key': AiProviderApiKeyEntry[];
+  'poolside-api-key': AiProviderApiKeyEntry[];
 };
 
 export type FamilyEntries<F extends AiProviderFamilyId> = FamilyEntriesMap[F];

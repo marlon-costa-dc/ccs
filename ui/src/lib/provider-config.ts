@@ -132,6 +132,8 @@ export const PROVIDER_FALLBACK_VISUALS: Record<ProviderVisualId, ProviderFallbac
   xai: { textClass: 'text-slate-900', letter: 'X' },
   zai: { textClass: 'text-purple-600', letter: 'Z' },
   opencode: { textClass: 'text-indigo-600', letter: 'O' },
+  'opencode-go': { textClass: 'text-indigo-600', letter: 'O' },
+  poolside: { textClass: 'text-teal-600', letter: 'P' },
   agy: { textClass: 'text-violet-600', letter: 'A' },
   qwen: { textClass: 'text-cyan-600', letter: 'Q' },
   iflow: { textClass: 'text-indigo-600', letter: 'i' },
@@ -142,7 +144,6 @@ export const PROVIDER_FALLBACK_VISUALS: Record<ProviderVisualId, ProviderFallbac
   kilo: { textClass: 'text-rose-600', letter: 'K' },
   qoder: { textClass: 'text-amber-600', letter: 'Q' },
   ghcp: { textClass: 'text-green-600', letter: 'C' },
-  go: { textClass: 'text-gray-600', letter: 'G' },
   kimi: { textClass: 'text-orange-500', letter: 'K' },
   openai: { textClass: 'text-slate-900', letter: 'O' },
   vertex: { textClass: 'text-blue-600', letter: 'V' },
@@ -164,6 +165,12 @@ export function getAiProviderFamilyVisual(familyId: AiProviderFamilyId): Provide
       return 'vertex';
     case 'openai-compatibility':
       return 'openai';
+    case 'opencode-api-key':
+      return 'opencode';
+    case 'opencode-go-api-key':
+      return 'opencode-go';
+    case 'poolside-api-key':
+      return 'poolside';
   }
 }
 

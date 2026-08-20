@@ -234,6 +234,16 @@ export function AuthMonitor() {
               bulkPauseMutation.isPending ||
               bulkResumeMutation.isPending
             }
+            providerName={selectedProviderData.displayName}
+            currentProvider={effectiveProvider ?? undefined}
+            providers={providerStats.map((ps) => ({
+              provider: ps.provider,
+              displayName: ps.displayName,
+              totalRequests: ps.totalRequests,
+              successCount: ps.successCount,
+              failureCount: ps.failureCount,
+            }))}
+            onProviderChange={setSelectedProvider}
           />
         ) : (
           <div className="p-6">
