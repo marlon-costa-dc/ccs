@@ -69,7 +69,7 @@ describe('global fetch proxy setup', () => {
 
     Agent.prototype.dispatch = function mockAgentDispatch(
       _options: Dispatcher.DispatchOptions,
-      _handler: Dispatcher.DispatchHandlers
+      _handler: Dispatcher.DispatchHandler
     ): boolean {
       directCalls += 1;
       return true;
@@ -77,7 +77,7 @@ describe('global fetch proxy setup', () => {
 
     ProxyAgent.prototype.dispatch = function mockProxyDispatch(
       _options: Dispatcher.DispatchOptions,
-      _handler: Dispatcher.DispatchHandlers
+      _handler: Dispatcher.DispatchHandler
     ): boolean {
       proxyCalls += 1;
       return true;
@@ -90,7 +90,7 @@ describe('global fetch proxy setup', () => {
           method: 'GET',
           path: '/',
         } as Dispatcher.DispatchOptions,
-        {} as Dispatcher.DispatchHandlers
+        {} as Dispatcher.DispatchHandler
       );
     } finally {
       Agent.prototype.dispatch = originalAgentDispatch;
@@ -160,7 +160,9 @@ describe('global fetch proxy setup', () => {
 
     expect(globalThis.fetch).toBe(originalFetch);
     expect(applyGlobalFetchProxy()).toEqual({ enabled: true });
-    expect(globalThis.fetch).toBe(undiciFetch);
+    expect(globalThis.fetch).not.toBe(originalFetch);
+    expect(typeof globalThis.fetch).toBe('function');
+    expect(globalThis.fetch.preconnect).toBe(originalFetch.preconnect);
     expect(getGlobalDispatcher()).not.toBe(originalDispatcher);
   });
 
