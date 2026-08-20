@@ -85,7 +85,7 @@ export function FlowVizHeader({
       <div className="flex items-center gap-2 flex-wrap justify-end">
         {canSwitchProvider && (
           <Select value={currentProvider ?? undefined} onValueChange={onProviderChange}>
-            <SelectTrigger className="h-8 w-[160px] text-xs" aria-label="Switch provider">
+            <SelectTrigger className="h-8 w-[160px] text-xs" aria-label={t('flowViz.provider')}>
               <SelectValue placeholder={t('flowViz.provider')} />
             </SelectTrigger>
             <SelectContent>
