@@ -108,6 +108,7 @@ describe('run-test-bucket', () => {
       'tests/unit/targets/native-claude-effort-launch.test.ts',
       'tests/unit/targets/settings-profile-browser-launch.test.ts',
       'tests/unit/targets/settings-profile-websearch-launch.test.ts',
+      'tests/unit/web-server/websearch-routes.test.ts',
     ]);
 
     expect(runs.map((run) => run.label)).toEqual([
@@ -117,6 +118,7 @@ describe('run-test-bucket', () => {
       'tests/unit/targets/native-claude-effort-launch.test.ts',
       'tests/unit/targets/settings-profile-browser-launch.test.ts',
       'tests/unit/targets/settings-profile-websearch-launch.test.ts',
+      'tests/unit/web-server/websearch-routes.test.ts',
     ]);
     expect(runs.slice(1).every((run) => run.quietOnPass)).toBe(true);
   });

@@ -5,9 +5,10 @@ import * as os from 'os';
 import * as path from 'path';
 import type { Server } from 'http';
 import {
+  invalidateConfigCache,
   loadOrCreateUnifiedConfig,
-  mutateUnifiedConfig,
-} from '../../../src/config/unified-config-loader';
+  mutateConfig,
+} from '../../../src/config/config-loader-facade';
 import websearchRoutes from '../../../src/web-server/routes/websearch-routes';
 
 const WEBSEARCH_ENV_KEYS = [
@@ -19,7 +20,7 @@ const WEBSEARCH_ENV_KEYS = [
   'CCS_WEBSEARCH_BRAVE_API_KEY',
 ] as const;
 
-describe('websearch routes', () => {
+describe.serial('websearch routes', () => {
   let server: Server;
   let baseUrl = '';
   let tempHome: string;
@@ -57,7 +58,6 @@ describe('websearch routes', () => {
 
       server.once('error', onError);
       server.once('listening', () => {
-        server.off('error', onError);
         resolve();
       });
     });
@@ -79,6 +79,7 @@ describe('websearch routes', () => {
     originalCcsHome = process.env.CCS_HOME;
     originalDashboardAuthEnabled = process.env.CCS_DASHBOARD_AUTH_ENABLED;
     process.env.CCS_HOME = tempHome;
+    invalidateConfigCache();
     process.env.CCS_DASHBOARD_AUTH_ENABLED = 'false';
     forcedRemoteAddress = '127.0.0.1';
 
@@ -98,6 +99,7 @@ describe('websearch routes', () => {
     } else {
       delete process.env.CCS_HOME;
     }
+    invalidateConfigCache();
 
     if (originalDashboardAuthEnabled !== undefined) {
       process.env.CCS_DASHBOARD_AUTH_ENABLED = originalDashboardAuthEnabled;
@@ -155,7 +157,7 @@ describe('websearch routes', () => {
   });
 
   it('returns masked API key state from dashboard-managed global env', async () => {
-    mutateUnifiedConfig((config) => {
+    mutateConfig((config) => {
       config.websearch = {
         enabled: true,
         providers: {
@@ -252,7 +254,7 @@ describe('websearch routes', () => {
   });
 
   it('preserves stored API keys when only provider settings change', async () => {
-    mutateUnifiedConfig((config) => {
+    mutateConfig((config) => {
       config.global_env = {
         enabled: true,
         env: {
@@ -336,7 +338,7 @@ describe('websearch routes', () => {
   });
 
   it('allows clearing a searxng url back to blank', async () => {
-    mutateUnifiedConfig((config) => {
+    mutateConfig((config) => {
       config.websearch = {
         enabled: true,
         providers: {
@@ -370,7 +372,7 @@ describe('websearch routes', () => {
   });
 
   it('sanitizes credential-bearing searxng urls out of the GET response', async () => {
-    mutateUnifiedConfig((config) => {
+    mutateConfig((config) => {
       config.websearch = {
         enabled: true,
         providers: {

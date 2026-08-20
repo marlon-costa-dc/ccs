@@ -123,7 +123,9 @@ export async function runSettingsFlow(ctx: ProfileDispatchContext): Promise<void
     );
   }
   const inheritedClaudeConfigDir = continuityInheritance.claudeConfigDir;
-  syncWebSearchMcpToConfigDir(inheritedClaudeConfigDir);
+  if (webSearchLaunch.enabled) {
+    syncWebSearchMcpToConfigDir(inheritedClaudeConfigDir);
+  }
   syncImageAnalysisMcpToConfigDir(inheritedClaudeConfigDir);
   if (
     browserRuntimeEnv &&

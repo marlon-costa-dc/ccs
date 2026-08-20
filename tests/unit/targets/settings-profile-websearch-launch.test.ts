@@ -39,7 +39,7 @@ function readTraceEvents(tracePath: string): Array<Record<string, unknown>> {
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
-describe('settings profile WebSearch launch', () => {
+describe.serial('settings profile WebSearch launch', () => {
   let tmpHome = '';
   let ccsDir = '';
   let settingsPath = '';
@@ -97,6 +97,7 @@ exit 0
       ...process.env,
       CI: '1',
       NO_COLOR: '1',
+      CCS_NO_PRE_DISPATCH: '1',
       CCS_HOME: tmpHome,
       CCS_CLAUDE_PATH: fakeClaudePath,
       CCS_DEBUG: '1',
