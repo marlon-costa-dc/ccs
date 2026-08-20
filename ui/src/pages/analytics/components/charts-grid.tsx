@@ -106,7 +106,7 @@ export function ChartsGrid({
         <div className="space-y-2">
           <h3 className="text-sm font-medium flex items-center gap-2">
             <Users className="w-4 h-4" />
-            {t('analyticsPages.sessionsTab')}
+            {t('analyticsPageV2.tabSessions')}
           </h3>
           <SessionStatsCard data={sessions} isLoading={isSessionsLoading} />
         </div>

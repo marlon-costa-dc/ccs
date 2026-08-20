@@ -125,7 +125,7 @@ export function AccountFlowViz({
   useEffect(() => {
     const timer = setTimeout(calculatePaths, 10);
     return () => clearTimeout(timer);
-  }, [calculatePaths]);
+  }, [showDetails, calculatePaths]);
 
   useEffect(() => {
     const startTime = Date.now();
