@@ -57,8 +57,7 @@ export async function fetchWithUpstreamTransport(
   options: { dispatcher?: Dispatcher; insecureTls?: boolean } = {}
 ): Promise<Response> {
   if (!isBunRuntime()) {
-    const requestUrl =
-      typeof input === 'string' || input instanceof URL ? input : input.url;
+    const requestUrl = typeof input === 'string' || input instanceof URL ? input : input.url;
     const response = await undiciFetch(requestUrl, init as UndiciRequestInit);
     return response as unknown as Response;
   }

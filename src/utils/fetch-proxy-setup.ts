@@ -171,8 +171,7 @@ export function applyGlobalFetchProxy(): { enabled: boolean; error?: string } {
       input: Parameters<typeof globalThis.fetch>[0],
       init?: Parameters<typeof globalThis.fetch>[1]
     ): Promise<Response> => {
-      const requestUrl =
-        typeof input === 'string' || input instanceof URL ? input : input.url;
+      const requestUrl = typeof input === 'string' || input instanceof URL ? input : input.url;
       const response = await undiciFetch(requestUrl, init as UndiciRequestInit);
       return response as unknown as Response;
     };
