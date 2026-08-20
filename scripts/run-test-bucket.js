@@ -49,6 +49,7 @@ const isolatedTests = new Set([
   'tests/unit/commands/update-command-beta-channel.test.js',
   'tests/unit/commands/update-command-force-reinstall.test.js',
   'tests/unit/commands/bar-command.test.ts',
+  'tests/npm/cli.test.js',
   'tests/unit/targets/droid-command-routing-integration.test.ts',
   'tests/unit/targets/native-claude-effort-launch.test.ts',
   'tests/unit/targets/settings-profile-browser-launch.test.ts',
