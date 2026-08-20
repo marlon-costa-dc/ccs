@@ -48,9 +48,9 @@ export default [
       //   generated baseline (eslint-rules/throw-error-baseline.json). Forces
       //   the typed-error taxonomy (src/errors/error-types.ts). Regenerate the
       //   baseline with: node scripts/generate-throw-error-baseline.js
-      // - max-lines: warn on files over 1500 LOC.
+      // - max-lines: warn on files over 400 LOC (goal of P5/P6 god-file splits).
       'ccs/no-new-throw-error': ['error', { allowlist: throwErrorBaseline }],
-      'max-lines': ['warn', { max: 1500, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
     },
   },
   {
