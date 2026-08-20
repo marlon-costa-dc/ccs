@@ -61,7 +61,7 @@ Try Beads in your own projects:
 
 ```bash
 # Install Beads
-curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/marlon-costa-dc/beads/main/scripts/install.sh | bash
 
 # Initialize in your repo
 bd init
