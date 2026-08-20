@@ -49,6 +49,7 @@ const isolatedTests = new Set([
   'tests/unit/commands/update-command-beta-channel.test.js',
   'tests/unit/commands/update-command-force-reinstall.test.js',
   'tests/unit/commands/bar-command.test.ts',
+  'tests/unit/targets/settings-profile-websearch-launch.test.ts',
   'tests/unit/targets/codex-adapter-exec.test.ts',
   'tests/unit/targets/codex-adapter.test.ts',
   'tests/unit/targets/droid-adapter.test.ts',
