@@ -1,4 +1,6 @@
 const { describe, expect, test } = require('bun:test');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const bucket = require('../../../scripts/run-test-bucket.js');
 
@@ -100,11 +102,11 @@ describe('run-test-bucket', () => {
 
   test('isolates standalone validation scripts that are not Bun test suites', () => {
     const runs = bucket.getBunRuns('slow', [
-      'tests/integration/cursor-daemon-lifecycle.test.ts',
+      'tests/integration/logging-request-context.test.ts',
       'tests/integration/token-counting-test.js',
     ]);
 
-    expect(bucket.usesBunTestRunner('tests/integration/cursor-daemon-lifecycle.test.ts')).toBe(
+    expect(bucket.usesBunTestRunner('tests/integration/logging-request-context.test.ts')).toBe(
       true
     );
     expect(bucket.usesBunTestRunner('tests/integration/token-counting-test.js')).toBe(false);
@@ -138,7 +140,7 @@ describe('run-test-bucket', () => {
     ).toBe(false);
     expect(
       bucket.shouldVerifyRunFileCount({
-        selected: ['tests/integration/cursor-daemon-lifecycle.test.ts'],
+        selected: ['tests/integration/logging-request-context.test.ts'],
       })
     ).toBe(true);
   });
@@ -153,5 +155,42 @@ describe('run-test-bucket', () => {
 
   test('still forces dist-dependent tests into the slow bucket', () => {
     expect(bucket.shouldForceSlow('tests/unit/config-dir-override.test.js')).toBe(true);
+  });
+
+  test('requires complete built runtime artifacts before reusing dist', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-test-bucket-build-'));
+
+    try {
+      const sourceFiles = [
+        path.join('src', 'ccs.ts'),
+        path.join('src', 'types', 'utils.ts'),
+        path.join('src', 'proxy', 'server', 'proxy-server.ts'),
+        path.join('src', 'proxy', '__tests__', 'ignored.test.ts'),
+        path.join('src', 'types', 'external.d.ts'),
+      ];
+      for (const relativePath of sourceFiles) {
+        const absolutePath = path.join(tempDir, relativePath);
+        fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+        fs.writeFileSync(absolutePath, 'export {};\n');
+      }
+
+      const requiredArtifacts = bucket.getRequiredBuildArtifacts(tempDir);
+      expect(requiredArtifacts).toEqual([
+        path.join('dist', 'ccs.js'),
+        path.join('dist', 'proxy', 'server', 'proxy-server.js'),
+        path.join('dist', 'types', 'utils.js'),
+      ]);
+      for (const relativePath of requiredArtifacts) {
+        const absolutePath = path.join(tempDir, relativePath);
+        fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+        fs.writeFileSync(absolutePath, 'module.exports = {};\n');
+      }
+
+      expect(bucket.hasCompleteBuildArtifacts(tempDir)).toBe(true);
+      fs.rmSync(path.join(tempDir, 'dist', 'proxy', 'server', 'proxy-server.js'));
+      expect(bucket.hasCompleteBuildArtifacts(tempDir)).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

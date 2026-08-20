@@ -91,3 +91,5 @@ export const DEFAULT_CURSOR_CONFIG: CursorConfig = {
   ghost_mode: true,
   model: 'gpt-5.3-codex',
 };
+
+export const DEFAULT_CURSOR_PORT = DEFAULT_CURSOR_CONFIG.port;

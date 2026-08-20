@@ -19,7 +19,6 @@ const candidateRoots = ['tests/unit', 'tests/integration', 'tests/npm', 'src'];
 // (catches deletion drift) but CANNOT detect new undeclared slow tests.
 // Automated perf-budget enforcement tracked in issue #1071.
 const slowTests = [
-  'tests/integration/cursor-daemon-lifecycle.test.ts',
   'tests/integration/logging-request-context.test.ts',
   'tests/integration/proxy/daemon-lifecycle.test.ts',
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
@@ -38,7 +37,6 @@ const slowTests = [
   'tests/unit/targets/settings-profile-browser-launch.test.ts',
   'tests/unit/targets/settings-profile-image-analysis-launch.test.ts',
   'tests/unit/targets/settings-profile-websearch-launch.test.ts',
-  'tests/unit/web-server/cursor-routes.test.ts',
   'tests/unit/web-server/websearch-routes.test.ts',
   'src/cliproxy/auth/__tests__/oauth-handler-gemini-backend-guidance.test.ts',
 ];
@@ -48,6 +46,8 @@ const slowTests = [
 const fastJsTests = new Set(['tests/unit/flag-parsing-simple.test.js']);
 
 const isolatedTests = new Set([
+  'tests/unit/commands/update-command-beta-channel.test.js',
+  'tests/unit/commands/update-command-force-reinstall.test.js',
   'tests/unit/commands/bar-command.test.ts',
   'tests/unit/targets/codex-adapter-exec.test.ts',
   'tests/unit/targets/codex-adapter.test.ts',
@@ -210,8 +210,50 @@ function shouldVerifyRunFileCount(run) {
   return run.selected.every((file) => usesBunTestRunner(file));
 }
 
+function getRequiredBuildArtifacts(baseDir = rootDir) {
+  const srcDir = path.join(baseDir, 'src');
+  if (!fs.existsSync(srcDir)) {
+    return [];
+  }
+
+  return collectFilesByExtension(srcDir, '.ts')
+    .filter((sourcePath) => !sourcePath.endsWith('.d.ts'))
+    .filter((sourcePath) => !isTestSourcePath(sourcePath))
+    .map((sourcePath) =>
+      path.join('dist', path.relative(srcDir, sourcePath).replace(/\.ts$/, '.js'))
+    )
+    .sort();
+}
+
+function collectFilesByExtension(dir, extension, files = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      collectFilesByExtension(fullPath, extension, files);
+    } else if (entry.isFile() && entry.name.endsWith(extension)) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+function isTestSourcePath(sourcePath) {
+  const normalized = sourcePath.split(path.sep).join('/');
+  return (
+    normalized.includes('/__tests__/') ||
+    /\.(?:test|spec)\.ts$/.test(normalized)
+  );
+}
+
+function hasCompleteBuildArtifacts(baseDir = rootDir) {
+  const requiredBuildArtifacts = getRequiredBuildArtifacts(baseDir);
+  return requiredBuildArtifacts.length > 0 && requiredBuildArtifacts.every((relativePath) =>
+    fs.existsSync(path.join(baseDir, relativePath))
+  );
+}
+
 function ensureBuildForSlowBucket() {
-  if (fs.existsSync(path.join(rootDir, 'dist', 'ccs.js'))) {
+  if (hasCompleteBuildArtifacts()) {
     return 0;
   }
 
@@ -295,6 +337,13 @@ function runBucket(name) {
 
   let exitCode = 0;
   for (const run of runs) {
+    if (name === 'slow') {
+      const buildStatus = ensureBuildForSlowBucket();
+      if (buildStatus !== 0) {
+        exitCode = buildStatus;
+        continue;
+      }
+    }
     const status = runBunTest(run);
     if (status !== 0) {
       exitCode = status;
@@ -353,5 +402,7 @@ module.exports = {
   parseBunFileCount,
   verifyReportedFileCount,
   shouldVerifyRunFileCount,
+  getRequiredBuildArtifacts,
+  hasCompleteBuildArtifacts,
   main,
 };

@@ -237,9 +237,7 @@ async function defaultDownloadAndExtract(
   let redirectsFollowed = 0;
 
   while (true) {
-    const { statusCode, headers, body } = await request(currentUrl, {
-      maxRedirections: 0, // disable undici's auto-follow; we follow manually
-    });
+    const { statusCode, headers, body } = await request(currentUrl);
 
     if (statusCode >= 300 && statusCode < 400) {
       const location = Array.isArray(headers['location'])

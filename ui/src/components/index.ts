@@ -9,7 +9,6 @@
 export * from './account';
 export * from './analytics';
 export * from './cliproxy';
-export * from './copilot';
 export * from './health';
 export * from './layout';
 export * from './monitoring';

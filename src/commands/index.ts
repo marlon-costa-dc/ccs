@@ -7,7 +7,6 @@ export { handleCleanupCommand } from './cleanup-command';
 export { handleCliproxyCommand } from './cliproxy-command';
 export { handleConfigCommand } from './config-command';
 export { handleConfigImageAnalysisCommand } from './config-image-analysis-command';
-export { handleCopilotCommand } from './copilot-command';
 export { handleDoctorCommand } from './doctor-command';
 export { handleDockerCommand } from './docker-command';
 export { handleHelpCommand } from './help-command';

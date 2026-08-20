@@ -75,8 +75,7 @@ Help locations:
 - `ccs cleanup --help`: `src/commands/cleanup-command.ts`
 - `ccs cliproxy --help`: `src/commands/cliproxy-command.ts`
 - `ccs config --help`: `src/commands/config-command.ts`
-- `ccs copilot --help`: `src/commands/copilot-command.ts`
-- `ccs cursor --help`: `src/commands/cursor-command.ts`
+- `ccs cursor --help`: `src/commands/help-command.ts`
 - `ccs doctor --help`: `src/commands/doctor-command.ts`
 - `ccs docker --help`: `src/commands/docker/help-subcommand.ts`
 - `ccs env --help`: `src/commands/env-command.ts`
@@ -163,7 +162,7 @@ bd close <id>         # Complete work
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/marlon-costa-dc/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
 
 ## Agent Context Profiles
 

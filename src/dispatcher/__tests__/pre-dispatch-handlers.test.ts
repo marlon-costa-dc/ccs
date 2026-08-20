@@ -109,32 +109,6 @@ describe('runPreDispatchHandlers', () => {
     expect(consumed).toBe(true);
   });
 
-  // ---------- copilot subcommand routing ----------
-
-  it('exits via process.exit for copilot subcommand (copilot --auth)', async () => {
-    // copilot --auth is a known subcommand token; handler exits with a code
-    await expect(
-      runPreDispatchHandlers({
-        args: ['copilot', '--auth'],
-        cliLogger: makeStubLogger(),
-      })
-    ).rejects.toThrow(/process\.exit/);
-    expect(exitSpy).toHaveBeenCalled();
-  });
-
-  // ---------- cursor subcommand routing ----------
-
-  it('exits via process.exit for legacy-cursor subcommand (legacy-cursor auth)', async () => {
-    // 'auth' is a valid CURSOR_SUBCOMMANDS token; handler calls process.exit(exitCode)
-    await expect(
-      runPreDispatchHandlers({
-        args: ['legacy-cursor', 'auth'],
-        cliLogger: makeStubLogger(),
-      })
-    ).rejects.toThrow(/process\.exit/);
-    expect(exitSpy).toHaveBeenCalled();
-  });
-
   // ---------- recovery error (non-fatal) ----------
 
   it('does not throw when recovery manager throws (best-effort)', async () => {

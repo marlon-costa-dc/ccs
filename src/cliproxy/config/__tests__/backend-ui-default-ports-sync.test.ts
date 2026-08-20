@@ -6,7 +6,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { CLIPROXY_DEFAULT_PORT as BACKEND_CLIPROXY_DEFAULT_PORT } from '../port-manager';
-import { DEFAULT_CURSOR_PORT as BACKEND_CURSOR_DEFAULT_PORT } from '../../../cursor/cursor-models';
+import { DEFAULT_CURSOR_PORT as BACKEND_CURSOR_DEFAULT_PORT } from '../../../config/schemas/copilot-cursor';
 import {
   CLIPROXY_PROVIDER_IDS as BACKEND_CLIPROXY_PROVIDER_IDS,
   getDeviceCodeVerificationProviders,

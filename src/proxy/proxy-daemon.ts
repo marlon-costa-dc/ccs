@@ -1,9 +1,8 @@
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, spawnSync, type ChildProcess, type SpawnSyncReturns } from 'child_process';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as lockfile from 'proper-lockfile';
-import { verifyProcessOwnership } from '../cursor/daemon-process-ownership';
 import type { OpenAICompatProfileConfig } from './profile-router';
 import {
   OPENAI_COMPAT_PROXY_ADAPTIVE_PORT_END,
@@ -58,14 +57,99 @@ interface OpenAICompatProxyHealthPayload {
   profile?: string;
 }
 
+type DaemonOwnershipStatus = 'owned' | 'not-owned' | 'not-running' | 'unknown';
+
+type ProcessCommandRunner = typeof spawnSync;
+type ProcessCommandReader = typeof fs.readFileSync;
+
+export function getProcessCommandLineForPlatform(
+  pid: number,
+  platform: NodeJS.Platform,
+  runCommand: ProcessCommandRunner = spawnSync,
+  readFile: ProcessCommandReader = fs.readFileSync
+): string | null {
+  if (platform === 'linux') {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const commandLine = readFile(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' ').trim();
+        if (commandLine) {
+          return commandLine;
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+  if (platform === 'darwin') {
+    try {
+      const result: SpawnSyncReturns<string> = runCommand(
+        'ps',
+        ['-p', String(pid), '-o', 'command='],
+        {
+          encoding: 'utf8',
+        }
+      );
+      if (result.error || result.status !== 0) {
+        return null;
+      }
+      return result.stdout.trim();
+    } catch {
+      return null;
+    }
+  }
+  if (platform === 'win32') {
+    try {
+      const result: SpawnSyncReturns<string> = runCommand(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          `(Get-CimInstance Win32_Process -Filter "ProcessId = ${pid}").CommandLine`,
+        ],
+        { encoding: 'utf8', windowsHide: true }
+      );
+      if (result.error || result.status !== 0) {
+        return null;
+      }
+      return result.stdout.trim() || null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function getProcessCommandLine(pid: number): string | null {
+  return getProcessCommandLineForPlatform(pid, process.platform);
+}
+
+function verifyProcessOwnership(
+  pid: number,
+  ownershipMatcher: (commandLine: string) => boolean
+): DaemonOwnershipStatus {
+  try {
+    process.kill(pid, 0);
+  } catch (err) {
+    const error = err as NodeJS.ErrnoException;
+    if (error.code === 'ESRCH') {
+      return 'not-running';
+    }
+    return 'unknown';
+  }
+  const commandLine = getProcessCommandLine(pid);
+  if (!commandLine) {
+    return 'unknown';
+  }
+  return ownershipMatcher(commandLine) ? 'owned' : 'not-owned';
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function verifyProxyProcessOwnership(
-  pid: number,
-  profileName?: string
-): ReturnType<typeof verifyProcessOwnership> {
+function verifyProxyProcessOwnership(pid: number, profileName?: string): DaemonOwnershipStatus {
   const profilePattern = profileName
     ? new RegExp(`(^|\\s)--profile(?:\\s+|=)${escapeRegExp(profileName)}(?=\\s|$)`)
     : null;

@@ -16,10 +16,6 @@ const boundedConsumers = [
     expectedCount: 1,
   },
   {
-    file: 'src/components/copilot/config-form/raw-editor-section.tsx',
-    expectedCount: 1,
-  },
-  {
     file: 'src/components/compatible-cli/raw-json-settings-editor-panel.tsx',
     expectedCount: 1,
   },
