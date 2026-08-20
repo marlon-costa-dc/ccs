@@ -100,17 +100,21 @@ describe('run-test-bucket', () => {
     ]);
   });
 
-  test('isolates the settings WebSearch subprocess suite in the slow bucket', () => {
+  test('isolates subprocess launch suites in the slow bucket', () => {
     const runs = bucket.getBunRuns('slow', [
       'tests/unit/commands/persist-command-handler.test.ts',
+      'tests/unit/targets/droid-command-routing-integration.test.ts',
+      'tests/unit/targets/native-claude-effort-launch.test.ts',
       'tests/unit/targets/settings-profile-websearch-launch.test.ts',
     ]);
 
     expect(runs.map((run) => run.label)).toEqual([
       'shared',
+      'tests/unit/targets/droid-command-routing-integration.test.ts',
+      'tests/unit/targets/native-claude-effort-launch.test.ts',
       'tests/unit/targets/settings-profile-websearch-launch.test.ts',
     ]);
-    expect(runs[1].quietOnPass).toBe(true);
+    expect(runs.slice(1).every((run) => run.quietOnPass)).toBe(true);
   });
 
   test('isolates standalone validation scripts that are not Bun test suites', () => {
