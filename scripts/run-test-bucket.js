@@ -46,6 +46,8 @@ const slowTests = [
 const fastJsTests = new Set(['tests/unit/flag-parsing-simple.test.js']);
 
 const isolatedTests = new Set([
+  'tests/unit/commands/update-command-beta-channel.test.js',
+  'tests/unit/commands/update-command-force-reinstall.test.js',
   'tests/unit/commands/bar-command.test.ts',
   'tests/unit/targets/codex-adapter-exec.test.ts',
   'tests/unit/targets/codex-adapter.test.ts',
@@ -293,6 +295,13 @@ function runBucket(name) {
 
   let exitCode = 0;
   for (const run of runs) {
+    if (name === 'slow') {
+      const buildStatus = ensureBuildForSlowBucket();
+      if (buildStatus !== 0) {
+        exitCode = buildStatus;
+        continue;
+      }
+    }
     const status = runBunTest(run);
     if (status !== 0) {
       exitCode = status;

@@ -86,23 +86,17 @@ describe('npm CLI', () => {
       }
     });
 
-    it('routes cursor probe through the cursor command handler', function() {
-      let output = '';
-      try {
-        output = execSync(`bun "${srcCcsPath}" cursor probe`, {
-          encoding: 'utf8',
-          stdio: 'pipe',
-          timeout: 3000,
-          env: { ...process.env, CCS_HOME: testCcsHome }
-        });
-      } catch (e) {
-        output = e.stderr?.toString() || e.stdout?.toString() || '';
-      }
-      assert(!output.includes("Profile 'cursor' not found"), 'Should not fall through to profile lookup');
-      assert(
-        output.includes('Cursor Live Probe') || output.includes('legacy cursor probe'),
-        'Should route through the legacy cursor compatibility handler'
-      );
+    it('routes cursor through the CLIProxy provider shortcut', function() {
+      const output = execSync(`bun "${srcCcsPath}" cursor --help`, {
+        encoding: 'utf8',
+        stdio: 'pipe',
+        timeout: 3000,
+        env: { ...process.env, CCS_HOME: testCcsHome }
+      });
+
+      assert(output.includes('CCS cursor Shortcut Help'), 'Should render Cursor provider help');
+      assert(output.includes('Cursor via CLIProxy OAuth'), 'Should use the CLIProxy Cursor provider');
+      assert(!output.includes('legacy cursor'), 'Should not expose the removed legacy Cursor bridge');
     });
 
     it('routes gitlab --help to provider shortcut help instead of starting auth', function() {
@@ -130,7 +124,7 @@ describe('npm CLI', () => {
         runCli('glm --help', { stdio: 'pipe' });
         // If GLM profile exists from previous setup, this is fine too
       } catch (e) {
-        const output = e.stderr?.toString() || e.stdout?.toString() || '';
+        const output = `${e.stderr?.toString() || ''}\n${e.stdout?.toString() || ''}`;
         // Either profile exists and works, or shows helpful "not found" message
         // Both are valid behaviors depending on user's setup
         const isValid = !output.includes("Profile 'glm' not found") ||
@@ -145,7 +139,7 @@ describe('npm CLI', () => {
         runCli('invalid-profile-name', { stdio: 'pipe' });
         assert(false, 'Should have thrown an error for invalid profile');
       } catch (e) {
-        const output = e.stderr?.toString() || e.stdout?.toString() || '';
+        const output = `${e.stderr?.toString() || ''}\n${e.stdout?.toString() || ''}`;
         assert(output.includes("not found") || output.includes("invalid"), 'Should show profile not found error');
       }
     });
