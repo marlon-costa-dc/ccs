@@ -322,6 +322,108 @@ function getFamilyGuide(family: AiProviderFamilyState): FamilyGuide {
           },
         ],
       };
+    case 'opencode-api-key':
+      return {
+        requiredNow: [
+          'Save the OpenCode Zen API key.',
+          'Leave Base URL blank unless this route should target a different OpenCode endpoint.',
+          'Add mappings only when the upstream model name differs from the requested name.',
+        ],
+        optionalLater: [
+          'Base URL override for a custom OpenCode gateway.',
+          'Headers for provider-specific routing.',
+          'Mappings such as claude-sonnet-4-5 -> kimi-k2.',
+        ],
+        emptyStateSummary: [
+          `Requests to ${family.routePath} use CLIProxy-managed OpenCode Zen credentials.`,
+          'Most setups start with the key only and keep the default endpoint.',
+          'Mappings and headers are optional follow-up steps.',
+        ],
+        profileBoundary:
+          'Use API Profiles when you want a CCS-native Anthropic-compatible profile rather than this CLIProxy-managed OpenCode Zen route.',
+        editPrompts: [
+          {
+            label: 'Base URL',
+            hint: 'Use it only for a custom OpenCode gateway or managed endpoint.',
+          },
+          {
+            label: 'Model mappings',
+            hint: 'Add them only when the requested names need translating upstream.',
+          },
+          {
+            label: 'Headers',
+            hint: 'Keep them empty unless the provider requires extra routing context.',
+          },
+        ],
+      };
+    case 'opencode-go-api-key':
+      return {
+        requiredNow: [
+          'Save the OpenCode Go API key.',
+          'Leave Base URL blank unless this route should target a different endpoint.',
+          'Add mappings only when the upstream model name differs from the requested name.',
+        ],
+        optionalLater: [
+          'Base URL override for a custom gateway.',
+          'Headers for provider-specific routing.',
+          'Mappings such as claude-sonnet-4-5 -> claude-3-7-sonnet-latest.',
+        ],
+        emptyStateSummary: [
+          `Requests to ${family.routePath} use CLIProxy-managed OpenCode Go credentials.`,
+          'Most setups start with the key only and keep the default endpoint.',
+          'Mappings and headers are optional follow-up steps.',
+        ],
+        profileBoundary:
+          'Use API Profiles when you want a CCS-native Anthropic-compatible profile rather than this CLIProxy-managed OpenCode Go route.',
+        editPrompts: [
+          {
+            label: 'Base URL',
+            hint: 'Use it only for a custom gateway or managed endpoint.',
+          },
+          {
+            label: 'Model mappings',
+            hint: 'Add them only when the requested names need translating upstream.',
+          },
+          {
+            label: 'Headers',
+            hint: 'Keep them empty unless the provider requires extra routing context.',
+          },
+        ],
+      };
+    case 'poolside-api-key':
+      return {
+        requiredNow: [
+          'Save the Poolside API key.',
+          'Leave Base URL blank unless this route should target a different endpoint.',
+          'Add mappings only when the upstream model name differs from the requested name.',
+        ],
+        optionalLater: [
+          'Base URL override for a custom gateway.',
+          'Headers for provider-specific routing.',
+          'Mappings such as claude-sonnet-4-5 -> nemotron-4-340b-reward.',
+        ],
+        emptyStateSummary: [
+          `Requests to ${family.routePath} use CLIProxy-managed Poolside credentials.`,
+          'Most setups start with the key only and keep the default endpoint.',
+          'Mappings and headers are optional follow-up steps.',
+        ],
+        profileBoundary:
+          'Use API Profiles when you want a CCS-native Anthropic-compatible profile rather than this CLIProxy-managed Poolside route.',
+        editPrompts: [
+          {
+            label: 'Base URL',
+            hint: 'Use it only for a custom gateway or managed endpoint.',
+          },
+          {
+            label: 'Model mappings',
+            hint: 'Add them only when the requested names need translating upstream.',
+          },
+          {
+            label: 'Headers',
+            hint: 'Keep them empty unless the provider requires extra routing context.',
+          },
+        ],
+      };
   }
 }
 

@@ -1874,6 +1874,7 @@ const resources = {
       },
       providerCard: {
         missingProjectIdAria: 'Missing Project ID',
+        missingProjectId: 'Missing Project ID - re-add account to fix',
       },
       loginPage: {
         showPassword: 'Show password',
@@ -2329,6 +2330,8 @@ const resources = {
       analyticsPages: {
         chartsGrid: 'Charts',
         costByModel: 'Cost by Model',
+        last24Hours: 'Last 24 Hours',
+        modelUsage: 'Model Usage',
       },
 
       // ========================================
@@ -2727,10 +2730,16 @@ const resources = {
         cliproxy: 'CLIProxy',
         accounts: 'Accounts',
         health: 'Health',
+        tabOverview: 'Overview',
+        tabAccountMonitor: 'Account Monitor',
+        tabLogs: 'Logs',
       },
       analyticsPageV2: {
         title: 'Analytics',
         subtitle: 'Usage analytics and insights.',
+        tabTrends: 'Usage Trends',
+        tabModels: 'Model Usage',
+        tabSessions: 'Sessions & CLIProxy',
       },
       logsPageV2: {
         title: 'Logs',
@@ -4667,6 +4676,7 @@ const resources = {
       },
       providerCard: {
         missingProjectIdAria: 'ID do Projeto Ausente',
+        missingProjectId: 'ID do Projeto Ausente - re-adicione a conta para corrigir',
       },
       loginPage: {
         showPassword: 'Mostrar senha',
@@ -5129,6 +5139,8 @@ const resources = {
       analyticsPages: {
         chartsGrid: 'Gráficos',
         costByModel: 'Custo por Modelo',
+        last24Hours: 'Últimas 24 horas',
+        modelUsage: 'Uso de Modelos',
       },
 
       // ========================================
@@ -5538,10 +5550,16 @@ const resources = {
         cliproxy: 'CLIProxy',
         accounts: 'Contas',
         health: 'Saúde',
+        tabOverview: 'Visão Geral',
+        tabAccountMonitor: 'Monitor de Contas',
+        tabLogs: 'Logs',
       },
       analyticsPageV2: {
         title: 'Análises',
         subtitle: 'Análises e insights de uso.',
+        tabTrends: 'Tendências de Uso',
+        tabModels: 'Uso de Modelos',
+        tabSessions: 'Sessões & CLIProxy',
       },
       logsPageV2: {
         title: 'Logs',
@@ -7333,6 +7351,7 @@ const resources = {
       },
       providerCard: {
         missingProjectIdAria: '缺少项目 ID',
+        missingProjectId: '缺少项目 ID - 重新添加账户以修复',
       },
       loginPage: {
         showPassword: '显示密码',
@@ -7770,6 +7789,8 @@ const resources = {
       analyticsPages: {
         chartsGrid: '图表',
         costByModel: '按模型成本',
+        last24Hours: '过去24小时',
+        modelUsage: '模型使用情况',
       },
       toasts: {
         profileCreated: '配置创建成功',
@@ -8148,10 +8169,16 @@ const resources = {
         cliproxy: 'CLIProxy',
         accounts: '账号',
         health: '健康',
+        tabOverview: '概览',
+        tabAccountMonitor: '账户监控',
+        tabLogs: '日志',
       },
       analyticsPageV2: {
         title: '分析',
         subtitle: '使用分析与洞察。',
+        tabTrends: '使用趋势',
+        tabModels: '模型使用',
+        tabSessions: '会话 & CLIProxy',
       },
       logsPageV2: {
         title: '日志',
@@ -10050,6 +10077,7 @@ const resources = {
       },
       providerCard: {
         missingProjectIdAria: 'Thiếu Project ID',
+        missingProjectId: 'Thiếu Project ID - tái thêm tài khoản để sửa',
       },
       loginPage: {
         showPassword: 'Hiện mật khẩu',
@@ -10493,6 +10521,8 @@ const resources = {
       analyticsPages: {
         chartsGrid: 'Biểu đồ',
         costByModel: 'Chi phí theo mô hình',
+        last24Hours: '24 giờ qua',
+        modelUsage: 'Sử dụng mô hình',
       },
       toasts: {
         profileCreated: 'Đã tạo hồ sơ thành công',
@@ -10883,10 +10913,16 @@ const resources = {
         cliproxy: 'CLIProxy',
         accounts: 'Tài khoản',
         health: 'Sức khỏe',
+        tabOverview: 'Tổng quan',
+        tabAccountMonitor: 'Giám sát tài khoản',
+        tabLogs: 'Nhật ký',
       },
       analyticsPageV2: {
         title: 'Phân tích',
         subtitle: 'Phân tích sử dụng và thông tin chi tiết.',
+        tabTrends: 'Xu hướng sử dụng',
+        tabModels: 'Sử dụng mô hình',
+        tabSessions: 'Phiên & CLIProxy',
       },
       logsPageV2: {
         title: 'Nhật ký',
@@ -12549,10 +12585,15 @@ const resources = {
       analyticsPageV2: {
         title: '分析',
         subtitle: '利用分析とインサイト。',
+        tabTrends: '使用トレンド',
+        tabModels: 'モデル使用状況',
+        tabSessions: 'セッション & CLIProxy',
       },
       analyticsPages: {
         chartsGrid: 'チャート',
         costByModel: 'モデル別コスト',
+        last24Hours: '過去24時間',
+        modelUsage: 'モデル使用状況',
       },
       apiPage: {
         title: 'API プロファイル',
@@ -12972,6 +13013,9 @@ const resources = {
         cliproxy: 'CLIProxy',
         accounts: 'アカウント',
         health: 'ヘルス',
+        tabOverview: '概要',
+        tabAccountMonitor: 'アカウントモニター',
+        tabLogs: 'ログ',
       },
       hubFooter: {
         logs: 'ログ',
@@ -13179,6 +13223,7 @@ const resources = {
       },
       providerCard: {
         missingProjectIdAria: 'プロジェクト ID がありません',
+        missingProjectId: 'プロジェクト ID がありません - アカウントを再追加して修正',
       },
       providerEditor: {
         provider: 'プロバイダー',
@@ -15533,6 +15578,7 @@ const resources = {
       },
       providerCard: {
         missingProjectIdAria: '프로젝트 ID 누락',
+        missingProjectId: '프로젝트 ID 누락 - 계정을 다시 추가하여 수정',
       },
       loginPage: {
         showPassword: '비밀번호 표시',
@@ -15991,6 +16037,8 @@ const resources = {
       analyticsPages: {
         chartsGrid: '차트',
         costByModel: '모델별 비용',
+        last24Hours: '지난 24시간',
+        modelUsage: '모델 사용량',
       },
 
       // ========================================
@@ -16391,10 +16439,16 @@ const resources = {
         cliproxy: 'CLIProxy',
         accounts: '계정',
         health: '헬스',
+        tabOverview: '개요',
+        tabAccountMonitor: '계정 모니터',
+        tabLogs: '로그',
       },
       analyticsPageV2: {
         title: '분석',
         subtitle: '사용량 분석 및 인사이트.',
+        tabTrends: '사용 추세',
+        tabModels: '모델 사용량',
+        tabSessions: '세션 & CLIProxy',
       },
       logsPageV2: {
         title: '로그',

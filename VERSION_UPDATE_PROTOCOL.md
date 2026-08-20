@@ -167,6 +167,7 @@ ccs list      # Includes: gemini, codex, xai, zai, opencode, opencode-go, poolsi
 2. **Line-length warnings**: 53 pre-existing max-lines warnings unchanged (not introduced by this update)
 3. **Quota providers**: `'opencode-go'` and `'poolside'` are added to `CLIProxyProvider` but NOT to `MANAGED_QUOTA_PROVIDERS` (quota rotation not implemented for these API-key providers yet)
 4. **OAuth**: OpenCode Zen, OpenCode Go, and Poolside use API key authentication. No OAuth flags — configure via AI Providers with API keys
+5. **AI Providers families**: Added `opencode-api-key`, `opencode-go-api-key`, `poolside-api-key` to `AI_PROVIDER_FAMILY_IDS`. These route through CLIProxyAPI's config.yaml sections (`opencode-api-key:`, `opencode-go-api-key:`, `poolside-api-key:`). Requires CLIProxyAPI dc7 backend with matching auth URL endpoints.
 
 ## ✅ Validation Checklist
 - [ ] `bun run build` completes without errors
@@ -177,3 +178,4 @@ ccs list      # Includes: gemini, codex, xai, zai, opencode, opencode-go, poolsi
 - [ ] `ccs auth list` includes all 19 providers + opencode-go, poolside
 - [ ] `ccs config show backend` shows `plus`
 - [ ] `ccs config show management_panel_repository` shows `marlon-costa-dc/cliproxyapi`
+- [ ] Dashboard AI Providers section shows 8 families (5 existing + 3 new: OpenCode Zen, OpenCode Go, Poolside)

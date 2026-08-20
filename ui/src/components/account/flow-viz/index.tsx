@@ -20,7 +20,13 @@ import { FlowPaths } from './flow-paths';
 import { FlowVizHeader } from './flow-viz-header';
 
 // Re-export types for backward compatibility
-export type { AccountData, ProviderData, AccountFlowVizProps, ConnectionEvent } from './types';
+export type {
+  AccountData,
+  ProviderData,
+  AccountFlowVizProps,
+  ProviderOption,
+  ConnectionEvent,
+} from './types';
 
 const SHOW_PAUSED_STORAGE_KEY = 'ccs-auth-monitor-show-paused';
 
@@ -29,6 +35,10 @@ export function AccountFlowViz({
   onBack,
   onPauseToggle,
   isPausingAccount,
+  providerName,
+  currentProvider,
+  providers,
+  onProviderChange,
 }: AccountFlowVizProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -115,7 +125,7 @@ export function AccountFlowViz({
   useEffect(() => {
     const timer = setTimeout(calculatePaths, 10);
     return () => clearTimeout(timer);
-  }, [dragOffsets, calculatePaths]);
+  }, [calculatePaths]);
 
   useEffect(() => {
     const startTime = Date.now();
@@ -125,7 +135,7 @@ export function AccountFlowViz({
       if (Date.now() - startTime < duration) requestAnimationFrame(animate);
     };
     requestAnimationFrame(animate);
-  }, [showDetails, calculatePaths]);
+  }, [calculatePaths]);
 
   const providerColor = PROVIDER_COLORS[providerData.provider.toLowerCase()] || '#6b7280';
   const zones = useMemo(() => splitAccountsIntoZones(visibleAccounts), [visibleAccounts]);
@@ -170,6 +180,10 @@ export function AccountFlowViz({
     <div className="flex flex-col" ref={containerRef}>
       <FlowVizHeader
         onBack={onBack}
+        providerName={providerName}
+        currentProvider={currentProvider}
+        providers={providers}
+        onProviderChange={onProviderChange}
         showDetails={showDetails}
         onToggleDetails={() => setShowDetails(!showDetails)}
         showPausedAccounts={showPausedAccounts}
@@ -198,6 +212,7 @@ export function AccountFlowViz({
           <svg
             ref={svgRef}
             className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible"
+            aria-label="Account flow visualization"
           >
             <FlowPaths
               paths={paths}

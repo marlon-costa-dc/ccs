@@ -37,6 +37,7 @@ export function ProviderCard({
 
   return (
     <button
+      type="button"
       onClick={onSelect}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -61,16 +62,10 @@ export function ProviderCard({
             {stats.displayName}
           </h3>
           <p className="text-[10px] text-muted-foreground">
-            {/* TODO i18n: missing key for account count */}
-            {stats.accountCount} account{stats.accountCount !== 1 ? 's' : ''}
+            {t('authMonitor.accountsCount', { count: stats.accountCount })}
           </p>
         </div>
-        <ChevronRight
-          className={cn(
-            'w-4 h-4 ml-auto text-muted-foreground transition-all',
-            isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
-          )}
-        />
+        <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground transition-opacity group-hover:opacity-100 opacity-60 shrink-0" />
       </div>
 
       <div className="space-y-2">
@@ -132,7 +127,7 @@ export function ProviderCard({
                       />
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-xs">
-                      {/* TODO i18n: missing key */}Missing Project ID - re-add account to fix
+                      {t('providerCard.missingProjectId')}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

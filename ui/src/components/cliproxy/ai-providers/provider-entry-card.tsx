@@ -53,16 +53,8 @@ export function ProviderEntryCard({
 
   if (variant === 'row') {
     return (
-      <div
-        role={onSelect ? 'button' : undefined}
-        tabIndex={onSelect ? 0 : undefined}
-        className={cn(
-          'group rounded-xl border bg-background px-3 py-3 transition-colors',
-          onSelect && 'cursor-pointer',
-          isSelected
-            ? 'border-primary/20 bg-primary/5 shadow-sm'
-            : 'border-border/60 hover:bg-muted/40'
-        )}
+      <button
+        type="button"
         onClick={onSelect}
         onKeyDown={(event) => {
           if (!onSelect) return;
@@ -71,6 +63,13 @@ export function ProviderEntryCard({
             onSelect();
           }
         }}
+        className={cn(
+          'group rounded-xl border bg-background px-3 py-3 transition-colors text-left',
+          onSelect && 'cursor-pointer',
+          isSelected
+            ? 'border-primary/20 bg-primary/5 shadow-sm'
+            : 'border-border/60 hover:bg-muted/40'
+        )}
       >
         <div className="flex items-start gap-3">
           <div
@@ -146,7 +145,7 @@ export function ProviderEntryCard({
             ) : null}
           </div>
         </div>
-      </div>
+      </button>
     );
   }
 

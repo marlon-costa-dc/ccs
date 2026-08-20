@@ -45,6 +45,7 @@ export function CostByModelCard({
               .sort((a, b) => b.cost - a.cost)
               .map((model) => (
                 <button
+                  type="button"
                   key={model.model}
                   className="group flex items-center text-xs w-full hover:bg-muted/50 rounded px-2 py-1.5 transition-colors cursor-pointer gap-3"
                   onClick={(e) => onModelClick(model, e)}

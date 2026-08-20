@@ -56,6 +56,7 @@ function ProviderSidebarItem({
 
   return (
     <button
+      type="button"
       className={cn(
         'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer text-left',
         isSelected
@@ -117,9 +118,8 @@ function VariantSidebarItem({
   };
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       className={cn(
         'group w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer text-left pl-6',
         isSelected
@@ -178,7 +178,7 @@ function VariantSidebarItem({
       >
         <Trash2 className="w-3 h-3" />
       </Button>
-    </div>
+    </button>
   );
 }
 

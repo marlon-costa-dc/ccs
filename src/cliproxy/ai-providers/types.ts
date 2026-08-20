@@ -4,6 +4,9 @@ export const AI_PROVIDER_FAMILY_IDS = [
   'claude-api-key',
   'vertex-api-key',
   'openai-compatibility',
+  'opencode-api-key',
+  'opencode-go-api-key',
+  'poolside-api-key',
 ] as const;
 
 export type AiProviderFamilyId = (typeof AI_PROVIDER_FAMILY_IDS)[number];
@@ -105,6 +108,9 @@ export interface LocalAiProviderConfig {
   'claude-api-key'?: AiProviderApiKeyEntry[];
   'vertex-api-key'?: AiProviderApiKeyEntry[];
   'openai-compatibility'?: OpenAICompatEntry[];
+  'opencode-api-key'?: AiProviderApiKeyEntry[];
+  'opencode-go-api-key'?: AiProviderApiKeyEntry[];
+  'poolside-api-key'?: AiProviderApiKeyEntry[];
   [key: string]: unknown;
 }
 
@@ -151,5 +157,29 @@ export const AI_PROVIDER_FAMILY_DEFINITIONS: Record<
     authMode: 'connector',
     supportsNamedEntries: true,
     routePath: '/api/provider/openai-compat',
+  },
+  'opencode-api-key': {
+    id: 'opencode-api-key',
+    displayName: 'OpenCode Zen',
+    description: 'OpenCode Zen API key for CLIProxy-managed routing',
+    authMode: 'api-key',
+    supportsNamedEntries: false,
+    routePath: '/api/provider/opencode',
+  },
+  'opencode-go-api-key': {
+    id: 'opencode-go-api-key',
+    displayName: 'OpenCode Go',
+    description: 'OpenCode Go API key for CLIProxy-managed routing',
+    authMode: 'api-key',
+    supportsNamedEntries: false,
+    routePath: '/api/provider/opencode-go',
+  },
+  'poolside-api-key': {
+    id: 'poolside-api-key',
+    displayName: 'Poolside',
+    description: 'Poolside API key for CLIProxy-managed routing',
+    authMode: 'api-key',
+    supportsNamedEntries: false,
+    routePath: '/api/provider/poolside',
   },
 };
