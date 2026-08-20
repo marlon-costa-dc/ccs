@@ -23,6 +23,17 @@ import type {
   OAuthModelAliasPoolCapability,
 } from '../../config/schemas/cliproxy';
 import { isValidCliproxyRetryValue } from '../../config/schemas/cliproxy';
+import type { CLIProxyOAuthModelAliasConfig } from '../../config/schemas/cliproxy';
+import {
+  mergeOAuthModelAliases,
+  parseOAuthModelAliasSection,
+  serializeOAuthModelAliasBody,
+} from './oauth-model-alias-config';
+import {
+  mergePayloadConfig,
+  parsePayloadSection,
+  serializePayloadSection,
+} from './payload-rule-config';
 
 /** Internal API key for CCS-managed requests */
 export const CCS_INTERNAL_API_KEY = 'ccs-internal-managed';
@@ -52,14 +63,14 @@ export const CCS_CONTROL_PANEL_SECRET = 'ccs';
  * v18: Persist routing.session-affinity and routing.session-affinity-ttl from CCS unified config
  * v19: Persist backend-aware management panel repository from CCS unified config
  * v20: Pool-gated cooling/routing/retry-cap block; disable-cooling flips to false for pool users
- * v21: Fail-closed ordered OAuth alias-pool projection contract
+ * v21: Persist user-defined OAuth aliases and scoped payload override rules
  */
 export const CLIPROXY_CONFIG_VERSION = 21;
 
 export const ORIGINAL_MANAGEMENT_PANEL_REPOSITORY =
   'https://github.com/router-for-me/Cli-Proxy-API-Management-Center';
 export const PLUS_MANAGEMENT_PANEL_REPOSITORY =
-  'https://github.com/kaitranntt/Cli-Proxy-API-Management-Center';
+  'https://github.com/marlon-costa-dc/Cli-Proxy-API-Management-Center';
 
 interface RegenerateConfigOptions {
   configPath?: string;
@@ -403,7 +414,7 @@ function addAliasEntry(
   if (getDeniedModelIdReasonForProvider(normalized.name, 'agy')) return;
   if (getDeniedModelIdReasonForProvider(normalized.alias, 'agy')) return;
 
-  const key = `${normalized.name}\u0000${normalized.alias}`;
+  const key = normalized.alias;
   const existingIndex = indexByKey.get(key);
   if (existingIndex !== undefined) {
     if (normalized.fork) entries[existingIndex].fork = true;
@@ -412,6 +423,33 @@ function addAliasEntry(
 
   indexByKey.set(key, entries.length);
   entries.push(normalized);
+}
+
+function upsertConfiguredAliasEntry(
+  entries: OAuthModelAliasEntry[],
+  indexByKey: Map<string, number>,
+  entry: OAuthModelAliasEntry
+): void {
+  const normalized: OAuthModelAliasEntry = {
+    name: sanitizeYamlScalar(entry.name),
+    alias: normalizeAntigravityAlias(entry.alias),
+    fork: entry.fork || undefined,
+  };
+  if (!normalized.name || !normalized.alias) return;
+  if (getDeniedModelIdReasonForProvider(normalized.name, 'agy')) return;
+  if (getDeniedModelIdReasonForProvider(normalized.alias, 'agy')) return;
+
+  const existingIndex = entries.findIndex((candidate) => candidate.alias === normalized.alias);
+  if (existingIndex === -1) {
+    addAliasEntry(entries, indexByKey, normalized);
+    return;
+  }
+
+  entries[existingIndex] = normalized;
+  indexByKey.clear();
+  entries.forEach((candidate, index) => {
+    indexByKey.set(candidate.alias, index);
+  });
 }
 
 function buildAntigravityAliasKey(entry: Pick<OAuthModelAliasEntry, 'name' | 'alias'>): string {
@@ -729,9 +767,13 @@ function writeLegacyGeminiAliasCleanupBackup(configPath: string, existingContent
  * Generate oauth-model-alias YAML section.
  * Merges default Antigravity aliases with any user-added custom aliases.
  */
-function generateOAuthModelAliasSection(existingAliases?: string): string {
+function generateOAuthModelAliasSection(
+  existingAliases?: string,
+  configuredAliases?: CLIProxyOAuthModelAliasConfig
+): string {
   const aliasEntries: OAuthModelAliasEntry[] = [];
   const aliasIndexByKey = new Map<string, number>();
+  const normalizedConfiguredAliases = mergeOAuthModelAliases({}, configuredAliases);
 
   // Start with default aliases.
   for (const alias of DEFAULT_ANTIGRAVITY_ALIASES) {
@@ -744,6 +786,11 @@ function generateOAuthModelAliasSection(existingAliases?: string): string {
     for (const alias of parsed) {
       addAliasEntry(aliasEntries, aliasIndexByKey, alias);
     }
+  }
+
+  // CCS-owned structured aliases replace the same client alias in place.
+  for (const alias of normalizedConfiguredAliases.antigravity ?? []) {
+    upsertConfiguredAliasEntry(aliasEntries, aliasIndexByKey, alias);
   }
 
   // Expand lightweight compatibility aliases (dot/hyphen + customtools toggle).
@@ -794,11 +841,13 @@ function extractNonAntigravityAliasChannels(existingAliases?: string): string {
  * @param port - Server port (default: 8317)
  * @param userApiKeys - User-added API keys to preserve (default: [])
  * @param existingAliases - Existing oauth-model-alias content to merge with defaults
+ * @param existingPayload - Existing payload content to merge with structured CCS rules
  */
 function generateUnifiedConfigContent(
   port: number = CLIPROXY_DEFAULT_PORT,
   userApiKeys: string[] = [],
-  existingAliases?: string
+  existingAliases?: string,
+  existingPayload?: string
 ): string {
   const authDir = getAuthDir(); // Base auth dir - CLIProxyAPI scans subdirectories
   // Convert Windows backslashes to forward slashes for YAML compatibility
@@ -813,6 +862,10 @@ function generateUnifiedConfigContent(
   const requestRetry = getRequestRetry();
   const maxRetryInterval = getMaxRetryInterval();
   const managementPanelRepository = getManagementPanelRepository();
+  const userRoutingConfig = loadOrCreateUnifiedConfig().cliproxy;
+  const payloadSection = serializePayloadSection(
+    mergePayloadConfig(parsePayloadSection(existingPayload ?? ''), userRoutingConfig.payload)
+  );
 
   // Get effective auth tokens (respects user customization)
   const effectiveApiKey = getEffectiveApiKey();
@@ -926,7 +979,8 @@ ${apiKeysYaml}
 
 # OAuth tokens directory (auto-discovered by CLIProxyAPI)
 auth-dir: "${authDirNormalized}"
-${generateOAuthModelAliasSection(existingAliases)}
+${generateOAuthModelAliasSection(existingAliases, userRoutingConfig.oauth_model_alias)}
+${payloadSection ? `${payloadSection}\n` : ''}
 `;
 
   return config;
@@ -1048,6 +1102,7 @@ export function regenerateConfig(
   let effectivePort = port;
   let userApiKeys: string[] = [];
   let existingAliases = '';
+  let existingPayload = '';
   const preservedSections: PreservedYamlSection[] = [];
 
   if (fs.existsSync(configPath)) {
@@ -1098,7 +1153,12 @@ export function regenerateConfig(
   fs.mkdirSync(authDir, { recursive: true, mode: 0o700 });
 
   // Generate fresh config with preserved user API keys and aliases
-  let configContent = generateUnifiedConfigContent(effectivePort, userApiKeys, existingAliases);
+  let configContent = generateUnifiedConfigContent(
+    effectivePort,
+    userApiKeys,
+    existingAliases,
+    existingPayload
+  );
 
   // Re-append managed top-level sections that are not part of the generated defaults.
   for (const section of preservedSections) {

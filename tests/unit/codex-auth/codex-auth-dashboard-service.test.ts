@@ -95,10 +95,8 @@ let ccsDir: string;
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-test-'));
   process.env.CCS_HOME = tmpDir;
-  // Clear ambient CODEX_HOME/CCS_CODEX_PROFILE so resolveActive() does not
-  // pick up the real ~/.codex from the outer shell. afterEach deletes these
-  // but beforeEach must also clear them to stay hermetic under bun's shared
-  // parallel runner.
+  // Hermeticity: the ambient shell may export CODEX_HOME / CCS_CODEX_PROFILE.
+  // Clear them so active-resolution tests start from a clean state.
   delete process.env.CODEX_HOME;
   delete process.env.CCS_CODEX_PROFILE;
   ccsDir = path.join(tmpDir, '.ccs');

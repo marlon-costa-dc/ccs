@@ -49,6 +49,23 @@ async function createProxyServer(options: {
   return { baseUrl: `http://127.0.0.1:${port}`, server };
 }
 
+/**
+ * Reserve a port that is guaranteed free (nothing listening) by binding to an
+ * ephemeral port and then closing the listener. Returns the now-free port.
+ * Avoids hardcoding a port (e.g. 19999) that may be occupied by another
+ * service on the host.
+ */
+async function reserveFreePort(): Promise<number> {
+  return await new Promise<number>((resolve, reject) => {
+    const server = http.createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const port = (server.address() as AddressInfo).port;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
 afterEach(async () => {
   while (servers.length > 0) {
     const server = servers.pop();
@@ -138,9 +155,10 @@ describe('cliproxy local proxy route', () => {
   });
 
   it('returns 502 when CLIProxy is not reachable', async () => {
-    // Use a port with nothing listening
+    // Use a port with nothing listening (dynamically reserved, then released)
+    const unreachablePort = await reserveFreePort();
     const proxy = await createProxyServer({
-      resolveTargetPort: () => 19999,
+      resolveTargetPort: () => unreachablePort,
       enforceAccess: () => true,
     });
 

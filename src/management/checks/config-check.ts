@@ -137,6 +137,8 @@ export class ConfigFilesChecker implements IHealthChecker {
     const settingsFiles = [
       { name: 'glm.settings.json', profile: 'glm', displayName: 'GLM Settings' },
       { name: 'kimi.settings.json', profile: 'kimi', displayName: 'Kimi Settings' },
+      { name: 'poolside.settings.json', profile: 'poolside', displayName: 'Poolside Settings' },
+      { name: 'opencode.settings.json', profile: 'opencode', displayName: 'OpenCode Settings' },
     ];
 
     for (const file of settingsFiles) {

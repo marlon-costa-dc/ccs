@@ -1,11 +1,30 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2378,
-    "filesAffected": 254,
-    "hotpathOccurrences": 1102,
-    "hotpathFilesAffected": 150,
+    "totalOccurrences": 2471,
+    "filesAffected": 261,
+    "hotpathOccurrences": 1186,
+    "hotpathFilesAffected": 155,
     "topHotpathFiles": [
+      {
+        "file": "src/management/shared-manager/diverged-file-adopter.ts",
+        "count": 39,
+        "calls": [
+          "closeSync",
+          "fsyncSync",
+          "linkSync",
+          "lstatSync",
+          "openSync",
+          "readdirSync",
+          "readFileSync",
+          "readlinkSync",
+          "renameSync",
+          "statSync",
+          "unlinkSync",
+          "writeFileSync"
+        ],
+        "markers": []
+      },
       {
         "file": "src/utils/browser/mcp-installer.ts",
         "count": 32,
@@ -139,24 +158,6 @@
           "statSync"
         ],
         "markers": []
-      },
-      {
-        "file": "src/utils/claude-dir-installer.ts",
-        "count": 21,
-        "calls": [
-          "copyFileSync",
-          "cpSync",
-          "existsSync",
-          "lstatSync",
-          "mkdirSync",
-          "readdirSync",
-          "renameSync",
-          "rmSync",
-          "statSync",
-          "unlinkSync",
-          "writeFileSync"
-        ],
-        "markers": []
       }
     ],
     "topFilesOverall": [
@@ -228,6 +229,25 @@
         "markers": []
       },
       {
+        "file": "src/management/shared-manager/diverged-file-adopter.ts",
+        "count": 39,
+        "calls": [
+          "closeSync",
+          "fsyncSync",
+          "linkSync",
+          "lstatSync",
+          "openSync",
+          "readdirSync",
+          "readFileSync",
+          "readlinkSync",
+          "renameSync",
+          "statSync",
+          "unlinkSync",
+          "writeFileSync"
+        ],
+        "markers": []
+      },
+      {
         "file": "src/cliproxy/executor/__tests__/variant-port-integration.test.js",
         "count": 36,
         "calls": [
@@ -282,26 +302,12 @@
           "writeFileSync"
         ],
         "markers": []
-      },
-      {
-        "file": "src/cliproxy/__tests__/session-tracker-port.test.js",
-        "count": 31,
-        "calls": [
-          "existsSync",
-          "mkdirSync",
-          "readdirSync",
-          "readFileSync",
-          "rmSync",
-          "unlinkSync",
-          "writeFileSync"
-        ],
-        "markers": []
       }
     ]
   },
   "legacyShim": {
-    "totalMarkers": 456,
-    "filesAffected": 171,
+    "totalMarkers": 466,
+    "filesAffected": 177,
     "topFiles": [
       {
         "file": "src/auth/profile-detector.ts",
@@ -491,11 +497,11 @@
   },
   "maintainability": {
     "typedErrors": {
-      "totalThrows": 446,
-      "typedThrows": 74,
-      "plainThrows": 312,
+      "totalThrows": 454,
+      "typedThrows": 83,
+      "plainThrows": 311,
       "otherThrows": 60,
-      "adoptionRatio": 0.1659,
+      "adoptionRatio": 0.1828,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
@@ -504,16 +510,16 @@
           "plain": 45
         },
         {
+          "subdomain": "commands",
+          "count": 38,
+          "typed": 6,
+          "plain": 30
+        },
+        {
           "subdomain": "proxy",
           "count": 38,
           "typed": 0,
           "plain": 34
-        },
-        {
-          "subdomain": "commands",
-          "count": 36,
-          "typed": 4,
-          "plain": 30
         },
         {
           "subdomain": "codex-auth",
@@ -540,6 +546,12 @@
           "plain": 17
         },
         {
+          "subdomain": "cliproxy/auth",
+          "count": 16,
+          "typed": 16,
+          "plain": 0
+        },
+        {
           "subdomain": "cliproxy/accounts",
           "count": 13,
           "typed": 0,
@@ -550,12 +562,6 @@
           "count": 12,
           "typed": 12,
           "plain": 0
-        },
-        {
-          "subdomain": "cliproxy/ai-providers",
-          "count": 12,
-          "typed": 0,
-          "plain": 12
         }
       ]
     },
@@ -566,15 +572,15 @@
         "web-server/routes",
         "auth"
       ],
-      "numerator": 22,
-      "denominator": 24,
-      "ratio": 0.9167,
+      "numerator": 28,
+      "denominator": 30,
+      "ratio": 0.9333,
       "targetRatio": 0.4
     },
     "loggerCoverage": {
       "filesWithCreateLogger": 65,
-      "totalSourceFiles": 752,
-      "coverageRatio": 0.0864,
+      "totalSourceFiles": 764,
+      "coverageRatio": 0.0851,
       "subdomainsWithZeroCreateLogger": [
         "api",
         "bin",
@@ -600,16 +606,21 @@
         },
         {
           "subdomain": "commands",
-          "count": 108,
+          "count": 110,
           "withLogger": 2
         },
         {
           "subdomain": "utils",
-          "count": 88,
+          "count": 90,
           "withLogger": 1
         },
         {
           "subdomain": "management",
+          "count": 35,
+          "withLogger": 1
+        },
+        {
+          "subdomain": "cliproxy/auth",
           "count": 32,
           "withLogger": 1
         },
@@ -617,11 +628,6 @@
           "subdomain": "cliproxy/quota",
           "count": 31,
           "withLogger": 5
-        },
-        {
-          "subdomain": "cliproxy/auth",
-          "count": 30,
-          "withLogger": 1
         },
         {
           "subdomain": "config",
@@ -646,10 +652,10 @@
       ]
     },
     "hotpathConsoleErrors": {
-      "totalOccurrences": 571,
-      "exemptOccurrences": 305,
-      "hotpathOccurrences": 266,
-      "filesAffected": 82,
+      "totalOccurrences": 593,
+      "exemptOccurrences": 326,
+      "hotpathOccurrences": 267,
+      "filesAffected": 81,
       "topFiles": [
         {
           "file": "src/errors/error-handler.ts",
@@ -704,22 +710,22 @@
           "count": 7
         },
         {
-          "file": "src/targets/droid-detector.ts",
+          "file": "src/cliproxy/auth/oauth-handler.ts",
           "count": 6
         },
         {
-          "file": "src/utils/hooks/image-analyzer-hook-installer.ts",
+          "file": "src/targets/droid-detector.ts",
           "count": 6
         }
       ]
     },
     "largeFiles": {
-      "countOver400": 91,
+      "countOver400": 92,
       "countOver600": 42,
       "topOver400": [
         {
           "file": "src/web-server/usage/native-quota-collector.ts",
-          "loc": 1662
+          "loc": 1758
         },
         {
           "file": "src/web-server/routes/cliproxy-auth-routes.ts",
@@ -727,7 +733,7 @@
         },
         {
           "file": "src/cliproxy/auth/oauth-handler.ts",
-          "loc": 1467
+          "loc": 1520
         },
         {
           "file": "src/cursor/cursor-executor.ts",
@@ -735,31 +741,35 @@
         },
         {
           "file": "src/web-server/model-pricing.ts",
-          "loc": 1105
+          "loc": 1127
+        },
+        {
+          "file": "src/cliproxy/config/generator.ts",
+          "loc": 1109
         },
         {
           "file": "src/cliproxy/auth/oauth-process.ts",
           "loc": 1048
         },
         {
-          "file": "src/web-server/routes/settings-routes.ts",
-          "loc": 1042
+          "file": "src/cliproxy/config/env-builder.ts",
+          "loc": 1045
         },
         {
-          "file": "src/cliproxy/config/generator.ts",
-          "loc": 1034
+          "file": "src/web-server/routes/settings-routes.ts",
+          "loc": 1042
         },
         {
           "file": "src/cliproxy/proxy/tool-sanitization-proxy.ts",
           "loc": 1020
         },
         {
-          "file": "src/cliproxy/config/env-builder.ts",
-          "loc": 1017
-        },
-        {
           "file": "src/commands/cliproxy/variant-subcommand.ts",
           "loc": 997
+        },
+        {
+          "file": "src/cliproxy/model-catalog.ts",
+          "loc": 955
         },
         {
           "file": "src/cliproxy/quota/quota-manager.ts",
@@ -772,10 +782,6 @@
         {
           "file": "src/glmt/glmt-proxy.ts",
           "loc": 939
-        },
-        {
-          "file": "src/cliproxy/accounts/registry.ts",
-          "loc": 871
         }
       ]
     }

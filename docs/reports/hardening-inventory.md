@@ -6,17 +6,18 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 
 | Metric | Value |
 |---|---:|
-| Sync fs occurrences (all) | 2378 |
-| Sync fs files affected (all) | 254 |
-| Sync fs occurrences (runtime hotpaths) | 1102 |
-| Sync fs files affected (runtime hotpaths) | 150 |
-| Legacy shim markers | 456 |
-| Legacy shim files affected | 171 |
+| Sync fs occurrences (all) | 2471 |
+| Sync fs files affected (all) | 261 |
+| Sync fs occurrences (runtime hotpaths) | 1186 |
+| Sync fs files affected (runtime hotpaths) | 155 |
+| Legacy shim markers | 466 |
+| Legacy shim files affected | 177 |
 
 ## Top Runtime Hotpath Sync fs Files
 
 | File | Sync Calls | API Names |
 |---|---:|---|
+| `src/management/shared-manager/diverged-file-adopter.ts` | 39 | closeSync, fsyncSync, linkSync, lstatSync, openSync, readdirSync, readFileSync, readlinkSync, renameSync, statSync, unlinkSync, writeFileSync |
 | `src/utils/browser/mcp-installer.ts` | 32 | chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync |
 | `src/utils/image-analysis/mcp-installer.ts` | 30 | chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync |
 | `src/utils/claude-symlink-manager.ts` | 27 | copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync, unlinkSync |
@@ -26,7 +27,6 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | `src/cliproxy/services/variant-settings.ts` | 23 | existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync |
 | `src/management/recovery-manager.ts` | 23 | copyFileSync, existsSync, lstatSync, mkdirSync, renameSync, statSync, unlinkSync, writeFileSync |
 | `src/utils/shell-completion.ts` | 23 | appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, statSync |
-| `src/utils/claude-dir-installer.ts` | 21 | copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync |
 
 ## Top Legacy Shim Marker Files
 
@@ -56,13 +56,13 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 
 | Metric | Value |
 |---|---:|
-| typed-error adoption (typed/total throws) | 16.6% (74/446) |
-| typed-error adoption (P4 locked subdomains) | 91.7% (22/24), target 40% |
-| hotpath console.error/warn occurrences | 266 (571 total, 305 CLI-UX exempt) |
-| hotpath console.error/warn files | 82 |
-| files with createLogger | 65/752 |
+| typed-error adoption (typed/total throws) | 18.3% (83/454) |
+| typed-error adoption (P4 locked subdomains) | 93.3% (28/30), target 40% |
+| hotpath console.error/warn occurrences | 267 (593 total, 326 CLI-UX exempt) |
+| hotpath console.error/warn files | 81 |
+| files with createLogger | 65/764 |
 | subdomains with zero createLogger | 15 (api, bin, channels, cliproxy, cliproxy/accounts, cliproxy/ai-providers, cliproxy/binary, cliproxy/config, cliproxy/management, cliproxy/sync, cliproxy/types, config, dispatcher, shared, types) |
-| files > 400 LOC | 91 |
+| files > 400 LOC | 92 |
 | files > 600 LOC | 42 |
 
 ### Top Hotpath console.error/warn Files
@@ -82,26 +82,26 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | `src/targets/claude-adapter.ts` | 7 |
 | `src/utils/shell-executor.ts` | 7 |
 | `src/utils/websearch/hook-config.ts` | 7 |
+| `src/cliproxy/auth/oauth-handler.ts` | 6 |
 | `src/targets/droid-detector.ts` | 6 |
-| `src/utils/hooks/image-analyzer-hook-installer.ts` | 6 |
 
 ### Files > 400 LOC (top 15)
 
 | File | LOC |
 |---|---:|
-| `src/web-server/usage/native-quota-collector.ts` | 1662 |
+| `src/web-server/usage/native-quota-collector.ts` | 1758 |
 | `src/web-server/routes/cliproxy-auth-routes.ts` | 1531 |
-| `src/cliproxy/auth/oauth-handler.ts` | 1467 |
+| `src/cliproxy/auth/oauth-handler.ts` | 1520 |
 | `src/cursor/cursor-executor.ts` | 1234 |
-| `src/web-server/model-pricing.ts` | 1105 |
+| `src/web-server/model-pricing.ts` | 1127 |
+| `src/cliproxy/config/generator.ts` | 1109 |
 | `src/cliproxy/auth/oauth-process.ts` | 1048 |
+| `src/cliproxy/config/env-builder.ts` | 1045 |
 | `src/web-server/routes/settings-routes.ts` | 1042 |
-| `src/cliproxy/config/generator.ts` | 1034 |
 | `src/cliproxy/proxy/tool-sanitization-proxy.ts` | 1020 |
-| `src/cliproxy/config/env-builder.ts` | 1017 |
 | `src/commands/cliproxy/variant-subcommand.ts` | 997 |
+| `src/cliproxy/model-catalog.ts` | 955 |
 | `src/cliproxy/quota/quota-manager.ts` | 954 |
 | `src/web-server/services/codex-dashboard-service.ts` | 940 |
 | `src/glmt/glmt-proxy.ts` | 939 |
-| `src/cliproxy/accounts/registry.ts` | 871 |
 

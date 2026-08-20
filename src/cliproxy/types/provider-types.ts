@@ -7,6 +7,8 @@ export type CLIProxyProvider =
   | 'gemini'
   | 'codex'
   | 'xai'
+  | 'zai'
+  | 'opencode'
   | 'agy'
   | 'qwen'
   | 'iflow'
@@ -18,7 +20,9 @@ export type CLIProxyProvider =
   | 'gitlab'
   | 'codebuddy'
   | 'kilo'
-  | 'qoder';
+  | 'qoder'
+  | 'opencode-go'
+  | 'poolside';
 
 /** CLIProxy backend selection */
 export type CLIProxyBackend = 'original' | 'plus';
