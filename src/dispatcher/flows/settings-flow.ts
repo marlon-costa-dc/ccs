@@ -32,7 +32,7 @@ import {
   resolveOptionalBrowserAttachRuntime,
   syncBrowserMcpToConfigDir,
 } from '../../utils/browser';
-import { getGlobalEnvConfig } from '../../config/config-loader-facade';
+import { getGlobalEnvConfig, getImageAnalysisConfig } from '../../config/config-loader-facade';
 import {
   ensureProfileHooks as ensureImageAnalyzerHooks,
   removeImageAnalysisProfileHook,
@@ -82,6 +82,7 @@ export async function runSettingsFlow(ctx: ProfileDispatchContext): Promise<void
     remainingArgs,
   } = ctx;
 
+  const imageAnalysisConfig = getImageAnalysisConfig();
   const imageAnalysisMcpReady =
     resolvedTarget === 'claude' ? ensureImageAnalysisMcpOrThrow() : true;
   const browserAttachRuntime =
@@ -123,8 +124,12 @@ export async function runSettingsFlow(ctx: ProfileDispatchContext): Promise<void
     );
   }
   const inheritedClaudeConfigDir = continuityInheritance.claudeConfigDir;
-  syncWebSearchMcpToConfigDir(inheritedClaudeConfigDir);
-  syncImageAnalysisMcpToConfigDir(inheritedClaudeConfigDir);
+  if (webSearchLaunch.enabled) {
+    syncWebSearchMcpToConfigDir(inheritedClaudeConfigDir);
+  }
+  if (imageAnalysisConfig.enabled) {
+    syncImageAnalysisMcpToConfigDir(inheritedClaudeConfigDir);
+  }
   if (
     browserRuntimeEnv &&
     inheritedClaudeConfigDir &&

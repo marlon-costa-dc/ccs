@@ -36,8 +36,29 @@ describe('run-test-bucket', () => {
     expect(slowSet.has('tests/integration/web-server/codex-profiles-endpoint.test.ts')).toBe(true);
   });
 
+  test('keeps daemon-launch suites slow and isolated', () => {
+    const daemonSuites = [
+      'tests/unit/utils/claudecode-env-stripping.test.ts',
+      'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
+    ];
+    const slowSet = bucket.getSlowSet();
+    const runs = bucket.getBunRuns('slow', daemonSuites);
+
+    for (const relativePath of daemonSuites) {
+      expect(slowSet.has(relativePath)).toBe(true);
+    }
+    expect(runs.map((run) => run.label)).toEqual(daemonSuites);
+  });
+
   test('forces npm tests into the slow bucket', () => {
     expect(bucket.shouldForceSlow('tests/npm/cli.test.js')).toBe(true);
+  });
+
+  test('isolates every npm artifact suite from the shared slow run', () => {
+    const npmSuites = ['tests/npm/cli.test.js', 'tests/npm/cross-platform.test.js'];
+    const runs = bucket.getBunRuns('slow', npmSuites);
+
+    expect(runs.map((run) => run.label)).toEqual(npmSuites);
   });
 
   test('discovers colocated backend tests under src', () => {
@@ -62,7 +83,12 @@ describe('run-test-bucket', () => {
   test('keeps slow bucket concurrency flag before explicit test paths', () => {
     const args = bucket.getBunArgs('slow', ['tests/integration/example.test.ts']);
 
-    expect(args).toEqual(['test', '--max-concurrency=1', './tests/integration/example.test.ts']);
+    expect(args).toEqual([
+      'test',
+      '--max-concurrency=1',
+      '--timeout=10000',
+      './tests/integration/example.test.ts',
+    ]);
   });
 
   test('isolates src tests while keeping already-covered tests in a shared run', () => {
@@ -98,6 +124,29 @@ describe('run-test-bucket', () => {
       'tests/unit/commands/bar-command.test.ts',
       'tests/unit/targets/target-registry.test.ts',
     ]);
+  });
+
+  test('isolates subprocess launch suites in the slow bucket', () => {
+    const runs = bucket.getBunRuns('slow', [
+      'tests/unit/commands/persist-command-handler.test.ts',
+      'tests/npm/cli.test.js',
+      'tests/unit/targets/droid-command-routing-integration.test.ts',
+      'tests/unit/targets/native-claude-effort-launch.test.ts',
+      'tests/unit/targets/settings-profile-browser-launch.test.ts',
+      'tests/unit/targets/settings-profile-websearch-launch.test.ts',
+      'tests/unit/web-server/websearch-routes.test.ts',
+    ]);
+
+    expect(runs.map((run) => run.label)).toEqual([
+      'shared',
+      'tests/npm/cli.test.js',
+      'tests/unit/targets/droid-command-routing-integration.test.ts',
+      'tests/unit/targets/native-claude-effort-launch.test.ts',
+      'tests/unit/targets/settings-profile-browser-launch.test.ts',
+      'tests/unit/targets/settings-profile-websearch-launch.test.ts',
+      'tests/unit/web-server/websearch-routes.test.ts',
+    ]);
+    expect(runs.slice(1).every((run) => run.quietOnPass)).toBe(true);
   });
 
   test('isolates standalone validation scripts that are not Bun test suites', () => {

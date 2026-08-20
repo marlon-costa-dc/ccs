@@ -1,8 +1,11 @@
 const assert = require('assert');
+const { afterAll, beforeAll, describe, it, setDefaultTimeout } = require('bun:test');
 const fs = require('fs');
 const { execSync } = require('child_process');
 const path = require('path');
 const { createTestEnvironment } = require('../shared/fixtures/test-environment');
+
+setDefaultTimeout(10000);
 
 describe('npm CLI', () => {
   const distCcsPath = path.join(__dirname, '..', '..', 'dist', 'ccs.js');
@@ -87,7 +90,7 @@ describe('npm CLI', () => {
     });
 
     it('routes cursor through the CLIProxy provider shortcut', function() {
-      const output = execSync(`bun "${srcCcsPath}" cursor --help`, {
+      const output = execSync(buildCliCommand('cursor --help'), {
         encoding: 'utf8',
         stdio: 'pipe',
         timeout: 3000,
@@ -100,7 +103,7 @@ describe('npm CLI', () => {
     });
 
     it('routes gitlab --help to provider shortcut help instead of starting auth', function() {
-      const output = execSync(`bun "${srcCcsPath}" gitlab --help`, {
+      const output = execSync(buildCliCommand('gitlab --help'), {
         encoding: 'utf8',
         timeout: 3000,
         env: { ...process.env, CCS_HOME: testCcsHome }

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
 import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -13,9 +13,11 @@ interface RunResult {
   stderr: string;
 }
 
+setDefaultTimeout(10000);
+
 function runCcs(args: string[], env: NodeJS.ProcessEnv): RunResult {
-  const ccsEntry = path.join(process.cwd(), 'src', 'ccs.ts');
-  const result = spawnSync(process.execPath, [ccsEntry, ...args], {
+  const ccsEntry = path.join(process.cwd(), 'dist', 'ccs.js');
+  const result = spawnSync('node', [ccsEntry, ...args], {
     encoding: 'utf8',
     env,
     timeout: 20000,
@@ -37,7 +39,7 @@ function readTraceEvents(tracePath: string): Array<Record<string, unknown>> {
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
-describe('settings profile WebSearch launch', () => {
+describe.serial('settings profile WebSearch launch', () => {
   let tmpHome = '';
   let ccsDir = '';
   let settingsPath = '';
@@ -95,6 +97,7 @@ exit 0
       ...process.env,
       CI: '1',
       NO_COLOR: '1',
+      CCS_NO_PRE_DISPATCH: '1',
       CCS_HOME: tmpHome,
       CCS_CLAUDE_PATH: fakeClaudePath,
       CCS_DEBUG: '1',

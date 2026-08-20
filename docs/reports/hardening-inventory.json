@@ -1,8 +1,8 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2404,
-    "filesAffected": 253,
+    "totalOccurrences": 2403,
+    "filesAffected": 252,
     "hotpathOccurrences": 1164,
     "hotpathFilesAffected": 153,
     "topHotpathFiles": [

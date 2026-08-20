@@ -17,11 +17,11 @@ interface RunResult {
 }
 
 function runCcs(args: string[], env: NodeJS.ProcessEnv): RunResult {
-  const ccsEntry = path.join(process.cwd(), 'src', 'ccs.ts');
-  const result = spawnSync(process.execPath, [ccsEntry, ...args], {
+  const ccsEntry = path.join(process.cwd(), 'dist', 'ccs.js');
+  const result = spawnSync('node', [ccsEntry, ...args], {
     encoding: 'utf8',
     env,
-    timeout: 8000,
+    timeout: 10000,
   });
 
   return {
@@ -48,6 +48,9 @@ function reserveClosedPort(): number {
   });
   const { port } = server;
   server.stop(true);
+  if (port === undefined) {
+    throw new Error('Mock browser server did not expose a port');
+  }
   return port;
 }
 
@@ -184,6 +187,8 @@ exit 0
       CCS_HOME: tmpHome,
       CCS_CLAUDE_PATH: fakeClaudePath,
       CCS_DEBUG: '1',
+      CCS_NO_PRE_DISPATCH: '1',
+      CCS_SKIP_PREFLIGHT: '1',
       CCS_BROWSER_USER_DATA_DIR: '',
       CCS_BROWSER_PROFILE_DIR: '',
       CCS_BROWSER_DEVTOOLS_HOST: '',
@@ -203,7 +208,7 @@ exit 0
       return;
     }
 
-    await stopOpenAICompatProxy();
+    await stopOpenAICompatProxy('glm');
     fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 

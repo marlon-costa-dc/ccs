@@ -23,6 +23,7 @@ const slowTests = [
   'tests/integration/proxy/daemon-lifecycle.test.ts',
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
   'tests/unit/commands/persist-command-handler.test.ts',
+  'tests/unit/utils/claudecode-env-stripping.test.ts',
   'tests/unit/hooks/browser-mcp-advanced-interactions.test.ts',
   'tests/unit/hooks/browser-mcp-downloads-and-files.test.ts',
   'tests/unit/hooks/browser-mcp-navigation-and-query.test.ts',
@@ -39,6 +40,7 @@ const slowTests = [
   'tests/unit/targets/settings-profile-websearch-launch.test.ts',
   'tests/unit/web-server/websearch-routes.test.ts',
   'src/cliproxy/auth/__tests__/oauth-handler-gemini-backend-guidance.test.ts',
+  'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
 ];
 // CommonJS-heavy JS suites stay slow by default because many of them mutate
 // module cache or process state. Opt them into `test:fast` only after they are
@@ -49,12 +51,20 @@ const isolatedTests = new Set([
   'tests/unit/commands/update-command-beta-channel.test.js',
   'tests/unit/commands/update-command-force-reinstall.test.js',
   'tests/unit/commands/bar-command.test.ts',
+  'tests/unit/utils/claudecode-env-stripping.test.ts',
+  'tests/npm/cli.test.js',
+  'tests/unit/targets/droid-command-routing-integration.test.ts',
+  'tests/unit/targets/native-claude-effort-launch.test.ts',
+  'tests/unit/targets/settings-profile-browser-launch.test.ts',
+  'tests/unit/targets/settings-profile-websearch-launch.test.ts',
+  'tests/unit/web-server/websearch-routes.test.ts',
   'tests/unit/targets/codex-adapter-exec.test.ts',
   'tests/unit/targets/codex-adapter.test.ts',
   'tests/unit/targets/droid-adapter.test.ts',
   'tests/unit/targets/target-registry.test.ts',
   'tests/unit/utils/fetch-proxy-setup.test.ts',
   'tests/unit/web-server/usage/account-attribution.test.ts',
+  'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
 ]);
 
 const filePattern = /(\.test\.(c|m)?[jt]s|\.spec\.(c|m)?[jt]s|-test\.(c|m)?[jt]s)$/;
@@ -134,11 +144,18 @@ function getBunArgs(name, selected = selectBucket(name)) {
   // Slow bucket forces sequential execution because it spawns subprocesses,
   // binds ports, and touches shared state — parallelism causes flakes.
   // Fast bucket keeps bun's default parallelism for speed.
-  return name === 'slow' ? ['test', '--max-concurrency=1', ...testPaths] : ['test', ...testPaths];
+  return name === 'slow'
+    ? ['test', '--max-concurrency=1', '--timeout=10000', ...testPaths]
+    : ['test', ...testPaths];
 }
 
 function shouldRunIsolated(file) {
-  return file.startsWith('src/') || isolatedTests.has(file) || !usesBunTestRunner(file);
+  return (
+    file.startsWith('src/') ||
+    file.startsWith('tests/npm/') ||
+    isolatedTests.has(file) ||
+    !usesBunTestRunner(file)
+  );
 }
 
 function getBunRuns(name, selected = selectBucket(name)) {
