@@ -100,11 +100,11 @@ describe('run-test-bucket', () => {
 
   test('isolates standalone validation scripts that are not Bun test suites', () => {
     const runs = bucket.getBunRuns('slow', [
-      'tests/integration/cursor-daemon-lifecycle.test.ts',
+      'tests/integration/logging-request-context.test.ts',
       'tests/integration/token-counting-test.js',
     ]);
 
-    expect(bucket.usesBunTestRunner('tests/integration/cursor-daemon-lifecycle.test.ts')).toBe(
+    expect(bucket.usesBunTestRunner('tests/integration/logging-request-context.test.ts')).toBe(
       true
     );
     expect(bucket.usesBunTestRunner('tests/integration/token-counting-test.js')).toBe(false);
@@ -138,7 +138,7 @@ describe('run-test-bucket', () => {
     ).toBe(false);
     expect(
       bucket.shouldVerifyRunFileCount({
-        selected: ['tests/integration/cursor-daemon-lifecycle.test.ts'],
+        selected: ['tests/integration/logging-request-context.test.ts'],
       })
     ).toBe(true);
   });

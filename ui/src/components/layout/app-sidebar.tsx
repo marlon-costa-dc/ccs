@@ -11,7 +11,6 @@ import {
   BarChart3,
   Gauge,
   ScrollText,
-  Github,
   Puzzle,
   TerminalSquare,
 } from 'lucide-react';
@@ -120,21 +119,6 @@ function buildNavGroups(t: (key: string) => string): SidebarGroupDef[] {
         { path: '/claude-extension', icon: Puzzle, label: t('nav.claudeExtension') },
         { path: '/codex', iconSrc: '/assets/sidebar/codex.svg', label: 'Codex CLI' },
         { path: '/droid', icon: TerminalSquare, label: t('nav.factoryDroid') },
-      ],
-    },
-    {
-      title: t('nav.deprecated'),
-      items: [
-        {
-          path: '/copilot',
-          icon: Github,
-          label: `${t('nav.githubCopilot')} (${t('nav.deprecated')})`,
-        },
-        {
-          path: '/legacy/cursor',
-          iconSrc: '/assets/sidebar/cursor.svg',
-          label: `${t('nav.cursorIde')} (Legacy)`,
-        },
       ],
     },
     {

@@ -7,7 +7,6 @@ import {
   CLEANUP_FLAGS,
   COMMAND_FLAG_SUGGESTIONS,
   CONFIG_SUBCOMMANDS,
-  COPILOT_COMPLETION_SUBCOMMANDS,
   DOCKER_SUBCOMMANDS,
   ROOT_COMMAND_FLAGS,
   ROOT_HELP_TOPICS,
@@ -18,7 +17,6 @@ import {
   getPublicRootCommandTokens,
   CLIPROXY_SUBCOMMANDS,
   MIGRATE_FLAGS,
-  CURSOR_COMPLETION_SUBCOMMANDS,
 } from './command-catalog';
 
 export interface CompletionSuggestion {
@@ -242,8 +240,6 @@ function getSuggestionsForCommand(tokensBeforeCurrent: string[]): CompletionSugg
         return completeSubcommands([], ['--help', '-h']);
       }
       return completeSubcommands([], ['--help', '-h']);
-    case 'cursor':
-      return completeSubcommands(CURSOR_COMPLETION_SUBCOMMANDS);
     case 'proxy':
       if (lastToken === '--shell')
         return completeSubcommands(['auto', 'bash', 'zsh', 'fish', 'powershell']);
@@ -251,8 +247,6 @@ function getSuggestionsForCommand(tokensBeforeCurrent: string[]): CompletionSugg
         [...PROXY_SUBCOMMANDS],
         ['--port', '--shell', '--insecure', '--help', '-h']
       );
-    case 'copilot':
-      return completeSubcommands(COPILOT_COMPLETION_SUBCOMMANDS);
     case 'env':
       if (lastToken === '--format')
         return completeSubcommands(['openai', 'anthropic', 'raw', 'claude-extension']);

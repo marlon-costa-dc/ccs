@@ -19,7 +19,6 @@ const candidateRoots = ['tests/unit', 'tests/integration', 'tests/npm', 'src'];
 // (catches deletion drift) but CANNOT detect new undeclared slow tests.
 // Automated perf-budget enforcement tracked in issue #1071.
 const slowTests = [
-  'tests/integration/cursor-daemon-lifecycle.test.ts',
   'tests/integration/logging-request-context.test.ts',
   'tests/integration/proxy/daemon-lifecycle.test.ts',
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
@@ -38,7 +37,6 @@ const slowTests = [
   'tests/unit/targets/settings-profile-browser-launch.test.ts',
   'tests/unit/targets/settings-profile-image-analysis-launch.test.ts',
   'tests/unit/targets/settings-profile-websearch-launch.test.ts',
-  'tests/unit/web-server/cursor-routes.test.ts',
   'tests/unit/web-server/websearch-routes.test.ts',
   'src/cliproxy/auth/__tests__/oauth-handler-gemini-backend-guidance.test.ts',
 ];

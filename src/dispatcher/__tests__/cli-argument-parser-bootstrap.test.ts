@@ -156,16 +156,6 @@ describe('bootstrapAndParseEarlyCli', () => {
     }
   });
 
-  // ---------- legacy cursor args ----------
-
-  it('normalizes legacy cursor args (legacy cursor → legacy-cursor profile)', async () => {
-    const result = await bootstrapAndParseEarlyCli(['legacy', 'cursor', '--auth']);
-    expect(result.exitNow).toBe(false);
-    // normalizeLegacyCursorArgs transforms ['legacy', 'cursor', '--auth'] → ['legacy-cursor', '--auth']
-    expect(result.args[0]).toBe('legacy-cursor');
-    expect(result.args).toContain('--auth');
-  });
-
   // ---------- normal passthrough ----------
 
   it('returns exitNow=false and preserves args for normal invocation', async () => {

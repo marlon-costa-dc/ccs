@@ -31,16 +31,9 @@ import {
 } from '../cliproxy/provider-capabilities';
 import { isGrandfatheredReservedProfileName } from '../config/reserved-names';
 import { ConfigError } from '../errors/error-types';
-import { LEGACY_CURSOR_PROFILE_NAME } from '../cursor/constants';
-import { normalizeCopilotModelId } from '../copilot/copilot-model-normalizer';
 import type { TargetType } from '../targets/target-adapter';
 import type { ProfileType } from '../types/profile';
-import {
-  getCcsDir,
-  getCursorConfig,
-  isUnifiedMode,
-  loadUnifiedConfig,
-} from '../config/config-loader-facade';
+import { getCcsDir, isUnifiedMode, loadUnifiedConfig } from '../config/config-loader-facade';
 export type { ProfileType } from '../types/profile';
 
 /** CLIProxy profile names (OAuth-based, zero config) */
@@ -331,8 +324,7 @@ class ProfileDetector {
    * Detect profile type and return routing information
    *
    * Priority order:
-   * 0. Hardcoded special runtime profiles (copilot, cursor)
-   * 0.5. Hardcoded CLIProxy profiles (except grandfathered xai/grok collisions)
+   * 0. Hardcoded CLIProxy profiles (except grandfathered xai/grok collisions)
    * 1. Unified config profiles (if config.yaml exists or CCS_UNIFIED_CONFIG=1)
    * 2. User-defined CLIProxy variants (config.cliproxy section) [legacy]
    * 3. Settings-based profiles (config.profiles section) [legacy]
@@ -345,65 +337,7 @@ class ProfileDetector {
       return this.resolveDefaultProfile();
     }
 
-    // Priority 0: Check Copilot profile - GitHub Copilot subscription via copilot-api
-    if (profileName === 'copilot') {
-      const unifiedConfig = this.readUnifiedConfig();
-      const copilotConfig = unifiedConfig?.copilot;
-
-      if (!copilotConfig?.enabled) {
-        const error = new Error(
-          'Copilot profile is not enabled.\n\n' +
-            'To enable GitHub Copilot integration:\n' +
-            '  1. Run: ccs config\n' +
-            '  2. Go to "GitHub Copilot" section\n' +
-            '  3. Enable the integration\n' +
-            '  4. Authenticate with GitHub: npx copilot-api auth\n\n' +
-            'Or manually edit ~/.ccs/config.yaml:\n' +
-            '  copilot:\n' +
-            '    enabled: true'
-        ) as ProfileNotFoundError;
-        error.profileName = profileName;
-        error.suggestions = [];
-        error.availableProfiles = this.listAvailableProfiles();
-        throw error;
-      }
-
-      return {
-        type: 'copilot',
-        name: 'copilot',
-        copilotConfig,
-      };
-    }
-
-    // Priority 0.25: Check explicit legacy Cursor bridge profile.
-    if (profileName === LEGACY_CURSOR_PROFILE_NAME) {
-      const cursorConfig = getCursorConfig();
-
-      if (!cursorConfig?.enabled) {
-        const error = new Error(
-          'Legacy Cursor profile is not enabled.\n\n' +
-            'To enable Cursor integration:\n' +
-            '  1. Run: ccs legacy cursor enable\n' +
-            '  2. Import auth: ccs legacy cursor auth\n' +
-            '  3. Start daemon: ccs legacy cursor start\n\n' +
-            'Or manually edit ~/.ccs/config.yaml:\n' +
-            '  cursor:\n' +
-            '    enabled: true'
-        ) as ProfileNotFoundError;
-        error.profileName = profileName;
-        error.suggestions = [];
-        error.availableProfiles = this.listAvailableProfiles();
-        throw error;
-      }
-
-      return {
-        type: 'cursor',
-        name: LEGACY_CURSOR_PROFILE_NAME,
-        cursorConfig,
-      };
-    }
-
-    // Priority 0.5: Check CLIProxy profiles (gemini, codex, agy, qwen, ...)
+    // Priority 0: Check CLIProxy profiles (gemini, codex, agy, qwen, ...)
     const builtinProvider = resolveCLIProxyProviderShortcut(profileName);
     const shouldGrandfatherConfiguredProfile = builtinProvider === 'xai';
     if (builtinProvider && !shouldGrandfatherConfiguredProfile) {
@@ -634,18 +568,6 @@ class ProfileDetector {
     // Check unified config first
     const unifiedConfig = this.readUnifiedConfig();
     if (unifiedConfig) {
-      // Copilot profile (if enabled)
-      if (unifiedConfig.copilot?.enabled) {
-        const currentCopilotModel = normalizeCopilotModelId(unifiedConfig.copilot.model);
-        lines.push('GitHub Copilot (via copilot-api):');
-        lines.push(`  - copilot (model: ${currentCopilotModel})`);
-      }
-
-      if (unifiedConfig.cursor?.enabled) {
-        lines.push('Cursor local proxy:');
-        lines.push(`  - cursor (model: ${unifiedConfig.cursor.model})`);
-      }
-
       // CLIProxy variants from unified config
       const variants = Object.keys(unifiedConfig.cliproxy?.variants || {});
       if (variants.length > 0) {

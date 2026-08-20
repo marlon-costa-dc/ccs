@@ -5,17 +5,14 @@
  * Each handler may short-circuit the dispatch by returning true.
  *
  * Handles: update check, auto-migrate, recovery-manager, root-command router,
- * provider help shortcut, copilot/cursor subcommand routing, first-time install hint.
+ * provider help shortcut, first-time install hint.
  */
 
 import { info } from '../utils/ui';
 import { resolveCLIProxyProviderShortcut } from '../cliproxy/provider-capabilities';
-import { isCopilotSubcommandToken } from '../copilot/constants';
-import { isCursorSubcommandToken, LEGACY_CURSOR_PROFILE_NAME } from '../cursor/constants';
 import { isCacheStale } from '../utils/update-checker';
 import { tryHandleRootCommand } from '../commands/root-command-router';
 import { refreshUpdateCache, showCachedUpdateNotification } from './environment-builder';
-import { printCursorLegacySubcommandDeprecation } from './cli-argument-parser';
 import type { Logger } from '../services/logging/logger';
 
 // ========== Pre-Dispatch Context ==========
@@ -117,45 +114,6 @@ export async function runPreDispatchHandlers(ctx: PreDispatchContext): Promise<b
     const { showProviderShortcutHelp } = await import('../commands/help-command');
     await showProviderShortcutHelp(shortcutProvider);
     return true;
-  }
-
-  // Special case: copilot command (GitHub Copilot integration).
-  // Route ONLY known subcommands to the handler; any other arg is kept as
-  // passthrough to the copilot bridge profile flow (legacy behavior). Do not
-  // treat an arbitrary token as an unknown subcommand error, or this breaks the
-  // passthrough path.
-  if (firstArg === 'copilot' && args.length > 1) {
-    const copilotToken = args[1];
-    if (isCopilotSubcommandToken(copilotToken)) {
-      const { handleCopilotCommand } = await import('../commands/copilot-command');
-      const exitCode = await handleCopilotCommand(args.slice(1));
-      process.exit(exitCode);
-    }
-  }
-
-  // Special case: explicit legacy Cursor bridge namespace.
-  // Route ONLY known subcommands; keep other args as passthrough to the cursor
-  // bridge flow (legacy behavior).
-  if (firstArg === LEGACY_CURSOR_PROFILE_NAME && args.length > 1) {
-    const cursorToken = args[1];
-    if (isCursorSubcommandToken(cursorToken)) {
-      const { handleCursorCommand } = await import('../commands/cursor-command');
-      const exitCode = await handleCursorCommand(args.slice(1));
-      process.exit(exitCode);
-    }
-  }
-
-  // Compatibility shim: old `ccs cursor <subcommand>` still forwards to the legacy bridge
-  // for one migration window, but bare/positional `ccs cursor` now belongs to CLIProxy.
-  if (firstArg === 'cursor' && args.length > 1) {
-    const { handleCursorCommand } = await import('../commands/cursor-command');
-    const cursorToken = args[1];
-
-    if (isCursorSubcommandToken(cursorToken) && cursorToken !== '--help' && cursorToken !== '-h') {
-      printCursorLegacySubcommandDeprecation(cursorToken);
-      const exitCode = await handleCursorCommand(args.slice(1));
-      process.exit(exitCode);
-    }
   }
 
   // First-time install: offer setup wizard for interactive users

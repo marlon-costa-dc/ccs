@@ -46,7 +46,6 @@ export async function showHelp(): Promise<void> {
   console.log(subheader('Supported Profile Types'));
   console.log(`  ${color('API profiles', 'command')}      glm, km, custom API profiles`);
   console.log(`  ${color('CLIProxy', 'command')}          gemini, agy, qwen, kiro, ghcp`);
-  console.log(`  ${color('Copilot', 'command')}           copilot (requires copilot-api daemon)`);
   console.log(
     `  ${color('Account profiles', 'command')}  work, personal, client (persists CLAUDE_CONFIG_DIR)`
   );
@@ -87,7 +86,6 @@ export async function showHelp(): Promise<void> {
   console.log(
     '  [i] Codex CLIProxy profiles are native Codex-only: use ccsxp or ccs codex --target codex.'
   );
-  console.log('  [i] Copilot profiles require copilot-api daemon.');
   console.log(
     '  [i] Account/default flows remove stale ANTHROPIC_* overrides before applying new setup.'
   );

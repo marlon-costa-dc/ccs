@@ -1,10 +1,10 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2471,
-    "filesAffected": 261,
-    "hotpathOccurrences": 1186,
-    "hotpathFilesAffected": 155,
+    "totalOccurrences": 2404,
+    "filesAffected": 253,
+    "hotpathOccurrences": 1164,
+    "hotpathFilesAffected": 153,
     "topHotpathFiles": [
       {
         "file": "src/management/shared-manager/diverged-file-adopter.ts",
@@ -306,33 +306,9 @@
     ]
   },
   "legacyShim": {
-    "totalMarkers": 466,
-    "filesAffected": 177,
+    "totalMarkers": 425,
+    "filesAffected": 167,
     "topFiles": [
-      {
-        "file": "src/auth/profile-detector.ts",
-        "count": 18,
-        "calls": [],
-        "markers": [
-          "? `Using legacy API profile \"${candidate}\" for \"${profileName}\".`",
-          "'  1. Run: ccs legacy cursor enable\\n' +",
-          "'  2. Import auth: ccs legacy cursor auth\\n' +",
-          "'  3. Start daemon: ccs legacy cursor start\\n\\n' +",
-          "'Legacy Cursor profile is not enabled.\\n\\n' +",
-          "* - Legacy JSON format (config.json, profiles.json) as fallback",
-          "* 2. User-defined CLIProxy variants (config.cliproxy section) [legacy]",
-          "* 3. Settings-based profiles (config.profiles section) [legacy]",
-          "* 4. Account-based profiles (profiles.json) [legacy]",
-          "* Priority: settings-based profiles (glm/km) checked FIRST for backward compatibility.",
-          "// Check if account-based default exists (legacy)",
-          "// Fall back to legacy config",
-          "// Fall back to legacy config display",
-          "// Fall through to legacy if not found in unified config",
-          "// Priority 0.25: Check explicit legacy Cursor bridge profile.",
-          "// Priority 3: Check settings-based profiles (glm, km) - LEGACY FALLBACK",
-          "// Priority 4: Check account-based profiles (work, personal) - LEGACY FALLBACK"
-        ]
-      },
       {
         "file": "src/web-server/usage/native-quota-collector.ts",
         "count": 15,
@@ -353,6 +329,25 @@
           "// Legacy single-profile collectors (unchanged; used by old tests + back-compat)",
           "// Multi-profile enumeration is the DEFAULT (production) behavior. The legacy",
           "// Use the legacy single-state approach via profile key '__legacy__' to avoid"
+        ]
+      },
+      {
+        "file": "src/auth/profile-detector.ts",
+        "count": 13,
+        "calls": [],
+        "markers": [
+          "? `Using legacy API profile \"${candidate}\" for \"${profileName}\".`",
+          "* - Legacy JSON format (config.json, profiles.json) as fallback",
+          "* 2. User-defined CLIProxy variants (config.cliproxy section) [legacy]",
+          "* 3. Settings-based profiles (config.profiles section) [legacy]",
+          "* 4. Account-based profiles (profiles.json) [legacy]",
+          "* Priority: settings-based profiles (glm/km) checked FIRST for backward compatibility.",
+          "// Check if account-based default exists (legacy)",
+          "// Fall back to legacy config",
+          "// Fall back to legacy config display",
+          "// Fall through to legacy if not found in unified config",
+          "// Priority 3: Check settings-based profiles (glm, km) - LEGACY FALLBACK",
+          "// Priority 4: Check account-based profiles (work, personal) - LEGACY FALLBACK"
         ]
       },
       {
@@ -429,22 +424,6 @@
         ]
       },
       {
-        "file": "src/commands/cursor-command-display.ts",
-        "count": 9,
-        "calls": [],
-        "markers": [
-          "'  disable   Disable legacy cursor integration in unified config',",
-          "'  enable    Enable legacy cursor integration in unified config',",
-          "'  status    Show legacy integration, authentication, and daemon status',",
-          "'Legacy auth options:',",
-          "'Legacy bridge quick start:',",
-          "'Legacy Cursor Compatibility',",
-          "'Legacy runtime entry (deprecated compatibility):',",
-          "console.log(`  - Legacy auth: ${LEGACY_CURSOR_COMMAND} auth`);",
-          "const LEGACY_CURSOR_COMMAND = 'ccs legacy cursor';"
-        ]
-      },
-      {
         "file": "src/config/migration-manager.ts",
         "count": 9,
         "calls": [],
@@ -483,6 +462,20 @@
           "it('legacy variant does not block port allocation', function () {",
           "legacy: {"
         ]
+      },
+      {
+        "file": "src/cliproxy/config/__tests__/config-generator.test.js",
+        "count": 7,
+        "calls": [],
+        "markers": [
+          "'Should preserve lone manual high-version aliases during legacy cleanup'",
+          "'Should preserve manual aliases after legacy migration has already run'",
+          "'Should preserve the manual 3.2 compatibility cluster during legacy cleanup'",
+          "'Should preserve the pruned legacy alias in the migration backup'",
+          "assert(fs.existsSync(backupPath), 'Should keep a backup of the legacy config before pruning');",
+          "it('prunes partially retained broad guessed ranges during legacy cleanup', () => {",
+          "it('writes a one-time backup before pruning legacy Gemini aliases during migration', () => {"
+        ]
       }
     ],
     "explicitShimFiles": [
@@ -497,16 +490,16 @@
   },
   "maintainability": {
     "typedErrors": {
-      "totalThrows": 454,
-      "typedThrows": 83,
-      "plainThrows": 311,
-      "otherThrows": 60,
-      "adoptionRatio": 0.1828,
+      "totalThrows": 426,
+      "typedThrows": 78,
+      "plainThrows": 290,
+      "otherThrows": 58,
+      "adoptionRatio": 0.1831,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
-          "count": 103,
-          "typed": 16,
+          "count": 102,
+          "typed": 15,
           "plain": 45
         },
         {
@@ -540,12 +533,6 @@
           "plain": 16
         },
         {
-          "subdomain": "cursor",
-          "count": 23,
-          "typed": 4,
-          "plain": 17
-        },
-        {
           "subdomain": "cliproxy/auth",
           "count": 16,
           "typed": 16,
@@ -562,6 +549,12 @@
           "count": 12,
           "typed": 12,
           "plain": 0
+        },
+        {
+          "subdomain": "cliproxy/ai-providers",
+          "count": 12,
+          "typed": 0,
+          "plain": 12
         }
       ]
     },
@@ -578,9 +571,9 @@
       "targetRatio": 0.4
     },
     "loggerCoverage": {
-      "filesWithCreateLogger": 65,
-      "totalSourceFiles": 764,
-      "coverageRatio": 0.0851,
+      "filesWithCreateLogger": 60,
+      "totalSourceFiles": 721,
+      "coverageRatio": 0.0832,
       "subdomainsWithZeroCreateLogger": [
         "api",
         "bin",
@@ -601,12 +594,12 @@
       "topSubdomainsByFiles": [
         {
           "subdomain": "web-server",
-          "count": 112,
+          "count": 108,
           "withLogger": 10
         },
         {
           "subdomain": "commands",
-          "count": 110,
+          "count": 107,
           "withLogger": 2
         },
         {
@@ -640,22 +633,22 @@
           "withLogger": 9
         },
         {
-          "subdomain": "cursor",
-          "count": 24,
-          "withLogger": 2
-        },
-        {
           "subdomain": "auth",
           "count": 20,
           "withLogger": 1
+        },
+        {
+          "subdomain": "cliproxy/executor",
+          "count": 18,
+          "withLogger": 4
         }
       ]
     },
     "hotpathConsoleErrors": {
-      "totalOccurrences": 593,
-      "exemptOccurrences": 326,
-      "hotpathOccurrences": 267,
-      "filesAffected": 81,
+      "totalOccurrences": 548,
+      "exemptOccurrences": 301,
+      "hotpathOccurrences": 247,
+      "filesAffected": 72,
       "topFiles": [
         {
           "file": "src/errors/error-handler.ts",
@@ -720,8 +713,8 @@
       ]
     },
     "largeFiles": {
-      "countOver400": 92,
-      "countOver600": 42,
+      "countOver400": 84,
+      "countOver600": 41,
       "topOver400": [
         {
           "file": "src/web-server/usage/native-quota-collector.ts",
@@ -736,8 +729,8 @@
           "loc": 1520
         },
         {
-          "file": "src/cursor/cursor-executor.ts",
-          "loc": 1234
+          "file": "src/cliproxy/model-catalog.ts",
+          "loc": 1152
         },
         {
           "file": "src/web-server/model-pricing.ts",
@@ -768,10 +761,6 @@
           "loc": 997
         },
         {
-          "file": "src/cliproxy/model-catalog.ts",
-          "loc": 955
-        },
-        {
           "file": "src/cliproxy/quota/quota-manager.ts",
           "loc": 954
         },
@@ -782,6 +771,10 @@
         {
           "file": "src/glmt/glmt-proxy.ts",
           "loc": 939
+        },
+        {
+          "file": "src/cliproxy/accounts/registry.ts",
+          "loc": 871
         }
       ]
     }

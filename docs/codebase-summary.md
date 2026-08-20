@@ -36,7 +36,7 @@ from this overview; inspect the owning handler and its tests.
 | Shared services | [`src/services/`](../src/services/) | Cross-cutting runtime services, including structured logging |
 | Errors | [`src/errors/`](../src/errors/) | Typed error taxonomy, handling, and exit behavior |
 | Utilities | [`src/utils/`](../src/utils/) | CCS path handling and bounded shared helpers for browser, hooks, web search, image analysis, and UI support |
-| Compatibility | [`src/glmt/`](../src/glmt/), [`src/copilot/`](../src/copilot/), [`src/cursor/`](../src/cursor/) | Legacy translation and integration-specific behavior |
+| Compatibility | [`src/glmt/`](../src/glmt/) | Legacy GLMT translation behavior |
 | Packaging/runtime bins | [`src/bin/`](../src/bin/) | Target-specific packaged entry points |
 
 The table is intentionally domain-level. Use repository search and nearby tests
