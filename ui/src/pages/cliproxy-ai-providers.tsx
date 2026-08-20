@@ -366,7 +366,7 @@ function getFamilyGuide(family: AiProviderFamilyState): FamilyGuide {
         optionalLater: [
           'Base URL override for a custom gateway.',
           'Headers for provider-specific routing.',
-          'Mappings such as claude-sonnet-4-5 -> claude-3-7-sonnet-latest.',
+'Mappings such as claude-sonnet-4-5 -> claude-fable-5.',
         ],
         emptyStateSummary: [
           `Requests to ${family.routePath} use CLIProxy-managed OpenCode Go credentials.`,
