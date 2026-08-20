@@ -17,8 +17,8 @@ interface RunResult {
 }
 
 function runCcs(args: string[], env: NodeJS.ProcessEnv): RunResult {
-  const ccsEntry = path.join(process.cwd(), 'src', 'ccs.ts');
-  const result = spawnSync(process.execPath, [ccsEntry, ...args], {
+  const ccsEntry = path.join(process.cwd(), 'dist', 'ccs.js');
+  const result = spawnSync('node', [ccsEntry, ...args], {
     encoding: 'utf8',
     env,
     timeout: 8000,
@@ -48,6 +48,9 @@ function reserveClosedPort(): number {
   });
   const { port } = server;
   server.stop(true);
+  if (port === undefined) {
+    throw new Error('Mock browser server did not expose a port');
+  }
   return port;
 }
 

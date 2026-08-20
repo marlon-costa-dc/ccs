@@ -51,6 +51,7 @@ const isolatedTests = new Set([
   'tests/unit/commands/bar-command.test.ts',
   'tests/unit/targets/droid-command-routing-integration.test.ts',
   'tests/unit/targets/native-claude-effort-launch.test.ts',
+  'tests/unit/targets/settings-profile-browser-launch.test.ts',
   'tests/unit/targets/settings-profile-websearch-launch.test.ts',
   'tests/unit/targets/codex-adapter-exec.test.ts',
   'tests/unit/targets/codex-adapter.test.ts',

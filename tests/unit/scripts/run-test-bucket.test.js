@@ -105,6 +105,7 @@ describe('run-test-bucket', () => {
       'tests/unit/commands/persist-command-handler.test.ts',
       'tests/unit/targets/droid-command-routing-integration.test.ts',
       'tests/unit/targets/native-claude-effort-launch.test.ts',
+      'tests/unit/targets/settings-profile-browser-launch.test.ts',
       'tests/unit/targets/settings-profile-websearch-launch.test.ts',
     ]);
 
@@ -112,6 +113,7 @@ describe('run-test-bucket', () => {
       'shared',
       'tests/unit/targets/droid-command-routing-integration.test.ts',
       'tests/unit/targets/native-claude-effort-launch.test.ts',
+      'tests/unit/targets/settings-profile-browser-launch.test.ts',
       'tests/unit/targets/settings-profile-websearch-launch.test.ts',
     ]);
     expect(runs.slice(1).every((run) => run.quietOnPass)).toBe(true);
