@@ -210,8 +210,20 @@ function shouldVerifyRunFileCount(run) {
   return run.selected.every((file) => usesBunTestRunner(file));
 }
 
+const requiredBuildArtifacts = [
+  path.join('dist', 'ccs.js'),
+  path.join('dist', 'types', 'utils.js'),
+  path.join('dist', 'proxy', 'server', 'proxy-server.js'),
+];
+
+function hasCompleteBuildArtifacts(baseDir = rootDir) {
+  return requiredBuildArtifacts.every((relativePath) =>
+    fs.existsSync(path.join(baseDir, relativePath))
+  );
+}
+
 function ensureBuildForSlowBucket() {
-  if (fs.existsSync(path.join(rootDir, 'dist', 'ccs.js'))) {
+  if (hasCompleteBuildArtifacts()) {
     return 0;
   }
 
@@ -360,5 +372,6 @@ module.exports = {
   parseBunFileCount,
   verifyReportedFileCount,
   shouldVerifyRunFileCount,
+  hasCompleteBuildArtifacts,
   main,
 };

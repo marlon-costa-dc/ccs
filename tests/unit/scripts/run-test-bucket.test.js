@@ -1,4 +1,6 @@
 const { describe, expect, test } = require('bun:test');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const bucket = require('../../../scripts/run-test-bucket.js');
 
@@ -153,5 +155,28 @@ describe('run-test-bucket', () => {
 
   test('still forces dist-dependent tests into the slow bucket', () => {
     expect(bucket.shouldForceSlow('tests/unit/config-dir-override.test.js')).toBe(true);
+  });
+
+  test('requires complete built runtime artifacts before reusing dist', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-test-bucket-build-'));
+    const requiredArtifacts = [
+      path.join('dist', 'ccs.js'),
+      path.join('dist', 'types', 'utils.js'),
+      path.join('dist', 'proxy', 'server', 'proxy-server.js'),
+    ];
+
+    try {
+      for (const relativePath of requiredArtifacts) {
+        const absolutePath = path.join(tempDir, relativePath);
+        fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+        fs.writeFileSync(absolutePath, 'module.exports = {};\n');
+      }
+
+      expect(bucket.hasCompleteBuildArtifacts(tempDir)).toBe(true);
+      fs.rmSync(path.join(tempDir, 'dist', 'types', 'utils.js'));
+      expect(bucket.hasCompleteBuildArtifacts(tempDir)).toBe(false);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });
