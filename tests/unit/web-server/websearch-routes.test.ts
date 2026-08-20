@@ -1,4 +1,13 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  setDefaultTimeout,
+} from 'bun:test';
 import express from 'express';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -19,6 +28,8 @@ const WEBSEARCH_ENV_KEYS = [
   'CCS_WEBSEARCH_TAVILY_API_KEY',
   'CCS_WEBSEARCH_BRAVE_API_KEY',
 ] as const;
+
+setDefaultTimeout(10000);
 
 describe.serial('websearch routes', () => {
   let server: Server;

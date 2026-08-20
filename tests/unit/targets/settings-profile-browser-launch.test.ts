@@ -187,6 +187,8 @@ exit 0
       CCS_HOME: tmpHome,
       CCS_CLAUDE_PATH: fakeClaudePath,
       CCS_DEBUG: '1',
+      CCS_NO_PRE_DISPATCH: '1',
+      CCS_SKIP_PREFLIGHT: '1',
       CCS_BROWSER_USER_DATA_DIR: '',
       CCS_BROWSER_PROFILE_DIR: '',
       CCS_BROWSER_DEVTOOLS_HOST: '',
@@ -206,7 +208,7 @@ exit 0
       return;
     }
 
-    await stopOpenAICompatProxy();
+    await stopOpenAICompatProxy('glm');
     fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
