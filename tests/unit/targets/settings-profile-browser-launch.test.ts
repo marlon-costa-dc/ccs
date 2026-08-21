@@ -208,7 +208,20 @@ exit 0
       return;
     }
 
-    await stopOpenAICompatProxy('glm');
+    const originalCcsHome = process.env.CCS_HOME;
+    process.env.CCS_HOME = tmpHome;
+    try {
+      const stopped = await stopOpenAICompatProxy('glm');
+      if (!stopped.success) {
+        throw new Error(stopped.error || 'Failed to stop the test OpenAI-compatible proxy');
+      }
+    } finally {
+      if (originalCcsHome !== undefined) {
+        process.env.CCS_HOME = originalCcsHome;
+      } else {
+        delete process.env.CCS_HOME;
+      }
+    }
     fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 

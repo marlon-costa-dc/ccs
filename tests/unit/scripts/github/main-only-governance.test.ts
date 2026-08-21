@@ -48,6 +48,13 @@ describe('main-only repository governance', () => {
     expect(beadsPrePush).not.toContain('bun run');
     expect(beadsPrePush).not.toContain('CCS_PR_BASE');
     expect(beadsPrePush).not.toContain('CCS_SKIP_PREPUSH_GATE');
+
+    const pendingRelease = read('.github/workflows/label-pending-release.yml');
+    expect(pendingRelease).toContain('branches: [main]');
+    expect(pendingRelease).toContain('set -euo pipefail');
+    expect(pendingRelease).toContain('--force');
+    expect(pendingRelease).not.toContain('|| true');
+    expect(pendingRelease).not.toContain('2>/dev/null');
   });
 
   test('removes superseded dev and manual package release owners', () => {

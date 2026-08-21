@@ -17,6 +17,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
           # Recompute the complete open-PR issue set so edited/synchronized PRs
           # can remove stale pending-release labels as well as add new ones.
           OPEN_PRS=$(gh pr list \
@@ -24,7 +26,7 @@ jobs:
             --base main \
             --state open \
             --json number,title,body \
-            --jq '.[] | @base64' 2>/dev/null || true)
+            --jq '.[] | @base64')
 
           ALL_REFERENCED_ISSUES=""
           while IFS= read -r PR_ROW; do
@@ -33,25 +35,25 @@ jobs:
             PR_NUM=$(printf '%s' "$PR_JSON" | jq -r '.number')
             PR_TITLE=$(printf '%s' "$PR_JSON" | jq -r '.title')
             PR_BODY=$(printf '%s' "$PR_JSON" | jq -r '.body // ""')
-            COMMIT_TEXT=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUM}/commits" --paginate --jq '.[].commit.message' 2>/dev/null || true)
+            COMMIT_TEXT=$(gh api "repos/${{ github.repository }}/pulls/${PR_NUM}/commits" --paginate --jq '.[].commit.message')
             PR_TEXT="$PR_TITLE
             $PR_BODY
             $COMMIT_TEXT"
             PR_ISSUES=$(printf '%s\n' "$PR_TEXT" | \
-              perl -ne 'while (/\b(?:fixes|closes|resolves|refs?)\s+((?:#[0-9]+\b(?:\s*+(?:,|and)?\s*+#[0-9]+\b)*))/ig) { print "$1\n"; }' | \
-              grep -oE '#[0-9]+' || true)
+              perl -ne 'while (/\b(?:fixes|closes|resolves|refs?)\s+((?:#[0-9]+\b(?:\s*+(?:,|and)?\s*+#[0-9]+\b)*))/ig) { $issues = $1; while ($issues =~ /(#[0-9]+)/g) { print "$1\n"; } }')
             if [[ -n "$PR_ISSUES" ]]; then
               ALL_REFERENCED_ISSUES=$(printf '%s\n%s\n' "$ALL_REFERENCED_ISSUES" "$PR_ISSUES")
             fi
           done <<< "$OPEN_PRS"
 
-          ISSUES=$(printf '%s\n' "$ALL_REFERENCED_ISSUES" | grep -oE '#[0-9]+' | sort -u || true)
-          CURRENT_PENDING=$(gh issue list --repo "${{ github.repository }}" --label "pending-release" --state all --json number --jq '.[].number' 2>/dev/null || true)
+          ISSUES=$(printf '%s\n' "$ALL_REFERENCED_ISSUES" | sed -nE '/^#[0-9]+$/p' | sort -u)
+          CURRENT_PENDING=$(gh issue list --repo "${{ github.repository }}" --label "pending-release" --state all --json number --jq '.[].number')
 
           gh label create "pending-release" \
             --color "fbca04" \
             --description "Fix in review, awaiting merge" \
-            --repo ${{ github.repository }} 2>/dev/null || true
+            --force \
+            --repo "${{ github.repository }}"
 
           if [[ -z "$ISSUES" ]]; then
             echo "No linked issues found across open main PRs"
@@ -59,13 +61,13 @@ jobs:
             for ISSUE in $ISSUES; do
               NUM=${ISSUE#\#}
               echo "Ensuring issue #$NUM has pending-release"
-              gh issue edit "$NUM" --add-label "pending-release" --repo "${{ github.repository }}" || true
+              gh issue edit "$NUM" --add-label "pending-release" --repo "${{ github.repository }}"
             done
           fi
 
           for NUM in $CURRENT_PENDING; do
             if ! printf '%s\n' "$ISSUES" | grep -qx "#${NUM}"; then
               echo "Removing stale pending-release from issue #$NUM"
-              gh issue edit "$NUM" --remove-label "pending-release" --repo "${{ github.repository }}" 2>/dev/null || true
+              gh issue edit "$NUM" --remove-label "pending-release" --repo "${{ github.repository }}"
             fi
           done
