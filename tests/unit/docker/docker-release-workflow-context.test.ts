@@ -6,6 +6,13 @@ import { join } from 'node:path';
 const repoRoot = join(import.meta.dir, '../../..');
 
 describe('docker release workflow context', () => {
+  test('publishes immutable images from published GitHub releases', () => {
+    const workflow = readFileSync(join(repoRoot, '.github/workflows/docker-release.yml'), 'utf8');
+
+    expect(workflow).toMatch(/on:\n  release:\n    types: \[published\]/);
+    expect(workflow).toContain('workflow_dispatch:');
+  });
+
   test('builds the integrated Dockerfile with the context its COPY paths expect', () => {
     const workflow = readFileSync(join(repoRoot, '.github/workflows/docker-release.yml'), 'utf8');
     const dockerfile = readFileSync(join(repoRoot, 'docker/Dockerfile.integrated'), 'utf8');

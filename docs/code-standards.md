@@ -183,8 +183,10 @@ docs(contributing): clarify validation
 
 Semantic-release owns versions, changelog entries, tags, npm publishing, and
 GitHub releases. Do not bump versions, tag, or publish manually. Release effects
-for each branch and commit type are defined in
-[`.releaserc.cjs`](../.releaserc.cjs).
+and downstream packaging are defined in the canonical
+[release process](./release-process.md); commit analysis is configured in
+[`.releaserc.cjs`](../.releaserc.cjs). Governance-only maintenance uses the
+explicit non-releasing `governance` scope.
 
 ## Documentation Triggers
 

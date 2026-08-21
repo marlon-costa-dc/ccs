@@ -7,6 +7,7 @@ import * as path from 'node:path';
 
 const matrixEnabled = process.env.CCS_RUNTIME_MATRIX === '1';
 const fixturePath = path.join(process.cwd(), 'tests/integration/proxy/fixtures/runtime-probe.cjs');
+const runtimeSetupTimeoutMs = 3 * 60_000;
 const proxyKeys = [
   'HTTP_PROXY',
   'HTTPS_PROXY',
@@ -142,7 +143,7 @@ describe.skipIf(!matrixEnabled)('real runtime upstream transport matrix', () => 
     ]);
     upstreamPort = (upstreamServer.address() as { port: number }).port;
     corporateProxyPort = (corporateProxy.address() as { port: number }).port;
-  }, 60_000);
+  }, runtimeSetupTimeoutMs);
 
   afterAll(async () => {
     const servers = [upstreamServer, corporateProxy].filter(

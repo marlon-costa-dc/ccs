@@ -12,7 +12,7 @@ import { Layout } from '@/components/layout/layout';
 import { Loader2 } from 'lucide-react';
 
 // Eager load: HomePage (initial route) + LoginPage (auth flow)
-import { HomePage } from '@/pages';
+import { HomePage } from '@/pages/home';
 import { LoginPage } from '@/pages/login';
 
 // Lazy load: heavy pages with charts or complex dependencies

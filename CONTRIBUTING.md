@@ -86,14 +86,17 @@ If `Push CI` stays queued for a long time, it is a maintainer infrastructure iss
 
 ## AI Agent Rules
 
-`CONTRIBUTING.md` is the human entry point. For AI agents working in this repo, the authoritative automation and workflow rules live in [CLAUDE.md](./CLAUDE.md).
+`CONTRIBUTING.md` is the human entry point. For AI agents, the portable entry
+point is [AGENTS.md](./AGENTS.md), which remains a symlink to the canonical
+[CLAUDE.md](./CLAUDE.md) content.
 
 ## Documentation Ownership
 
 Documentation follows this truth order:
 
 1. Source, tests, package scripts, and workflows define implemented behavior.
-2. [CLAUDE.md](./CLAUDE.md) and this guide define repository workflow.
+2. [AGENTS.md](./AGENTS.md), [CLAUDE.md](./CLAUDE.md), and this guide define
+   repository workflow.
 3. [docs/README.md](./docs/README.md) maps maintainer documentation.
 4. [docs.ccs.kaitran.ca](https://docs.ccs.kaitran.ca) owns detailed user guides
    and CLI reference.
@@ -270,6 +273,8 @@ Releases are automated with semantic-release.
 
 - Merges to `main` publish the `@latest` channel.
 - Do not manually bump versions, create tags, or run manual `npm publish`.
+- [`docs/release-process.md`](./docs/release-process.md) is the canonical
+  release authority and documents downstream packaging and Docker promotion.
 
 ## Security Reporting
 

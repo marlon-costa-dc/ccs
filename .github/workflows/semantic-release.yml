@@ -1,5 +1,8 @@
 name: Semantic Release
 
+# Sole owner of CCS package versions, changelog entries, npm publication,
+# package tags, and package GitHub releases.
+
 on:
   push:
     branches: [main]

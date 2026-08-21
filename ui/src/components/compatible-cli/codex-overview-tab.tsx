@@ -9,7 +9,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { QuickCommands } from '@/components/shared';
+import { QuickCommands } from '@/components/shared/quick-commands';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';

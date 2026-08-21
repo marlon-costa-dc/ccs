@@ -7,7 +7,7 @@ function resolvePath(relativePath: string) {
 }
 
 describe('push ci workflow', () => {
-  test('keeps dev push quality checks separate from release automation', () => {
+  test('keeps main push quality checks separate from release automation', () => {
     const workflowPath = resolvePath('../../../../.github/workflows/push-ci.yml');
 
     expect(fs.existsSync(workflowPath)).toBe(true);
@@ -16,7 +16,8 @@ describe('push ci workflow', () => {
 
     expect(workflow).toContain('name: Push CI');
     expect(workflow).toContain('push:');
-    expect(workflow).toContain('branches: [dev]');
+    expect(workflow).toContain('branches: [main]');
+    expect(workflow).not.toContain('branches: [dev]');
     expect(workflow).toContain('group: push-ci-${{ github.ref }}');
     expect(workflow).toContain('cancel-in-progress: true');
     expect(workflow).toContain('runs-on: ubuntu-latest');

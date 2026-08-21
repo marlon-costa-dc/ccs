@@ -4,11 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [[ "${CCS_SKIP_PREPUSH_GATE:-}" == "1" ]]; then
-  echo "[i] Skipping pre-push CI parity gate (CCS_SKIP_PREPUSH_GATE=1)."
-  exit 0
-fi
-
 if [[ ! -f AGENTS.md ]]; then
   echo "[X] Missing AGENTS.md in this worktree."
   echo "    Ensure you are in a valid CCS repository/worktree before pushing."
@@ -32,14 +27,7 @@ if [[ -z "$CURRENT_BRANCH" || "$CURRENT_BRANCH" == "HEAD" ]]; then
   exit 0
 fi
 
-BASE_BRANCH="${CCS_PR_BASE:-}"
-if [[ -z "$BASE_BRANCH" ]]; then
-  if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" =~ ^hotfix/ || "$CURRENT_BRANCH" =~ ^kai/hotfix- ]]; then
-    BASE_BRANCH="main"
-  else
-    BASE_BRANCH="main"
-  fi
-fi
+BASE_BRANCH="main"
 
 echo "[i] Pre-push CI parity gate"
 echo "    branch: $CURRENT_BRANCH"
@@ -51,8 +39,7 @@ fi
 if git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
   if ! git merge-base --is-ancestor "origin/$BASE_BRANCH" HEAD; then
     echo "[X] Branch '$CURRENT_BRANCH' is behind origin/$BASE_BRANCH."
-    echo "    Rebase or merge before pushing:"
-    echo "    git pull --rebase origin $BASE_BRANCH"
+    echo "    Integrate origin/$BASE_BRANCH before pushing."
     exit 1
   fi
 fi

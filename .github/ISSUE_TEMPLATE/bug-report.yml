@@ -86,4 +86,4 @@ body:
       options:
         - label: I searched existing issues first.
         - label: I removed secrets and private data from logs/screenshots.
-        - label: I can still reproduce this on the latest released or dev build.
+        - label: I can still reproduce this on the latest release or `main` build.

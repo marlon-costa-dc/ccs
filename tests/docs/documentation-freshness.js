@@ -56,10 +56,33 @@ requireText('docs/openai-compatible-providers.md', 'CCS_OPENAI_PROXY_INSECURE');
 requireText('docs/openai-compatible-providers.md', 'CCS_OPENAI_PROXY_REQUEST_TIMEOUT_MS');
 requireText('macos-bar/README.md', 'macos-bar/VERSION');
 requireText('macos-bar/README.md', '.github/workflows/bar-release.yml');
+requireText('docs/project-roadmap.md', 'Beads is the execution source of truth');
+requireText('docs/release-process.md', 'Semantic-release is the sole authority');
+requireText('docs/release-process.md', '.github/workflows/semantic-release.yml');
+requireText('VERSION_UPDATE_PROTOCOL.md', 'Status: superseded historical material.');
 requireText(
   '.github/ISSUE_TEMPLATE/documentation.yml',
   'https://docs.ccs.kaitran.ca/providers/oauth/cursor'
 );
+
+const agentsPath = path.join(root, 'AGENTS.md');
+if (!fs.lstatSync(agentsPath).isSymbolicLink() || fs.readlinkSync(agentsPath) !== 'CLAUDE.md') {
+  failures.push('AGENTS.md must remain a symlink to CLAUDE.md');
+}
+
+const portableGovernanceFiles = [
+  'CLAUDE.md',
+  'CONTRIBUTING.md',
+  'VERSION_UPDATE_PROTOCOL.md',
+  'docs/README.md',
+  'docs/project-roadmap.md',
+  'docs/release-process.md',
+];
+for (const relativePath of portableGovernanceFiles) {
+  if (/\/(?:Users|home)\//.test(read(relativePath))) {
+    failures.push(`${relativePath} contains a machine-specific absolute path`);
+  }
+}
 
 const practicalGuidanceFiles = [
   path.join(root, 'README.md'),
@@ -84,6 +107,9 @@ for (const staleGuidePath of removedGuides) {
 
 const markdownFiles = [
   path.join(root, 'README.md'),
+  path.join(root, 'CLAUDE.md'),
+  path.join(root, 'CONTRIBUTING.md'),
+  path.join(root, 'VERSION_UPDATE_PROTOCOL.md'),
   path.join(root, 'docker', 'README.md'),
   path.join(root, 'macos-bar', 'README.md'),
   ...collectFiles(path.join(root, 'docs'), /\.mdx?$/),
