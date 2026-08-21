@@ -15,7 +15,7 @@ name: Breaking Change Guard – Docker Compose Contract
 
 on:
   pull_request:
-    branches: [main, dev]
+    branches: [main]
     paths:
       - "docker/compose.yaml"
 

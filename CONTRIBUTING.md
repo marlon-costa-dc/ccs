@@ -5,8 +5,8 @@ CCS is a Bun + TypeScript CLI with a React dashboard. This guide is the shortest
 ## Before You Start
 
 - An issue is helpful for medium or large changes, but small fixes and docs updates can go straight to a PR.
-- Branch from `dev`.
-- Open PRs against `dev`.
+- Branch from `main`.
+- Open PRs against `main`.
 - Use conventional commits.
 - If you change user-facing behavior, update the docs that describe it.
 - Suspected security vulnerabilities do not go through public issues. Use [SECURITY.md](./SECURITY.md).
@@ -46,8 +46,8 @@ git clone https://github.com/YOUR_USERNAME/ccs.git
 cd ccs
 git remote add upstream https://github.com/kaitranntt/ccs.git
 
-git checkout dev
-git pull upstream dev
+git checkout main
+git pull upstream main
 
 bun install
 cd ui && bun install && cd ..
@@ -55,11 +55,11 @@ cd ui && bun install && cd ..
 
 ## Branching and PRs
 
-Create all normal contribution branches from `dev`.
+Create all normal contribution branches from `main`.
 
 ```bash
-git checkout dev
-git pull upstream dev
+git checkout main
+git pull upstream main
 git checkout -b feat/short-description
 ```
 
@@ -71,22 +71,18 @@ Use these prefixes:
 
 Rules:
 
-- Never commit directly to `main` or `dev`.
-- Open PRs to `dev`, not `main`.
-- Treat `hotfix/*` as maintainer-only emergency flow from `main`.
+- Never commit directly to `main`.
+- Open PRs to `main`.
 - Delete your branch after merge.
 
 ## CI and Release Flow
 
-CCS now uses three separate automation lanes:
+CCS now uses separate automation lanes:
 
-- `CI` runs on pull requests to `dev` and `main`. This is the review gate for contributor branches.
-- `Push CI` runs after a merge lands on `dev`. This is the code-quality signal for the shared `dev` branch.
-- `Dev Release` publishes the `@dev` package after `dev` changes land. It is release automation, not the primary contributor quality signal.
+- `CI` runs on pull requests to `main`. This is the review gate for contributor branches.
+- `Push CI` runs after a merge lands on `main`. This is the code-quality signal for the shared `main` branch.
 
-If `Dev Release` is red but your PR checks were green, check `Push CI` before assuming the merged code is broken.
-
-If `CI` or `Push CI` stays queued for a long time, it is a maintainer infrastructure issue, not a contributor mistake. Leave a comment on your PR and a maintainer will address it.
+If `Push CI` stays queued for a long time, it is a maintainer infrastructure issue, not a contributor mistake. Leave a comment on your PR and a maintainer will address it.
 
 ## AI Agent Rules
 
@@ -122,7 +118,7 @@ Example:
 
 ```bash
 git push -u origin docs/contributing-refresh
-gh pr create --base dev --title "docs(contributing): refresh contributor guide"
+gh pr create --base main --title "docs(contributing): refresh contributor guide"
 ```
 
 ## Local Development
@@ -182,7 +178,7 @@ bun run validate:ci-parity
 
 `bun run validate:ci-parity` adds:
 
-- branch freshness check against `origin/dev` or `origin/main`
+- branch freshness check against `origin/main`
 - `build:all`
 - full non-e2e test suite via `test:all`
 - `test:e2e` with `CCS_E2E_SKIP_BUILD=1`
@@ -214,7 +210,7 @@ Use `bun run test:e2e` locally before review if you touch command routing, proxy
 | `lint` fails in PR CI | `validate` now uses read-only `lint` | Run `bun run lint:fix`, then rerun `bun run validate` |
 | `test` fails in PR CI but `validate` passed | The failure is in `test:slow` or `test:e2e` | Run `bun run validate:ci-parity` locally |
 | Checks stay queued for >10 min | Self-hosted runner is offline | Wait for maintainer intervention; rerunning usually does not help |
-| `Dev Release` is red on `dev` after merge | Release-only failure or publish problem | Check `Push CI` first to confirm code quality |
+| `Push CI` is red on `main` after merge | Release-only failure or publish problem | Check `Push CI` logs for the failing job |
 
 If you cannot run the full suite, that is still fine for early or docs-only PRs. Just say what you did run, or what blocked you, in the PR.
 
@@ -272,7 +268,6 @@ git commit -m "update file"
 
 Releases are automated with semantic-release.
 
-- Merges to `dev` publish the `@dev` channel.
 - Merges to `main` publish the `@latest` channel.
 - Do not manually bump versions, create tags, or run manual `npm publish`.
 

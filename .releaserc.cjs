@@ -1,8 +1,7 @@
 /**
  * Semantic Release Configuration
  *
- * Branch-aware config:
- * - dev branch: Uses dev release configuration (prerelease)
+ * Main-only configuration:
  * - main branch: Uses production release configuration (stable, npm @latest)
  *
  * RC soak window for Docker mutable tags is handled entirely in docker-release.yml:
@@ -11,14 +10,6 @@
  * `gh workflow run promote-release.yml -f tag=vX.Y.Z` (workflow_dispatch).
  * npm @latest is always set immediately on stable release — no rc soak needed.
  */
-
-const currentBranch =
-  process.env.GITHUB_REF_NAME ||
-  process.env.GIT_BRANCH ||
-  (process.env.GITHUB_REF && process.env.GITHUB_REF.replace('refs/heads/', '')) ||
-  require('child_process').execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
-
-console.error(`[semantic-release config] Branch: ${currentBranch}`);
 
 // Shared plugin config
 const commitAnalyzer = [
@@ -43,8 +34,6 @@ const releaseNotesGenerator = [
         { type: 'feat', section: 'Features' },
         { type: 'fix', section: 'Bug Fixes' },
         { type: 'hotfix', section: 'Hotfixes' },
-        // Breaking changes (feat! / fix!) surface under Features/Bug Fixes
-        // with a BREAKING CHANGE footer note — no separate section needed.
         { type: 'revert', section: 'Reverts' },
         { type: 'docs', section: 'Documentation' },
         { type: 'style', section: 'Styles' },
@@ -53,57 +42,17 @@ const releaseNotesGenerator = [
         { type: 'test', section: 'Tests' },
         { type: 'build', section: 'Build System' },
         { type: 'ci', section: 'CI' },
-        // chore commits are intentionally hidden from release notes (no section).
-        // "### Removed" sections come from feat!/fix! BREAKING CHANGE footers,
-        // not from a separate commit type.
       ],
     },
   },
 ];
-
-// Dev release configuration
-const devConfig = {
-  branches: [
-    'main', // Required even in dev config
-    {
-      name: 'dev',
-      prerelease: 'dev',
-    },
-  ],
-  plugins: [
-    commitAnalyzer,
-    releaseNotesGenerator,
-    [
-      '@semantic-release/changelog',
-      {
-        changelogFile: 'CHANGELOG.md',
-      },
-    ],
-    '@semantic-release/npm',
-    [
-      '@semantic-release/github',
-      {
-        prerelease: true,
-        // Disable automatic success comment - custom step in dev-release.yml handles this
-        successComment: false,
-      },
-    ],
-    [
-      '@semantic-release/git',
-      {
-        assets: ['CHANGELOG.md', 'package.json'],
-        message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
-      },
-    ],
-  ],
-};
 
 // Production release configuration
 // Every merge to main publishes a stable vX.Y.Z release immediately to npm @latest.
 // Docker immutable :<ver> tag is pushed by docker-release.yml on the release: published event.
 // Docker mutable :latest/:MAJOR/:MINOR tags require a separate manual promote step — see
 // docs/release-process.md and promote-release.yml for the soak + promote procedure.
-const productionConfig = {
+const config = {
   branches: ['main'],
   plugins: [
     commitAnalyzer,
@@ -132,9 +81,5 @@ const productionConfig = {
     ],
   ],
 };
-
-const config = currentBranch === 'dev' ? devConfig : productionConfig;
-
-console.error(`[semantic-release config] Using ${currentBranch === 'dev' ? 'DEV' : 'PRODUCTION'} config`);
 
 module.exports = config;

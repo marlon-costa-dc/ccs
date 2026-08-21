@@ -3,7 +3,7 @@ name: Label Pending Release
 on:
   pull_request:
     types: [opened, reopened, edited, synchronize]
-    branches: [dev]
+    branches: [main]
 
 jobs:
   label:
@@ -13,7 +13,7 @@ jobs:
       pull-requests: read
 
     steps:
-      - name: Reconcile pending-release labels for open dev PRs
+      - name: Reconcile pending-release labels for open main PRs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -21,7 +21,7 @@ jobs:
           # can remove stale pending-release labels as well as add new ones.
           OPEN_PRS=$(gh pr list \
             --repo "${{ github.repository }}" \
-            --base dev \
+            --base main \
             --state open \
             --json number,title,body \
             --jq '.[] | @base64' 2>/dev/null || true)
@@ -54,7 +54,7 @@ jobs:
             --repo ${{ github.repository }} 2>/dev/null || true
 
           if [[ -z "$ISSUES" ]]; then
-            echo "No linked issues found across open dev PRs"
+            echo "No linked issues found across open main PRs"
           else
             for ISSUE in $ISSUES; do
               NUM=${ISSUE#\#}

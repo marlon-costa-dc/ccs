@@ -10,11 +10,11 @@ Factory Droid, CLIProxy, and compatible provider profiles.
 
 ## Non-Negotiables
 
-- Default branch is `dev`. Feature/fix branches start from `dev`; production
+- Default branch is `main`. Feature/fix branches start from `main`; production
   hotfixes start from `main` only when explicitly needed.
 - Never touch the user's real `~/.ccs/` or `~/.claude/` in tests. Use
   `getCcsDir()` from `src/utils/config-manager.ts`; it respects `CCS_HOME`.
-- Do not commit directly to `dev` or `main`.
+- Do not commit directly to `main`.
 - Do not manually bump versions or create release tags. Semantic-release owns
   versions, changelog, tags, npm publish, and GitHub releases.
 - CLI terminal output must be ASCII only: `[OK]`, `[!]`, `[X]`, `[i]`.
@@ -126,12 +126,11 @@ canonical duplicate.
 ## Release Signals
 
 - PR `CI` is the contributor quality gate.
-- `Push CI` is the post-merge signal for `dev`.
-- `Dev Release` publishes the `@dev` npm package.
-- A red `Dev Release` is not automatically contributor failure; check PR `CI`
-  and `Push CI` first.
+- `Push CI` is the post-merge signal for `main`.
+- A red `Push CI` is not automatically contributor failure; check PR `CI`
+  first.
 
-Use `feat:` or `fix:` for dev-to-main promotion PRs so release automation runs.
+Use `feat:` or `fix:` for main promotion PRs so release automation runs.
 
 ## Design Standards
 

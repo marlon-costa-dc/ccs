@@ -73,3 +73,7 @@ _serve*.log
 .beads-credential-key
 .beads/proxieddb/
 *.gate.lock*
+
+# Gas Town runtime artifacts (not product WIP)
+.opencode/
+.runtime/
