@@ -57,6 +57,9 @@ describe('main-only repository governance', () => {
       '.github/workflows/publish-npm.yml.deprecated',
       'scripts/dev-release.sh',
       'scripts/bump-version.sh',
+      'scripts/github/stable-release-issue-cleanup.mjs',
+      'scripts/github/stable-release-issue-cleanup-lib.mjs',
+      'tests/unit/github/stable-release-issue-cleanup.test.mjs',
     ];
 
     for (const relativePath of removedPaths) {
