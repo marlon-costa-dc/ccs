@@ -7,6 +7,7 @@ import path from 'path';
 
 const UI_ROOT = __dirname;
 const REPO_ROOT = path.resolve(__dirname, '..');
+const LOCALE_ROOT = path.resolve(UI_ROOT, 'src/lib/i18n');
 const BACKEND_ORIGIN = 'http://localhost:3000';
 const TRUSTED_VITE_DEV_ORIGINS = new Set([
   'http://localhost:5173',
@@ -73,6 +74,14 @@ export default defineConfig({
           'code-highlight': ['prism-react-renderer'],
           // Notifications
           'notifications': ['sonner'],
+          // Keep each translation catalog independently cacheable and below
+          // Rollup's large-chunk threshold.
+          'locale-en': [path.join(LOCALE_ROOT, 'en.json')],
+          'locale-pt-BR': [path.join(LOCALE_ROOT, 'pt-BR.json')],
+          'locale-zh-CN': [path.join(LOCALE_ROOT, 'zh-CN.json')],
+          'locale-vi': [path.join(LOCALE_ROOT, 'vi.json')],
+          'locale-ja': [path.join(LOCALE_ROOT, 'ja.json')],
+          'locale-ko': [path.join(LOCALE_ROOT, 'ko.json')],
           // Utilities
           'utils': ['date-fns', 'clsx', 'class-variance-authority', 'tailwind-merge', 'yaml'],
         },

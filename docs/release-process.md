@@ -24,8 +24,9 @@ semantic-release with [`.releaserc.cjs`](../.releaserc.cjs).
 The configuration analyzes conventional commits since the previous package
 release. `feat` produces at least a minor release; `fix`, `hotfix`, `refactor`,
 and `style` produce patch releases under repository rules; breaking-change
-notation produces the corresponding major release. Other commits may produce
-no release.
+notation produces the corresponding major release. The explicit `governance`
+scope produces no release, regardless of commit type. Other commits may also
+produce no release.
 
 When a release is required, semantic-release updates `CHANGELOG.md` and
 `package.json`, publishes npm `@latest`, creates the package tag and GitHub
@@ -77,12 +78,13 @@ behavior is not the contract for the supported integrated image.
 
 ## Non-publishing maintenance
 
-Documentation and governance-only maintenance uses a non-releasing
-conventional commit type, such as `chore`, and must not dispatch a release
-workflow, change a version, create a tag, or publish an artifact. This
-governance convergence follows that path and does not publish a release.
-Semantic-release still evaluates the final `main` history after merge; no other
-surface may publish on its behalf.
+Documentation and governance-only maintenance must use the `governance` scope
+and normally uses a non-releasing conventional commit type, such as
+`chore(governance)`. The semantic-release configuration maps that scope to
+`release: false`, so a corrective commit in the same lane cannot accidentally
+schedule a package release. This path must not dispatch a release workflow,
+change a version, create a tag, or publish an artifact. No other surface may
+publish on semantic-release's behalf.
 
 ## Verification
 

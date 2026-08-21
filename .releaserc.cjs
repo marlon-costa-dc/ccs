@@ -17,6 +17,7 @@ const commitAnalyzer = [
   {
     preset: 'conventionalcommits',
     releaseRules: [
+      { scope: 'governance', release: false },
       { type: 'hotfix', release: 'patch' },
       { type: 'docs', scope: 'README', release: 'patch' },
       { type: 'refactor', release: 'patch' },

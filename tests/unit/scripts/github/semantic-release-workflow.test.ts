@@ -1,10 +1,14 @@
 import { describe, expect, test } from 'bun:test';
+import { analyzeCommits } from '@semantic-release/commit-analyzer';
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as path from 'node:path';
 
 function resolvePath(relativePath: string) {
   return path.resolve(import.meta.dir, relativePath);
 }
+
+const repoRoot = resolvePath('../../../..');
 
 describe('semantic-release workflow', () => {
   test('is the sole package release owner on main', () => {
@@ -23,5 +27,28 @@ describe('semantic-release workflow', () => {
     expect(workflow).toContain('npx semantic-release');
     expect(workflow).not.toContain('branches: [dev]');
     expect(workflow).not.toContain('scripts/dev-release.sh');
+  });
+
+  test('keeps governance maintenance explicitly non-releasing', async () => {
+    const require = createRequire(import.meta.url);
+    const releaseConfig = require(path.join(repoRoot, '.releaserc.cjs')) as {
+      plugins: Array<string | [string, Record<string, unknown>]>;
+    };
+    const analyzer = releaseConfig.plugins[0];
+
+    expect(Array.isArray(analyzer)).toBe(true);
+    if (!Array.isArray(analyzer)) throw new Error('Commit analyzer configuration is missing');
+
+    const analyzerOptions = analyzer[1];
+    const logger = { log: () => undefined };
+    const analyze = (message: string) =>
+      analyzeCommits(analyzerOptions, {
+        cwd: repoRoot,
+        commits: [{ hash: 'test-commit', message }],
+        logger,
+      });
+
+    expect(await analyze('fix(governance): align repository policy')).toBeNull();
+    expect(await analyze('fix(cli): correct profile lookup')).toBe('patch');
   });
 });
