@@ -13,7 +13,7 @@ set -euo pipefail
 # Skip gate entirely for delete-only pushes. Git passes refs on stdin as
 # "<local-ref> <local-sha> <remote-ref> <remote-sha>"; deletes have local-sha = 40 zeros.
 # Running a full test suite just to delete a merged branch is pure waste.
-STDIN_CONTENT="$(cat || true)"
+STDIN_CONTENT="$(cat)"
 if [[ -n "$STDIN_CONTENT" ]]; then
   NON_DELETE_COUNT="$(printf '%s\n' "$STDIN_CONTENT" | awk 'NF >= 2 && $2 !~ /^0{40}$/' | wc -l | tr -d ' ')"
   if [[ "$NON_DELETE_COUNT" == "0" ]]; then
@@ -23,11 +23,7 @@ if [[ -n "$STDIN_CONTENT" ]]; then
 fi
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-BASE_BRANCH="${CCS_PR_BASE:-}"
-
-if [[ -z "$BASE_BRANCH" ]]; then
-  BASE_BRANCH="main"
-fi
+BASE_BRANCH="main"
 
 if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" =~ ^hotfix/ || "$CURRENT_BRANCH" =~ ^kai/hotfix- ]]; then
   echo "[i] Protected branch detected, running full CI parity gate..."

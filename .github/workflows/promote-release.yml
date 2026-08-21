@@ -62,7 +62,7 @@ jobs:
           if [[ "${IS_PRERELEASE}" == "true" ]]; then
             echo "[X] Release ${TAG} is still a prerelease (isPrerelease=true)"
             echo "    Semantic-release publishes stable releases to main automatically."
-            echo "    Check that the tag was created from a main merge, not a dev prerelease."
+            echo "    Check that the stable tag was created from a main merge."
             exit 1
           fi
           if [[ "${IS_PRERELEASE}" != "false" ]]; then

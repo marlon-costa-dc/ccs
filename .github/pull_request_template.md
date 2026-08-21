@@ -16,7 +16,7 @@ Use what applies. If you skipped something, add a short note instead of forcing 
 
 Check what applies. Not every item is relevant for every PR.
 
-- [ ] Base branch is `dev` unless this is an approved hotfix
+- [ ] Base branch is `main`
 - [ ] Branch name follows `feat/*`, `fix/*`, `docs/*`, or approved hotfix naming
 - [ ] Relevant `--help` output updated if CLI behavior changed
 - [ ] Tests added or updated if behavior changed

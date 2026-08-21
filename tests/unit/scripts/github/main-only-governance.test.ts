@@ -14,6 +14,9 @@ describe('main-only repository governance', () => {
       '.github/workflows/ci.yml',
       '.github/workflows/push-ci.yml',
       '.github/workflows/semantic-release.yml',
+      '.github/workflows/promote-release.yml',
+      '.github/pull_request_template.md',
+      '.github/ISSUE_TEMPLATE/bug-report.yml',
       '.husky/pre-push',
     ];
 
@@ -28,7 +31,10 @@ describe('main-only repository governance', () => {
     expect(read('.github/workflows/ci.yml')).toContain('branches: [main]');
     expect(read('.github/workflows/push-ci.yml')).toContain('branches: [main]');
     expect(read('.github/workflows/semantic-release.yml')).toContain('branches: [main]');
-    expect(read('.husky/pre-push')).toContain('BASE_BRANCH="main"');
+    const prePush = read('.husky/pre-push');
+    expect(prePush).toContain('BASE_BRANCH="main"');
+    expect(prePush).not.toContain('CCS_PR_BASE');
+    expect(prePush).not.toContain('|| true');
   });
 
   test('removes superseded dev and manual package release owners', () => {
