@@ -18,6 +18,8 @@ describe('main-only repository governance', () => {
       '.github/pull_request_template.md',
       '.github/ISSUE_TEMPLATE/bug-report.yml',
       '.husky/pre-push',
+      'scripts/ci-parity-gate.sh',
+      '.beads/hooks/pre-push',
     ];
 
     for (const surface of surfaces) {
@@ -35,6 +37,17 @@ describe('main-only repository governance', () => {
     expect(prePush).toContain('BASE_BRANCH="main"');
     expect(prePush).not.toContain('CCS_PR_BASE');
     expect(prePush).not.toContain('|| true');
+
+    const ciParityGate = read('scripts/ci-parity-gate.sh');
+    expect(ciParityGate).toContain('BASE_BRANCH="main"');
+    expect(ciParityGate).not.toContain('CCS_PR_BASE');
+    expect(ciParityGate).not.toContain('CCS_SKIP_PREPUSH_GATE');
+
+    const beadsPrePush = read('.beads/hooks/pre-push');
+    expect(beadsPrePush).toContain('bd hooks run pre-push');
+    expect(beadsPrePush).not.toContain('bun run');
+    expect(beadsPrePush).not.toContain('CCS_PR_BASE');
+    expect(beadsPrePush).not.toContain('CCS_SKIP_PREPUSH_GATE');
   });
 
   test('removes superseded dev and manual package release owners', () => {
