@@ -21,6 +21,7 @@ const candidateRoots = ['tests/unit', 'tests/integration', 'tests/npm', 'src'];
 const slowTests = [
   'tests/integration/logging-request-context.test.ts',
   'tests/integration/proxy/daemon-lifecycle.test.ts',
+  'tests/integration/update-command-install-origin.test.ts',
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
   'tests/unit/commands/persist-command-handler.test.ts',
   'tests/unit/utils/claudecode-env-stripping.test.ts',
@@ -48,6 +49,7 @@ const slowTests = [
 const fastJsTests = new Set(['tests/unit/flag-parsing-simple.test.js']);
 
 const isolatedTests = new Set([
+  'tests/integration/update-command-install-origin.test.ts',
   'tests/unit/commands/update-command-beta-channel.test.js',
   'tests/unit/commands/update-command-force-reinstall.test.js',
   'tests/unit/commands/bar-command.test.ts',

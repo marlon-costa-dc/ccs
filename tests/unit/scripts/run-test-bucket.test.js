@@ -50,6 +50,15 @@ describe('run-test-bucket', () => {
     expect(runs.map((run) => run.label)).toEqual(daemonSuites);
   });
 
+  test('keeps update install-origin integration slow and isolated', () => {
+    const relativePath = 'tests/integration/update-command-install-origin.test.ts';
+    const slowSet = bucket.getSlowSet();
+    const runs = bucket.getBunRuns('slow', [relativePath]);
+
+    expect(slowSet.has(relativePath)).toBe(true);
+    expect(runs.map((run) => run.label)).toEqual([relativePath]);
+  });
+
   test('forces npm tests into the slow bucket', () => {
     expect(bucket.shouldForceSlow('tests/npm/cli.test.js')).toBe(true);
   });
