@@ -101,4 +101,4 @@ if [[ "$SIGNING" == "adhoc" ]]; then
   echo "[!] Ad-hoc build: first launch needs right-click > Open, or"
   echo "    xattr -dr com.apple.quarantine \"/Applications/$APP_NAME.app\""
 fi
-echo "[i] To publish: gh release upload ccs-bar-latest \"$ZIP\" --clobber"
+echo "[i] Publish only through .github/workflows/bar-release.yml from main."

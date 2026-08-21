@@ -16,6 +16,12 @@ function requireText(relativePath, expected) {
   }
 }
 
+function rejectText(relativePath, forbidden) {
+  if (read(relativePath).includes(forbidden)) {
+    failures.push(`${relativePath} contains retired guidance: ${forbidden}`);
+  }
+}
+
 function collectFiles(directory, filePattern) {
   const files = [];
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -56,10 +62,20 @@ requireText('docs/openai-compatible-providers.md', 'CCS_OPENAI_PROXY_INSECURE');
 requireText('docs/openai-compatible-providers.md', 'CCS_OPENAI_PROXY_REQUEST_TIMEOUT_MS');
 requireText('macos-bar/README.md', 'macos-bar/VERSION');
 requireText('macos-bar/README.md', '.github/workflows/bar-release.yml');
+requireText('macos-bar/README.md', 'The workflow is the only publisher for `ccs-bar-latest`.');
+rejectText('macos-bar/README.md', 'gh release upload');
+rejectText('macos-bar/README.md', '### Manual fallback');
+requireText(
+  'macos-bar/Scripts/package_app.sh',
+  'Publish only through .github/workflows/bar-release.yml from main.'
+);
+rejectText('macos-bar/Scripts/package_app.sh', 'gh release upload');
 requireText('docs/project-roadmap.md', 'Beads is the execution source of truth');
 requireText('docs/release-process.md', 'Semantic-release is the sole authority');
 requireText('docs/release-process.md', '.github/workflows/semantic-release.yml');
 requireText('VERSION_UPDATE_PROTOCOL.md', 'Status: superseded historical material.');
+requireText('CLAUDE.md', 'the assigned Bead remains the execution');
+rejectText('CLAUDE.md', 'Issue triage is GitHub-only');
 requireText(
   '.github/ISSUE_TEMPLATE/documentation.yml',
   'https://docs.ccs.kaitran.ca/providers/oauth/cursor'
@@ -71,16 +87,25 @@ if (!fs.lstatSync(agentsPath).isSymbolicLink() || fs.readlinkSync(agentsPath) !=
 }
 
 const portableGovernanceFiles = [
+  'README.md',
   'CLAUDE.md',
   'CONTRIBUTING.md',
   'VERSION_UPDATE_PROTOCOL.md',
+  '.cursor/rules/beads.mdc',
+  '.github/pull_request_template.md',
   'docs/README.md',
   'docs/project-roadmap.md',
   'docs/release-process.md',
+  'macos-bar/README.md',
 ];
 for (const relativePath of portableGovernanceFiles) {
-  if (/\/(?:Users|home)\//.test(read(relativePath))) {
+  const source = read(relativePath);
+  if (/\/(?:Users|home)\//.test(source)) {
     failures.push(`${relativePath} contains a machine-specific absolute path`);
+  }
+
+  if (/\borigin\/dev\b|branches:\s*\[dev\]|base branch is `dev`/i.test(source)) {
+    failures.push(`${relativePath} contains retired dev-branch governance`);
   }
 }
 

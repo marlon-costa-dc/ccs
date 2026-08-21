@@ -110,10 +110,13 @@ bun run validate
 After every push to a PR, watch CI until it finishes. If checks fail, inspect
 logs, fix root cause, push again, and re-watch.
 
-## Issue Triage
+## Issue Intake and Triage
 
-Issue triage is GitHub-only unless implementation is explicitly requested.
-Always inspect live state first:
+GitHub Issues are the public intake and discussion surface for external
+reports. In a Gas Town workspace, the assigned Bead remains the execution
+source of truth: read it before the GitHub issue and record durable findings
+there. Triage-only requests are read-only unless implementation is explicitly
+requested. Always inspect live GitHub state first:
 
 ```bash
 gh issue view <number> --json title,body,state,labels,assignees,comments

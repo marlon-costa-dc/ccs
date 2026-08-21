@@ -10,10 +10,10 @@ consume its immutable tag and release; they do not create a competing release.
 | Source | Workflow | Result |
 | --- | --- | --- |
 | Push to `main` | [`semantic-release.yml`](../.github/workflows/semantic-release.yml) | Build and validation, then semantic-release when commit history requires a release |
-| Semantic-release tag or manual replay of an existing tag | [`release.yml`](../.github/workflows/release.yml) | Package assets added to the existing GitHub release after provenance checks |
+| Semantic-release tag or operator replay of an existing tag | [`release.yml`](../.github/workflows/release.yml) | Package assets added to the existing GitHub release after provenance checks |
 | Published stable or `rc` GitHub release | [`docker-release.yml`](../.github/workflows/docker-release.yml) | Immutable integrated Docker version tag, signature, and smoke test |
-| Manual stable promotion | [`promote-release.yml`](../.github/workflows/promote-release.yml) | Docker `:latest`, major, and minor aliases |
-| Manual CCS Bar publication | [`bar-release.yml`](../.github/workflows/bar-release.yml) | Floating `ccs-bar-latest` assets; no package version, npm publication, or package tag |
+| Operator-approved stable promotion | [`promote-release.yml`](../.github/workflows/promote-release.yml) | Docker `:latest`, major, and minor aliases |
+| Operator-dispatched CCS Bar publication | [`bar-release.yml`](../.github/workflows/bar-release.yml) | Floating `ccs-bar-latest` assets; no package version, npm publication, or package tag |
 
 ## Package release authority
 
@@ -75,6 +75,16 @@ creates `:latest`, `:X`, and `:X.Y` aliases from the immutable image digest.
 
 The deprecated `ccs-dashboard` image has a sunset compatibility job. Its tag
 behavior is not the contract for the supported integrated image.
+
+## CCS Bar assets
+
+`macos-bar/VERSION` owns the version of the separate CCS Bar asset. Bar version
+changes land through the normal pull-request workflow. An operator then runs
+[`bar-release.yml`](../.github/workflows/bar-release.yml) from `main`.
+
+That workflow is the only publisher for the floating `ccs-bar-latest` release.
+Local packaging commands validate the app; they do not upload assets or edit
+release metadata.
 
 ## Non-publishing maintenance
 

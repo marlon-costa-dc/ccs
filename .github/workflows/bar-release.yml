@@ -4,14 +4,14 @@ name: Bar Release
 # release asset (what `ccs bar install` downloads).
 #
 # Scoped deliberately so it NEVER burdens other PRs or CI:
-#   - Runs only by manual dispatch from `main`. Regular PRs and non-bar changes
+#   - Runs only by operator dispatch from `main`. Regular PRs and non-bar changes
 #     do not start it.
 #   - Runs ONLY on the dedicated self-hosted macOS runner (label `ccs-bar` on
 #     kai-minim4). The Linux CI runners never match this job, and this job never
 #     competes for them.
 #
-# Version source: `macos-bar/VERSION` (single line semver). Bump it in the same
-# PR when you want a new number; the asset is always "latest" regardless.
+# Version source: `macos-bar/VERSION` (single line semver). Version changes land
+# through the normal PR workflow; the published asset is always "latest".
 
 on:
   workflow_dispatch:
@@ -71,7 +71,7 @@ jobs:
           Install or update: ccs bar install
           Ad-hoc signed: first launch may need right-click then Open.
 
-          Built from main by the manual Bar Release workflow.
+          Built from main by the operator-dispatched Bar Release workflow.
           NOTES
           gh release edit ccs-bar-latest --target "$GITHUB_SHA" --title "CCS Bar v${VERSION}" --notes-file "$notes"
           rm -f "$notes"
