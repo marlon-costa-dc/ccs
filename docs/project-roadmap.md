@@ -16,7 +16,7 @@ roadmap copy.
 
 ## Planning Guidance
 
-1. Confirm the issue still reproduces against `origin/dev`.
+1. Confirm the issue still reproduces against `origin/main`.
 2. Read `CLAUDE.md` and the affected source, tests, help, and public docs.
 3. Keep the implementation and compatibility boundary explicit.
 4. Run focused validation, then the repository quality gate appropriate to the

@@ -37,7 +37,7 @@ if [[ -z "$BASE_BRANCH" ]]; then
   if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" =~ ^hotfix/ || "$CURRENT_BRANCH" =~ ^kai/hotfix- ]]; then
     BASE_BRANCH="main"
   else
-    BASE_BRANCH="dev"
+    BASE_BRANCH="main"
   fi
 fi
 

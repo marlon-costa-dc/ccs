@@ -126,12 +126,11 @@ canonical duplicate.
 ## Release Signals
 
 - PR `CI` is the contributor quality gate.
-- `Push CI` is the post-merge signal for `dev`.
-- `Dev Release` publishes the `@dev` npm package.
-- A red `Dev Release` is not automatically contributor failure; check PR `CI`
-  and `Push CI` first.
+- `Push CI` is the post-merge signal for `main`.
+- A red `Push CI` is not automatically contributor failure; check PR `CI`
+  first.
 
-Use `feat:` or `fix:` for dev-to-main promotion PRs so release automation runs.
+Use `feat:` or `fix:` for main promotion PRs so release automation runs.
 
 ## Design Standards
 

@@ -84,15 +84,14 @@ export function planIssueCleanup({ releaseIssues, resolvedIssues, issueStates })
   return releaseIssues.map((number) => {
     const state = issueStates.get(number) || { labels: [], state: 'UNKNOWN' };
     const labels = new Set(state.labels);
-    const wasReleasedDev = labels.has('released-dev');
-    const shouldClose = state.state === 'OPEN' && (wasReleasedDev || resolved.has(number));
+    const shouldClose = state.state === 'OPEN' && resolved.has(number);
 
     return {
       number,
-      removeLabels: ['released-dev', 'pending-release'],
+      removeLabels: ['pending-release'],
       addReleasedLabel: shouldClose,
       close: shouldClose,
-      reason: wasReleasedDev ? 'promoted from dev to stable' : 'resolved by stable release',
+      reason: 'resolved by stable release',
     };
   });
 }
