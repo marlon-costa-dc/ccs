@@ -1,4 +1,4 @@
-name: GitHub Release
+name: Package GitHub Release Assets
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to package, for example v8.9.0-dc3
+        description: Existing semantic-release tag to package, for example v8.9.0
         required: true
         type: string
 
@@ -15,17 +15,18 @@ permissions:
   contents: write
 
 concurrency:
-  group: github-release-${{ inputs.tag || github.ref_name }}
+  group: github-release-assets-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  release:
+  package:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout release tag
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Setup Node.js
@@ -47,14 +48,79 @@ jobs:
       - name: Validate
         run: bun run validate
 
-      - name: Pack release asset
+      - name: Verify tag, package, and release provenance
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
-          VERSION="${TAG#v}"
-          ASSET="ccs_${VERSION}_package.tar.gz"
-          tar -czf "${ASSET}" \
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "[X] Expected a semantic version tag, got: $TAG"
+            exit 1
+          fi
+
+          tag_commit="$(git rev-parse "${TAG}^{commit}")"
+          head_commit="$(git rev-parse HEAD)"
+          if [[ "$head_commit" != "$tag_commit" ]]; then
+            echo "[X] Checkout $head_commit does not match tag $TAG at $tag_commit"
+            exit 1
+          fi
+
+          git fetch origin main --no-tags
+          if ! git merge-base --is-ancestor "$tag_commit" origin/main; then
+            echo "[X] Tag $TAG does not identify a commit on origin/main"
+            exit 1
+          fi
+
+          version="${TAG#v}"
+          package_version="$(node -p "require('./package.json').version")"
+          if [[ "$package_version" != "$version" ]]; then
+            echo "[X] Tag version $version does not match package.json $package_version"
+            exit 1
+          fi
+
+          release_json=""
+          for attempt in {1..12}; do
+            if release_json="$(gh release view "$TAG" --json tagName,isDraft,targetCommitish 2>/dev/null)"; then
+              break
+            fi
+            if [[ "$attempt" == "12" ]]; then
+              echo "[X] Semantic-release GitHub release $TAG does not exist"
+              exit 1
+            fi
+            sleep 10
+          done
+
+          release_tag="$(jq -r '.tagName' <<<"$release_json")"
+          release_draft="$(jq -r '.isDraft' <<<"$release_json")"
+          release_target="$(jq -r '.targetCommitish' <<<"$release_json")"
+          if [[ "$release_tag" != "$TAG" || "$release_draft" != "false" ]]; then
+            echo "[X] Release must be published and identify tag $TAG"
+            exit 1
+          fi
+          if [[ "$release_target" != "main" && "$release_target" != "$TAG" && "$release_target" != "$tag_commit" && "$tag_commit" != "$release_target"* ]]; then
+            echo "[X] Release target $release_target does not identify main or $tag_commit"
+            exit 1
+          fi
+
+          {
+            echo "TAG=$TAG"
+            echo "VERSION=$version"
+            echo "ASSET=ccs_${version}_package.tar.gz"
+            echo "CHECKSUMS=ccs_${version}_checksums.txt"
+          } >> "$GITHUB_ENV"
+
+      - name: Pack release assets
+        run: |
+          set -euo pipefail
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -czf "$ASSET" \
             package.json \
             README.md \
             LICENSE \
@@ -62,20 +128,18 @@ jobs:
             lib \
             scripts \
             config
-          sha256sum "${ASSET}" > checksums.txt
-          echo "ASSET=${ASSET}" >> "$GITHUB_ENV"
-          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
-          echo "TAG=${TAG}" >> "$GITHUB_ENV"
+          sha256sum "$ASSET" > "$CHECKSUMS"
 
-      - name: Publish GitHub release
+      - name: Upload assets to existing release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release upload "${TAG}" "${ASSET}" checksums.txt --clobber
-          else
-            gh release create "${TAG}" "${ASSET}" checksums.txt \
-              --title "CCS ${VERSION}" \
-              --generate-notes
-          fi
+          existing_assets="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          for asset in "$ASSET" "$CHECKSUMS"; do
+            if grep -Fxq "$asset" <<<"$existing_assets"; then
+              echo "[X] Release asset already exists and will not be overwritten: $asset"
+              exit 1
+            fi
+          done
+          gh release upload "$TAG" "$ASSET" "$CHECKSUMS"

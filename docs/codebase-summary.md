@@ -150,7 +150,8 @@ evergreen documentation.
 | Bundle verification | [`scripts/verify-bundle.js`](../scripts/verify-bundle.js) |
 | Local CI-equivalent gate | [`scripts/ci-parity-gate.sh`](../scripts/ci-parity-gate.sh) |
 | Commit policy | [`commitlint.config.cjs`](../commitlint.config.cjs) |
-| Branch-aware releases | [`.releaserc.cjs`](../.releaserc.cjs) |
+| Package release policy and downstream packaging | [`docs/release-process.md`](./release-process.md) |
+| Semantic-release commit analysis | [`.releaserc.cjs`](../.releaserc.cjs) |
 | GitHub automation | [`.github/workflows/`](../.github/workflows/) |
 
 Semantic-release owns versions, changelog updates, tags, npm publication, and

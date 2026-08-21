@@ -1,6 +1,6 @@
 # CCS CLI Agent Guide
 
-Canonical agent instructions for `/Users/kaitran/CloudPersonal/ccs/cli`.
+Canonical agent instructions for this repository.
 `AGENTS.md` must stay a symlink to this file.
 
 ## Scope
@@ -43,7 +43,7 @@ All env values written into settings must be strings.
 Use the narrowest authoritative source:
 
 1. Source, tests, package scripts, and workflows define implemented behavior.
-2. `CLAUDE.md` and `CONTRIBUTING.md` define repository workflow.
+2. `AGENTS.md`/`CLAUDE.md` and `CONTRIBUTING.md` define repository workflow.
 3. `docs/README.md` maps maintainer documentation and its owners.
 4. The separate `kaitranntt/ccs-docs` repository and published site own user
    guides and CLI reference.
@@ -64,9 +64,9 @@ workflow changes. Remove stale claims instead of preserving them as TODOs.
   `ccs <provider>` unless the page is provider-specific.
 - If CLI commands, config, providers, install steps, or user workflows change,
   update the separate public CCS docs repository. Maintainers using the
-  standard CloudPersonal checkout may have it at
-  `/Users/kaitran/CloudPersonal/ccs/docs`; fork contributors can use their own
-  checkout and coordinate the matching docs change in the PR.
+  governed workspace should use the related-repository checkout declared by
+  workspace configuration. Fork contributors can use their own checkout and
+  coordinate the matching docs change in the PR.
 
 Help locations:
 
@@ -85,24 +85,26 @@ Help locations:
 
 ## Validation
 
-Format before validating:
+From the repository root, format before validating:
 
 ```bash
-cd /Users/kaitran/CloudPersonal/ccs/cli && bun run format
-cd /Users/kaitran/CloudPersonal/ccs/cli && bun run lint:fix
-cd /Users/kaitran/CloudPersonal/ccs/cli && bun run validate
+bun run format
+bun run lint:fix
+bun run validate
 ```
 
 Before requesting review or merge, run:
 
 ```bash
-cd /Users/kaitran/CloudPersonal/ccs/cli && bun run validate:ci-parity
+bun run validate:ci-parity
 ```
 
 If UI changed:
 
 ```bash
-cd /Users/kaitran/CloudPersonal/ccs/cli/ui && bun run format && bun run validate
+cd ui
+bun run format
+bun run validate
 ```
 
 After every push to a PR, watch CI until it finishes. If checks fail, inspect
@@ -114,7 +116,7 @@ Issue triage is GitHub-only unless implementation is explicitly requested.
 Always inspect live state first:
 
 ```bash
-cd /Users/kaitran/CloudPersonal/ccs/cli && gh issue view <number> --json title,body,state,labels,assignees,comments
+gh issue view <number> --json title,body,state,labels,assignees,comments
 ```
 
 For open issues, prefer one type label and one area label. Use routing labels
@@ -141,7 +143,19 @@ Use `feat:` or `fix:` for main promotion PRs so release automation runs.
   launch flows.
 - Error messages should help users recover, not just report failure.
 
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:1105d646 -->
+## Governed Execution
+
+Beads is the execution source of truth when this repository is attached to Gas
+Town. `gt prime` loads the current lifecycle, `gt hook` identifies the assigned
+bead, and `bd show <id>` provides its durable requirements and evidence.
+
+Hooked workers use only the Gas Town-created lane, keep evidence on the bead,
+and finish with `gt done`. Gas Town owns branch and worktree creation, remote
+submission, the merge queue, and tracker closure. Generic Git handoff examples
+in the managed Beads section do not replace that lifecycle. External
+contributors follow [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:46cd31e7 -->
 ## Beads Issue Tracker
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
@@ -161,7 +175,7 @@ bd close <id>         # Complete work
 - Run `bd prime` for detailed command reference and session close protocol
 - Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
 
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/marlon-costa-dc/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
+**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/core-concepts/sync-concepts.md for details and anti-patterns.
 
 ## Agent Context Profiles
 
@@ -185,6 +199,7 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
    # Team-maintainer opt-in only, unless current instructions forbid it:
    git pull --rebase
+   bd dolt push
    git push
    git status
    ```
