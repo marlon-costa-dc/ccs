@@ -10,11 +10,11 @@ Factory Droid, CLIProxy, and compatible provider profiles.
 
 ## Non-Negotiables
 
-- Default branch is `dev`. Feature/fix branches start from `dev`; production
+- Default branch is `main`. Feature/fix branches start from `main`; production
   hotfixes start from `main` only when explicitly needed.
 - Never touch the user's real `~/.ccs/` or `~/.claude/` in tests. Use
   `getCcsDir()` from `src/utils/config-manager.ts`; it respects `CCS_HOME`.
-- Do not commit directly to `dev` or `main`.
+- Do not commit directly to `main`.
 - Do not manually bump versions or create release tags. Semantic-release owns
   versions, changelog, tags, npm publish, and GitHub releases.
 - CLI terminal output must be ASCII only: `[OK]`, `[!]`, `[X]`, `[i]`.
