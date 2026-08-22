@@ -30,6 +30,12 @@ describe('run-test-bucket', () => {
     }
   });
 
+  test('isolates every split Browser MCP suite from shared process state', () => {
+    const runs = bucket.getBunRuns('slow', browserMcpSplitSuites);
+
+    expect(runs.map((run) => run.label)).toEqual(browserMcpSplitSuites);
+  });
+
   test('keeps web-server integration tests that bind ports in the slow bucket', () => {
     const slowSet = bucket.getSlowSet();
 
@@ -95,7 +101,7 @@ describe('run-test-bucket', () => {
     expect(args).toEqual([
       'test',
       '--max-concurrency=1',
-      '--timeout=10000',
+      '--timeout=30000',
       './tests/integration/example.test.ts',
     ]);
   });

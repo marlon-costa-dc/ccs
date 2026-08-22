@@ -9,6 +9,7 @@ import {
   OPENAI_COMPAT_PROXY_ADAPTIVE_PORT_START,
   OPENAI_COMPAT_PROXY_SERVICE_NAME,
   getOpenAICompatProxyDir,
+  getOpenAICompatProxyLogPath,
 } from './proxy-daemon-paths';
 import {
   getLegacyOpenAICompatProxyPid,
@@ -642,9 +643,16 @@ export async function startOpenAICompatProxy(
       new Promise((resolve) => {
         let resolved = false;
         let timeout: NodeJS.Timeout | null = null;
-        let stderr = '';
         const authToken = generateProxyAuthToken();
         const authTokenFile = writeOpenAICompatProxyAuthTokenFile(profile.profileName, authToken);
+        const stderrLogPath = getOpenAICompatProxyLogPath(profile.profileName);
+        const readDaemonStderr = () => {
+          try {
+            return fs.readFileSync(stderrLogPath, 'utf8');
+          } catch {
+            return '';
+          }
+        };
         const commitState = () => {
           if (proc.pid) {
             writeOpenAICompatProxyPid(profile.profileName, proc.pid);
@@ -675,31 +683,36 @@ export async function startOpenAICompatProxy(
           resolve(result);
         };
 
-        const proc: ChildProcess = spawn(
-          process.execPath,
-          [
-            daemonEntry,
-            '--port',
-            String(port),
-            '--host',
-            host,
-            '--profile',
-            profile.profileName,
-            '--settings-path',
-            profile.settingsPath,
-            '--auth-token-file',
-            authTokenFile,
-            ...(options.insecure ? ['--insecure'] : []),
-            '--ccs-openai-proxy-daemon',
-          ],
-          { stdio: ['ignore', 'ignore', 'pipe'], detached: true }
-        );
+        const stderrFd = fs.openSync(stderrLogPath, 'w', 0o600);
+        fs.chmodSync(stderrLogPath, 0o600);
+        let proc: ChildProcess;
+        try {
+          proc = spawn(
+            process.execPath,
+            [
+              daemonEntry,
+              '--port',
+              String(port),
+              '--host',
+              host,
+              '--profile',
+              profile.profileName,
+              '--settings-path',
+              profile.settingsPath,
+              '--auth-token-file',
+              authTokenFile,
+              ...(options.insecure ? ['--insecure'] : []),
+              '--ccs-openai-proxy-daemon',
+            ],
+            // A detached daemon cannot retain a pipe owned by the CLI parent;
+            // doing so keeps the launcher alive after the daemon is healthy.
+            { stdio: ['ignore', 'ignore', stderrFd], detached: true }
+          );
+        } finally {
+          fs.closeSync(stderrFd);
+        }
 
         proc.unref();
-        proc.stderr?.setEncoding('utf8');
-        proc.stderr?.on('data', (chunk) => {
-          stderr += chunk;
-        });
 
         let attempts = 0;
         const poll = async () => {
@@ -725,6 +738,7 @@ export async function startOpenAICompatProxy(
             return;
           }
           if (attempts >= 30) {
+            await terminateDaemonProcess(proc.pid);
             finish({
               success: false,
               port,
@@ -745,6 +759,7 @@ export async function startOpenAICompatProxy(
           });
         });
         proc.on('exit', (code, signal) => {
+          const stderr = readDaemonStderr();
           const bindConflict = isPortBindConflictMessage(stderr);
           if (code === 0) {
             finish({

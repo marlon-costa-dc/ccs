@@ -19,6 +19,7 @@ import {
   OPENAI_COMPAT_PROXY_ADAPTIVE_PORT_START,
   getLegacyOpenAICompatProxyPidPath,
   getLegacyOpenAICompatProxySessionPath,
+  getOpenAICompatProxyLogPath,
   getOpenAICompatProxyPidPath,
   getOpenAICompatProxySessionPath,
 } from '../../../src/proxy/proxy-daemon-paths';
@@ -154,10 +155,12 @@ describe('openai proxy daemon lifecycle', () => {
     expect(status.authToken).toBe(authToken);
 
     const sessionPath = getOpenAICompatProxySessionPath('hf');
+    const logPath = getOpenAICompatProxyLogPath('hf');
     const proxyDir = path.dirname(sessionPath);
     if (process.platform !== 'win32') {
       expect(fs.statSync(proxyDir).mode & 0o777).toBe(0o700);
       expect(fs.statSync(sessionPath).mode & 0o777).toBe(0o600);
+      expect(fs.statSync(logPath).mode & 0o777).toBe(0o600);
     }
     expect(fs.readdirSync(proxyDir).some((entry) => entry.endsWith('.token'))).toBe(false);
     if (started.pid) {

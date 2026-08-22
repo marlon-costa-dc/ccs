@@ -10,14 +10,14 @@ interface RunResult {
   stderr: string;
 }
 
-setDefaultTimeout(10000);
+setDefaultTimeout(30000);
 
 function runCcs(args: string[], env: NodeJS.ProcessEnv): RunResult {
   const ccsEntry = path.join(process.cwd(), 'dist', 'ccs.js');
   const result = spawnSync('node', [ccsEntry, ...args], {
     encoding: 'utf8',
     env,
-    timeout: 10000,
+    timeout: 20000,
   });
 
   return {

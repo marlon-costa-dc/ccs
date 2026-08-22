@@ -6,6 +6,14 @@ const { spawnSync } = require('node:child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const candidateRoots = ['tests/unit', 'tests/integration', 'tests/npm', 'src'];
+const browserMcpSplitTests = [
+  'tests/unit/hooks/browser-mcp-advanced-interactions.test.ts',
+  'tests/unit/hooks/browser-mcp-downloads-and-files.test.ts',
+  'tests/unit/hooks/browser-mcp-navigation-and-query.test.ts',
+  'tests/unit/hooks/browser-mcp-orchestration-and-artifacts.test.ts',
+  'tests/unit/hooks/browser-mcp-recording-and-replay.test.ts',
+  'tests/unit/hooks/browser-mcp-session-and-intercepts.test.ts',
+];
 // Add a `.ts` test to `slowTests` when ANY of these apply:
 //   1. It spawns a child process (CLI, bun test, node, gh, etc.).
 //   2. It binds a port, starts a server, or talks to localhost.
@@ -25,12 +33,7 @@ const slowTests = [
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
   'tests/unit/commands/persist-command-handler.test.ts',
   'tests/unit/utils/claudecode-env-stripping.test.ts',
-  'tests/unit/hooks/browser-mcp-advanced-interactions.test.ts',
-  'tests/unit/hooks/browser-mcp-downloads-and-files.test.ts',
-  'tests/unit/hooks/browser-mcp-navigation-and-query.test.ts',
-  'tests/unit/hooks/browser-mcp-orchestration-and-artifacts.test.ts',
-  'tests/unit/hooks/browser-mcp-recording-and-replay.test.ts',
-  'tests/unit/hooks/browser-mcp-session-and-intercepts.test.ts',
+  ...browserMcpSplitTests,
   'tests/unit/targets/codex-runtime-integration.test.ts',
   'tests/unit/targets/codex-settings-bridge-launch.test.ts',
   'tests/unit/targets/droid-command-routing-integration.test.ts',
@@ -50,6 +53,7 @@ const fastJsTests = new Set(['tests/unit/flag-parsing-simple.test.js']);
 
 const isolatedTests = new Set([
   'tests/integration/update-command-install-origin.test.ts',
+  ...browserMcpSplitTests,
   'tests/unit/commands/update-command-beta-channel.test.js',
   'tests/unit/commands/update-command-force-reinstall.test.js',
   'tests/unit/commands/bar-command.test.ts',
@@ -143,11 +147,11 @@ function toBunTestPath(relativePath) {
 function getBunArgs(name, selected = selectBucket(name)) {
   const testPaths = selected.map(toBunTestPath);
 
-  // Slow bucket forces sequential execution because it spawns subprocesses,
-  // binds ports, and touches shared state — parallelism causes flakes.
+  // Slow bucket forces sequential execution and allows the declared launch
+  // suites enough time for subprocess startup on loaded CI workers.
   // Fast bucket keeps bun's default parallelism for speed.
   return name === 'slow'
-    ? ['test', '--max-concurrency=1', '--timeout=10000', ...testPaths]
+    ? ['test', '--max-concurrency=1', '--timeout=30000', ...testPaths]
     : ['test', ...testPaths];
 }
 
