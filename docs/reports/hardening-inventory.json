@@ -491,10 +491,10 @@
   "maintainability": {
     "typedErrors": {
       "totalThrows": 426,
-      "typedThrows": 78,
-      "plainThrows": 290,
+      "typedThrows": 79,
+      "plainThrows": 289,
       "otherThrows": 58,
-      "adoptionRatio": 0.1831,
+      "adoptionRatio": 0.1854,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
@@ -511,8 +511,8 @@
         {
           "subdomain": "proxy",
           "count": 38,
-          "typed": 0,
-          "plain": 34
+          "typed": 1,
+          "plain": 33
         },
         {
           "subdomain": "codex-auth",
@@ -773,8 +773,8 @@
           "loc": 939
         },
         {
-          "file": "src/cliproxy/accounts/registry.ts",
-          "loc": 871
+          "file": "src/proxy/proxy-daemon.ts",
+          "loc": 877
         }
       ]
     }

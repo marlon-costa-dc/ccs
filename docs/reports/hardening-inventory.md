@@ -56,7 +56,7 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 
 | Metric | Value |
 |---|---:|
-| typed-error adoption (typed/total throws) | 18.3% (78/426) |
+| typed-error adoption (typed/total throws) | 18.5% (79/426) |
 | typed-error adoption (P4 locked subdomains) | 93.3% (28/30), target 40% |
 | hotpath console.error/warn occurrences | 247 (548 total, 301 CLI-UX exempt) |
 | hotpath console.error/warn files | 72 |
@@ -103,5 +103,5 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | `src/cliproxy/quota/quota-manager.ts` | 954 |
 | `src/web-server/services/codex-dashboard-service.ts` | 940 |
 | `src/glmt/glmt-proxy.ts` | 939 |
-| `src/cliproxy/accounts/registry.ts` | 871 |
+| `src/proxy/proxy-daemon.ts` | 877 |
 
