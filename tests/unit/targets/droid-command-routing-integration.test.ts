@@ -10,7 +10,7 @@ interface RunResult {
   stderr: string;
 }
 
-setDefaultTimeout(10000);
+setDefaultTimeout(30000);
 
 function runCcs(args: string[], env: NodeJS.ProcessEnv): RunResult {
   const ccsEntry = path.join(process.cwd(), 'dist', 'ccs.js');

@@ -3,12 +3,14 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as http from 'http';
 import * as lockfile from 'proper-lockfile';
+import { ProxyError } from '../errors/error-types';
 import type { OpenAICompatProfileConfig } from './profile-router';
 import {
   OPENAI_COMPAT_PROXY_ADAPTIVE_PORT_END,
   OPENAI_COMPAT_PROXY_ADAPTIVE_PORT_START,
   OPENAI_COMPAT_PROXY_SERVICE_NAME,
   getOpenAICompatProxyDir,
+  getOpenAICompatProxyLogPath,
 } from './proxy-daemon-paths';
 import {
   getLegacyOpenAICompatProxyPid,
@@ -179,7 +181,7 @@ async function withOpenAICompatProxyLock<T>(operation: () => Promise<T>): Promis
       realpath: false,
     });
   } catch (error) {
-    throw new Error(
+    throw new ProxyError(
       `Failed to lock OpenAI-compatible proxy directory (${proxyDir}): ${(error as Error).message}`
     );
   }
@@ -635,143 +637,173 @@ export async function startOpenAICompatProxy(
       };
     }
 
-    const launchOnPort = (
+    const launchOnPort = async (
       port: number,
       persistState: boolean
-    ): Promise<OpenAICompatProxyLaunchResult> =>
-      new Promise((resolve) => {
-        let resolved = false;
-        let timeout: NodeJS.Timeout | null = null;
-        let stderr = '';
-        const authToken = generateProxyAuthToken();
-        const authTokenFile = writeOpenAICompatProxyAuthTokenFile(profile.profileName, authToken);
-        const commitState = () => {
-          if (proc.pid) {
-            writeOpenAICompatProxyPid(profile.profileName, proc.pid);
-          }
-          writeOpenAICompatProxySession({
-            profileName: profile.profileName,
-            settingsPath: profile.settingsPath,
-            host,
-            port,
-            baseUrl: profile.baseUrl,
-            authToken,
-            model: profile.model,
-            insecure: options.insecure,
+    ): Promise<OpenAICompatProxyLaunchResult> => {
+      const authToken = generateProxyAuthToken();
+      const authTokenFile = writeOpenAICompatProxyAuthTokenFile(profile.profileName, authToken);
+      const stderrLogPath = getOpenAICompatProxyLogPath(profile.profileName);
+
+      try {
+        const stderrHandle = await fs.promises.open(stderrLogPath, 'w', 0o600);
+        try {
+          await stderrHandle.chmod(0o600);
+          return await new Promise((resolve) => {
+            let resolved = false;
+            let timeout: NodeJS.Timeout | null = null;
+            const readDaemonStderr = async () => {
+              try {
+                return await fs.promises.readFile(stderrLogPath, 'utf8');
+              } catch {
+                return '';
+              }
+            };
+            const commitState = () => {
+              if (proc.pid) {
+                writeOpenAICompatProxyPid(profile.profileName, proc.pid);
+              }
+              writeOpenAICompatProxySession({
+                profileName: profile.profileName,
+                settingsPath: profile.settingsPath,
+                host,
+                port,
+                baseUrl: profile.baseUrl,
+                authToken,
+                model: profile.model,
+                insecure: options.insecure,
+              });
+            };
+
+            const finish = (result: OpenAICompatProxyLaunchResult) => {
+              if (resolved) return;
+              resolved = true;
+              if (timeout) clearTimeout(timeout);
+              if (!result.success) {
+                removeOpenAICompatProxyAuthTokenFile(authTokenFile);
+                if (persistState) {
+                  removeOpenAICompatProxyPid(profile.profileName);
+                  removeOpenAICompatProxySession(profile.profileName);
+                }
+              }
+              resolve(result);
+            };
+
+            const proc: ChildProcess = spawn(
+              process.execPath,
+              [
+                daemonEntry,
+                '--port',
+                String(port),
+                '--host',
+                host,
+                '--profile',
+                profile.profileName,
+                '--settings-path',
+                profile.settingsPath,
+                '--auth-token-file',
+                authTokenFile,
+                ...(options.insecure ? ['--insecure'] : []),
+                '--ccs-openai-proxy-daemon',
+              ],
+              // A detached daemon cannot retain a pipe owned by the CLI parent;
+              // doing so keeps the launcher alive after the daemon is healthy.
+              { stdio: ['ignore', 'ignore', stderrHandle.fd], detached: true }
+            );
+
+            proc.unref();
+
+            let attempts = 0;
+            const poll = async () => {
+              attempts += 1;
+              if (await isOpenAICompatProxyRunning(port, profile.profileName)) {
+                if (persistState) {
+                  commitState();
+                }
+                finish({
+                  success: true,
+                  pid: proc.pid,
+                  port,
+                  authToken,
+                  ...(persistState
+                    ? {}
+                    : {
+                        commitState,
+                        stop: async () => {
+                          await terminateDaemonProcess(proc.pid);
+                        },
+                      }),
+                });
+                return;
+              }
+              if (attempts >= 30) {
+                await terminateDaemonProcess(proc.pid);
+                finish({
+                  success: false,
+                  port,
+                  error: `Proxy daemon did not start within 30 seconds on port ${port}`,
+                });
+                return;
+              }
+              timeout = setTimeout(poll, 1000);
+            };
+
+            timeout = setTimeout(poll, 1000);
+            proc.on('error', (error) => {
+              finish({
+                success: false,
+                port,
+                error: error.message,
+                bindConflict: isPortBindConflictMessage(error.message),
+              });
+            });
+            proc.on('exit', async (code, signal) => {
+              const stderr = await readDaemonStderr();
+              const bindConflict = isPortBindConflictMessage(stderr);
+              if (code === 0) {
+                finish({
+                  success: false,
+                  port,
+                  error: 'Proxy daemon exited before becoming healthy',
+                  bindConflict,
+                });
+                return;
+              }
+              if (code !== null) {
+                finish({
+                  success: false,
+                  port,
+                  error: stderr.trim() || `Proxy daemon exited with code ${code}`,
+                  bindConflict,
+                });
+                return;
+              }
+              finish({
+                success: false,
+                port,
+                error: `Proxy daemon was killed by signal ${signal}`,
+                bindConflict,
+              });
+            });
           });
+        } finally {
+          await stderrHandle.close();
+        }
+      } catch (error) {
+        removeOpenAICompatProxyAuthTokenFile(authTokenFile);
+        if (persistState) {
+          removeOpenAICompatProxyPid(profile.profileName);
+          removeOpenAICompatProxySession(profile.profileName);
+        }
+        const message = (error as Error).message;
+        return {
+          success: false,
+          port,
+          error: `Failed to launch proxy daemon: ${message}`,
+          bindConflict: isPortBindConflictMessage(message),
         };
-
-        const finish = (result: OpenAICompatProxyLaunchResult) => {
-          if (resolved) return;
-          resolved = true;
-          if (timeout) clearTimeout(timeout);
-          if (!result.success) {
-            removeOpenAICompatProxyAuthTokenFile(authTokenFile);
-            if (persistState) {
-              removeOpenAICompatProxyPid(profile.profileName);
-              removeOpenAICompatProxySession(profile.profileName);
-            }
-          }
-          resolve(result);
-        };
-
-        const proc: ChildProcess = spawn(
-          process.execPath,
-          [
-            daemonEntry,
-            '--port',
-            String(port),
-            '--host',
-            host,
-            '--profile',
-            profile.profileName,
-            '--settings-path',
-            profile.settingsPath,
-            '--auth-token-file',
-            authTokenFile,
-            ...(options.insecure ? ['--insecure'] : []),
-            '--ccs-openai-proxy-daemon',
-          ],
-          { stdio: ['ignore', 'ignore', 'pipe'], detached: true }
-        );
-
-        proc.unref();
-        proc.stderr?.setEncoding('utf8');
-        proc.stderr?.on('data', (chunk) => {
-          stderr += chunk;
-        });
-
-        let attempts = 0;
-        const poll = async () => {
-          attempts += 1;
-          if (await isOpenAICompatProxyRunning(port, profile.profileName)) {
-            if (persistState) {
-              commitState();
-            }
-            finish({
-              success: true,
-              pid: proc.pid,
-              port,
-              authToken,
-              ...(persistState
-                ? {}
-                : {
-                    commitState,
-                    stop: async () => {
-                      await terminateDaemonProcess(proc.pid);
-                    },
-                  }),
-            });
-            return;
-          }
-          if (attempts >= 30) {
-            finish({
-              success: false,
-              port,
-              error: `Proxy daemon did not start within 30 seconds on port ${port}`,
-            });
-            return;
-          }
-          timeout = setTimeout(poll, 1000);
-        };
-
-        timeout = setTimeout(poll, 1000);
-        proc.on('error', (error) => {
-          finish({
-            success: false,
-            port,
-            error: error.message,
-            bindConflict: isPortBindConflictMessage(error.message),
-          });
-        });
-        proc.on('exit', (code, signal) => {
-          const bindConflict = isPortBindConflictMessage(stderr);
-          if (code === 0) {
-            finish({
-              success: false,
-              port,
-              error: 'Proxy daemon exited before becoming healthy',
-              bindConflict,
-            });
-            return;
-          }
-          if (code !== null) {
-            finish({
-              success: false,
-              port,
-              error: stderr.trim() || `Proxy daemon exited with code ${code}`,
-              bindConflict,
-            });
-            return;
-          }
-          finish({
-            success: false,
-            port,
-            error: `Proxy daemon was killed by signal ${signal}`,
-            bindConflict,
-          });
-        });
-      });
+      }
+    };
 
     const launchProxy = async (persistState: boolean): Promise<OpenAICompatProxyLaunchResult> => {
       const attemptedPorts = new Set<number>();
