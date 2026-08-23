@@ -20,7 +20,31 @@ concurrency:
 
 jobs:
   package:
-    runs-on: ubuntu-latest
+    # One job per platform. The tarball ships node_modules so a consumer needs
+    # no network and no compiler at install time, and optional dependencies are
+    # platform-resolved: chokidar pulls fsevents on macOS only, so a bundle
+    # built on Linux would silently downgrade macOS file watching to polling
+    # (src/web-server/file-watcher.ts, src/cliproxy/sync/auto-sync-watcher.ts).
+    # Each runner therefore resolves its own tree. bcrypt needs no per-platform
+    # build: it ships prebuilds for all seven targets and selects at runtime.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux_amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux_arm64
+          - runner: macos-13
+            platform: darwin_amd64
+          - runner: macos-latest
+            platform: darwin_arm64
+          - runner: windows-latest
+            platform: windows_amd64
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v4
@@ -52,6 +76,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
           set -euo pipefail
 
@@ -107,13 +132,26 @@ jobs:
           {
             echo "TAG=$TAG"
             echo "VERSION=$version"
-            echo "ASSET=ccs_${version}_package.tar.gz"
-            echo "CHECKSUMS=ccs_${version}_checksums.txt"
+            echo "ASSET=ccs_${version}_${PLATFORM}_package.tar.gz"
+            echo "CHECKSUMS=ccs_${version}_${PLATFORM}_checksums.txt"
           } >> "$GITHUB_ENV"
+
+      - name: Install production dependencies for this platform
+        run: |
+          set -euo pipefail
+          # Discard the dev tree used for build/validate and resolve runtime
+          # dependencies only, on this runner, so optionalDependencies match the
+          # target platform. --ignore-scripts is safe here: preinstall.js exits
+          # early under CI, and bcrypt resolves its prebuild at runtime through
+          # node-gyp-build rather than during install.
+          rm -rf node_modules
+          npm install --omit=dev --ignore-scripts --no-audit --no-fund
 
       - name: Pack release assets
         run: |
           set -euo pipefail
+          # node_modules is part of the artifact: the consumer installs by
+          # unpacking, with no registry access and no build toolchain.
           tar \
             --sort=name \
             --mtime='UTC 1970-01-01' \
@@ -127,8 +165,13 @@ jobs:
             dist \
             lib \
             scripts \
-            config
-          sha256sum "$ASSET" > "$CHECKSUMS"
+            config \
+            node_modules
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$ASSET" > "$CHECKSUMS"
+          else
+            shasum -a 256 "$ASSET" > "$CHECKSUMS"
+          fi
 
       - name: Upload assets to existing release
         env:
