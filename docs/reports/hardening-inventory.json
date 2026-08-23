@@ -738,7 +738,7 @@
         },
         {
           "file": "src/cliproxy/config/generator.ts",
-          "loc": 1109
+          "loc": 1120
         },
         {
           "file": "src/cliproxy/auth/oauth-process.ts",

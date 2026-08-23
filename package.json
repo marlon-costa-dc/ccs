@@ -1,6 +1,6 @@
 {
   "name": "@kaitranntt/ccs",
-  "version": "8.9.0-dc3",
+  "version": "8.9.0-dc4",
   "description": "Claude Codex Switch - Instant profile switching between Claude, GLM, Kimi, and more",
   "keywords": [
     "cli",
@@ -113,7 +113,7 @@
     "ora": "^5.4.1",
     "proper-lockfile": "^4.1.2",
     "smol-toml": "^1.6.1",
-    "undici": "^6.0.0",
+    "undici": "^6.28.0",
     "ws": "^8.16.0"
   },
   "devDependencies": {

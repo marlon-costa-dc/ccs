@@ -28,8 +28,18 @@ function normalizeAliasEntry(value: unknown): CLIProxyOAuthModelAliasEntry | nul
   };
 }
 
+/**
+ * Identity of one alias entry: the (name, alias) PAIR, not the alias alone.
+ *
+ * CLIProxyAPI supports sequential failover by repeating the same alias with
+ * different upstream names; config order is the candidate order. Keying on the
+ * alias alone collapses such a chain to its first entry, silently destroying
+ * the failover pool. The upstream binary dedupes on the same pair
+ * (internal/config/config_normalization.go), so this keeps both sides in
+ * agreement.
+ */
 function aliasKey(entry: CLIProxyOAuthModelAliasEntry): string {
-  return entry.alias;
+  return `${entry.name}\u0000${entry.alias}`;
 }
 
 export function parseOAuthModelAliasSection(body: string): CLIProxyOAuthModelAliasConfig {
