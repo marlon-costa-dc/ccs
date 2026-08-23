@@ -6,6 +6,12 @@ name: Semantic Release
 on:
   push:
     branches: [main]
+  # Manual trigger for recovery: when a run is cancelled or never starts (for
+  # example a queue stuck on an unavailable runner), the only way back was an
+  # empty commit on main. semantic-release is idempotent — it exits without
+  # publishing when no releasable commit exists since the last tag — so an
+  # operator-initiated run is safe.
+  workflow_dispatch:
 
 concurrency:
   group: semantic-release-${{ github.ref }}
