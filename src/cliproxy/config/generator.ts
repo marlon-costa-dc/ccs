@@ -16,6 +16,12 @@ import { getAuthDir, getProviderAuthDir, getConfigPathForPort } from './path-res
 import { CLIPROXY_DEFAULT_PORT } from './port-manager';
 import { loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
 import { getActiveDockerLegacyApiKeys } from '../../docker/docker-key-rotation';
+import { getInstalledCliproxyVersion } from '../binary-manager';
+import type {
+  CompositeFallbackEntry,
+  CompositeTierConfig,
+  OAuthModelAliasPoolCapability,
+} from '../../config/schemas/cliproxy';
 import { isValidCliproxyRetryValue } from '../../config/schemas/cliproxy';
 import type { CLIProxyOAuthModelAliasConfig } from '../../config/schemas/cliproxy';
 import {
@@ -80,6 +86,106 @@ interface OAuthModelAliasEntry {
   name: string;
   alias: string;
   fork?: boolean;
+}
+
+type OrderedOAuthAliasHop = {
+  readonly channel: CLIProxyProvider;
+  readonly model: string;
+};
+
+type OrderedOAuthAliasPool = {
+  readonly alias: string;
+  readonly hops: readonly OrderedOAuthAliasHop[];
+};
+
+const ORDERED_OAUTH_ALIAS_POOL_UNSUPPORTED_REASON =
+  'OAuth aliases keep one model per alias within each channel, while multi-model OpenAI-compatible pools use request-by-request rotation';
+
+export class OrderedOAuthAliasPoolUnsupportedError extends Error {
+  readonly name = 'OrderedOAuthAliasPoolUnsupportedError';
+
+  constructor(
+    readonly capability: Extract<OAuthModelAliasPoolCapability, { kind: 'unsupported' }>
+  ) {
+    super(
+      `Ordered cross-channel OAuth fallback is unavailable in CLIProxyAPI ${capability.runtimeVersion}: ${capability.reason}`
+    );
+  }
+}
+
+export class DuplicateOAuthAliasPoolHopError extends Error {
+  readonly name = 'DuplicateOAuthAliasPoolHopError';
+
+  constructor(readonly hop: string) {
+    super(`duplicate fallback hop ${hop}`);
+  }
+}
+
+function fallbackHopKey(hop: OrderedOAuthAliasHop): string {
+  return `${hop.channel}/${hop.model}`;
+}
+
+export function buildOrderedOAuthAliasPool(
+  alias: string,
+  tier: CompositeTierConfig
+): OrderedOAuthAliasPool {
+  const hops: readonly OrderedOAuthAliasHop[] = [
+    { channel: tier.provider, model: tier.model },
+    ...(tier.fallback_chain ?? []).map((fallback: CompositeFallbackEntry) => ({
+      channel: fallback.provider,
+      model: fallback.model,
+    })),
+  ];
+  const seen = new Set<string>();
+  for (const hop of hops) {
+    const key = fallbackHopKey(hop);
+    if (seen.has(key)) {
+      throw new DuplicateOAuthAliasPoolHopError(key);
+    }
+    seen.add(key);
+  }
+  return { alias, hops };
+}
+
+export function generateOrderedOAuthAliasPoolYaml(
+  pool: OrderedOAuthAliasPool,
+  capability: OAuthModelAliasPoolCapability
+): string {
+  if (capability.kind === 'unsupported') {
+    throw new OrderedOAuthAliasPoolUnsupportedError(capability);
+  }
+  return pool.hops
+    .map(
+      (hop) =>
+        `  ${hop.channel}:\n    - name: ${hop.model}\n      alias: ${pool.alias}\n      fork: true`
+    )
+    .join('\n');
+}
+
+function getOrderedOAuthAliasPoolCapability(): OAuthModelAliasPoolCapability {
+  return {
+    kind: 'unsupported',
+    runtimeVersion: getInstalledCliproxyVersion(),
+    reason: ORDERED_OAUTH_ALIAS_POOL_UNSUPPORTED_REASON,
+  };
+}
+
+function getConfiguredOrderedOAuthAliasPools(): readonly OrderedOAuthAliasPool[] {
+  const variants = loadOrCreateUnifiedConfig().cliproxy?.variants ?? {};
+  const pools: OrderedOAuthAliasPool[] = [];
+  for (const [variantName, variant] of Object.entries(variants)) {
+    if (!('type' in variant) || variant.type !== 'composite') {
+      continue;
+    }
+    for (const tierName of ['opus', 'sonnet', 'haiku'] as const) {
+      const tier = variant.tiers[tierName];
+      if ((tier.fallback_chain?.length ?? 0) === 0) {
+        continue;
+      }
+      pools.push(buildOrderedOAuthAliasPool(`${variantName}-${tierName}`, tier));
+    }
+  }
+  return pools;
 }
 
 interface PreservedAntigravityAliasesResult {
@@ -711,15 +817,31 @@ function generateOAuthModelAliasSection(
     })
     .join('\n');
 
-  const existingAliasConfig = parseOAuthModelAliasSection(existingAliases ?? '');
-  const mergedAliasConfig = mergeOAuthModelAliases(
-    existingAliasConfig,
-    normalizedConfiguredAliases
-  );
-  delete mergedAliasConfig.antigravity;
-  const otherProviders = serializeOAuthModelAliasBody(mergedAliasConfig);
+  const orderedPools = getConfiguredOrderedOAuthAliasPools();
+  const orderedPoolYaml = orderedPools
+    .map((pool) => generateOrderedOAuthAliasPoolYaml(pool, getOrderedOAuthAliasPoolCapability()))
+    .join('\n');
+  const preservedNonAntigravityAliases = extractNonAntigravityAliasChannels(existingAliases);
+  return `oauth-model-alias:\n  antigravity:\n${entries}${orderedPoolYaml ? `\n${orderedPoolYaml}` : ''}${preservedNonAntigravityAliases ? `\n${preservedNonAntigravityAliases}` : ''}`;
+}
 
-  return `oauth-model-alias:\n  antigravity:\n${entries}${otherProviders ? `\n${otherProviders}` : ''}`;
+function extractNonAntigravityAliasChannels(existingAliases?: string): string {
+  if (!existingAliases) {
+    return '';
+  }
+  const lines = existingAliases.split('\n');
+  const kept: string[] = [];
+  let keepChannel = false;
+  for (const line of lines) {
+    const channelMatch = line.match(/^  ([a-z0-9-]+):\s*$/i);
+    if (channelMatch) {
+      keepChannel = channelMatch[1].toLowerCase() !== 'antigravity';
+    }
+    if (keepChannel) {
+      kept.push(line);
+    }
+  }
+  return kept.join('\n').trimEnd();
 }
 
 /**
@@ -1020,29 +1142,21 @@ export function regenerateConfig(
 
       // Preserve user customizations while pruning legacy generated Gemini preview noise.
       const existingConfigVersion = getConfigVersionFromContent(content);
-      const existingAliasBody = extractYamlSection(content, 'oauth-model-alias');
-      const preservedAliases = extractPreservedAntigravityAliases(existingAliasBody, {
-        enableLegacyGeminiStaleCleanup:
-          existingConfigVersion === null ||
-          existingConfigVersion < LEGACY_GEMINI_STALE_ALIAS_MIGRATION_VERSION,
-      });
-      const preservedAliasConfig = parseOAuthModelAliasSection(existingAliasBody);
-      const preservedAntigravityConfig = parseOAuthModelAliasSection(preservedAliases.yaml);
-      if (preservedAntigravityConfig.antigravity) {
-        preservedAliasConfig.antigravity = preservedAntigravityConfig.antigravity;
-      } else {
-        delete preservedAliasConfig.antigravity;
-      }
-      existingAliases = serializeOAuthModelAliasBody(preservedAliasConfig);
-      existingPayload = extractYamlSection(content, 'payload');
+      const preservedAliases = extractPreservedAntigravityAliases(
+        extractYamlSection(content, 'oauth-model-alias'),
+        {
+          enableLegacyGeminiStaleCleanup:
+            existingConfigVersion === null ||
+            existingConfigVersion < LEGACY_GEMINI_STALE_ALIAS_MIGRATION_VERSION,
+        }
+      );
+      existingAliases = extractYamlSection(content, 'oauth-model-alias');
       if (preservedAliases.prunedLegacyAliasCount > 0) {
         writeLegacyGeminiAliasCleanupBackup(configPath, content);
       }
     } catch {
       // Use defaults if reading fails
     }
-    // Delete existing config
-    fs.unlinkSync(configPath);
   }
 
   // Ensure directories exist
@@ -1062,6 +1176,9 @@ export function regenerateConfig(
     configContent += `${section.key}:\n${section.body}\n`;
   }
 
+  if (fs.existsSync(configPath)) {
+    fs.unlinkSync(configPath);
+  }
   fs.writeFileSync(configPath, configContent, { mode: 0o600 });
 
   return configPath;
