@@ -9,12 +9,11 @@ set -euo pipefail
 
 # Protected branches keep the full CI parity gate.
 # Feature branches use a faster gate and let GitHub CI run the full suite.
-# Override in emergencies only: CCS_SKIP_PREPUSH_GATE=1 git push --no-verify
 
 # Skip gate entirely for delete-only pushes. Git passes refs on stdin as
 # "<local-ref> <local-sha> <remote-ref> <remote-sha>"; deletes have local-sha = 40 zeros.
 # Running a full test suite just to delete a merged branch is pure waste.
-STDIN_CONTENT="$(cat || true)"
+STDIN_CONTENT="$(cat)"
 if [[ -n "$STDIN_CONTENT" ]]; then
   NON_DELETE_COUNT="$(printf '%s\n' "$STDIN_CONTENT" | awk 'NF >= 2 && $2 !~ /^0{40}$/' | wc -l | tr -d ' ')"
   if [[ "$NON_DELETE_COUNT" == "0" ]]; then
@@ -24,17 +23,9 @@ if [[ -n "$STDIN_CONTENT" ]]; then
 fi
 
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-BASE_BRANCH="${CCS_PR_BASE:-}"
+BASE_BRANCH="main"
 
-if [[ -z "$BASE_BRANCH" ]]; then
-  if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" =~ ^hotfix/ || "$CURRENT_BRANCH" =~ ^kai/hotfix- ]]; then
-    BASE_BRANCH="main"
-  else
-    BASE_BRANCH="dev"
-  fi
-fi
-
-if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "dev" || "$CURRENT_BRANCH" =~ ^hotfix/ || "$CURRENT_BRANCH" =~ ^kai/hotfix- ]]; then
+if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" =~ ^hotfix/ || "$CURRENT_BRANCH" =~ ^kai/hotfix- ]]; then
   echo "[i] Protected branch detected, running full CI parity gate..."
   bun run validate:ci-parity
   exit 0
@@ -49,13 +40,13 @@ bun run lint
 bun run format:check
 bun run test:fast
 
-git fetch origin "$BASE_BRANCH" --quiet || true
+git fetch origin "$BASE_BRANCH" --quiet
 DIFF_RANGE="HEAD"
 if git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
   DIFF_RANGE="origin/$BASE_BRANCH...HEAD"
 fi
 
-CHANGED_FILES="$(git diff --name-only "$DIFF_RANGE" || true)"
+CHANGED_FILES="$(git diff --name-only "$DIFF_RANGE")"
 
 if printf '%s\n' "$CHANGED_FILES" | grep -q '^ui/'; then
   echo "[i] UI changes detected, running ui:validate..."
