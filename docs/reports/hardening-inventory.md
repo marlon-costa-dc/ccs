@@ -94,7 +94,7 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | `src/cliproxy/auth/oauth-handler.ts` | 1520 |
 | `src/cliproxy/model-catalog.ts` | 1152 |
 | `src/web-server/model-pricing.ts` | 1127 |
-| `src/cliproxy/config/generator.ts` | 1109 |
+| `src/cliproxy/config/generator.ts` | 1120 |
 | `src/cliproxy/auth/oauth-process.ts` | 1048 |
 | `src/cliproxy/config/env-builder.ts` | 1045 |
 | `src/web-server/routes/settings-routes.ts` | 1042 |
