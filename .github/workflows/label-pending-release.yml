@@ -13,7 +13,30 @@ jobs:
       pull-requests: read
 
     steps:
+      # This job reconciles GitHub Issue labels. A fork that tracks work in an
+      # external tracker keeps Issues disabled, and every `gh label`/`gh issue`
+      # call then fails with "repository has disabled issues" — under
+      # `set -euo pipefail` the first one aborts the job, so the check goes red
+      # on every pull request rather than on a real problem.
+      #
+      # Skip explicitly instead of masking: if Issues are ever enabled, the
+      # guard stops matching and the reconciliation runs again unchanged.
+      - name: Skip when the repository has Issues disabled
+        id: issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          ENABLED=$(gh repo view "${{ github.repository }}" --json hasIssuesEnabled --jq '.hasIssuesEnabled')
+          echo "enabled=${ENABLED}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$ENABLED" != "true" ]]; then
+            echo "Issues are disabled on ${{ github.repository }}; nothing to reconcile."
+          fi
+
       - name: Reconcile pending-release labels for open main PRs
+        if: steps.issues.outputs.enabled == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

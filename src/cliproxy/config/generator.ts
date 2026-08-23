@@ -308,7 +308,11 @@ function addAliasEntry(
   if (getDeniedModelIdReasonForProvider(normalized.name, 'agy')) return;
   if (getDeniedModelIdReasonForProvider(normalized.alias, 'agy')) return;
 
-  const key = normalized.alias;
+  // Dedupe on the (name, alias) PAIR — buildAntigravityAliasKey already does.
+  // Repeating one alias with different upstream names is how CLIProxyAPI
+  // declares a sequential failover pool, so alias-only keying would collapse
+  // the chain to its first candidate.
+  const key = buildAntigravityAliasKey(normalized);
   const existingIndex = indexByKey.get(key);
   if (existingIndex !== undefined) {
     if (normalized.fork) entries[existingIndex].fork = true;
@@ -333,7 +337,14 @@ function upsertConfiguredAliasEntry(
   if (getDeniedModelIdReasonForProvider(normalized.name, 'agy')) return;
   if (getDeniedModelIdReasonForProvider(normalized.alias, 'agy')) return;
 
-  const existingIndex = entries.findIndex((candidate) => candidate.alias === normalized.alias);
+  // Replace only the entry carrying the SAME (name, alias) pair. Two entries
+  // that share an alias but map to different upstream names are distinct
+  // candidates of one sequential failover pool, so a configured entry must
+  // join the chain instead of overwriting a sibling candidate.
+  const normalizedKey = buildAntigravityAliasKey(normalized);
+  const existingIndex = entries.findIndex(
+    (candidate) => buildAntigravityAliasKey(candidate) === normalizedKey
+  );
   if (existingIndex === -1) {
     addAliasEntry(entries, indexByKey, normalized);
     return;
@@ -342,7 +353,7 @@ function upsertConfiguredAliasEntry(
   entries[existingIndex] = normalized;
   indexByKey.clear();
   entries.forEach((candidate, index) => {
-    indexByKey.set(candidate.alias, index);
+    indexByKey.set(buildAntigravityAliasKey(candidate), index);
   });
 }
 
