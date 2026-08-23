@@ -14,7 +14,12 @@ concurrency:
 jobs:
   guard:
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: [self-hosted, linux, x64]
+    # GitHub-hosted, like every other active workflow. This fork registers no
+    # self-hosted runners (`/actions/runners` returns zero), so jobs pinned to
+    # that label never start: releases sat pending or were cancelled, and a
+    # merged change could not reach a published artifact. The job needs no
+    # machine-local state — it checks out, builds and calls semantic-release.
+    runs-on: ubuntu-latest
     outputs:
       should_release: ${{ steps.release-guard.outputs.should_release }}
 
@@ -38,7 +43,7 @@ jobs:
   release:
     needs: guard
     if: ${{ needs.guard.outputs.should_release == 'true' }}
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
 
     permissions:
       contents: write

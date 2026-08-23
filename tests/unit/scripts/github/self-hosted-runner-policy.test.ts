@@ -10,6 +10,8 @@ const GITHUB_HOSTED_ACTIVE_WORKFLOWS = [
   'ci.yml',
   'push-ci.yml',
   'release.yml',
+  // Publishing must not depend on a runner this repository does not register.
+  'semantic-release.yml',
   'docs-parity.yml',
   'label-pending-release.yml',
   'breaking-change-guard.yml',
