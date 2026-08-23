@@ -50,12 +50,12 @@ describe('CLIProxy user routing config', () => {
     ]);
   });
 
-  it('lets configured aliases replace an existing provider client alias in place', () => {
+  it('lets configured aliases replace an existing entry with the same name and alias', () => {
     const merged = mergeOAuthModelAliases(
       {
         codex: [
           { name: 'first-upstream', alias: 'first-client' },
-          { name: 'old-upstream', alias: 'gpt-5.6-sol-fast', fork: true },
+          { name: 'gpt-5.6-sol', alias: 'gpt-5.6-sol-fast', fork: true },
           { name: 'last-upstream', alias: 'last-client' },
         ],
       },
@@ -68,6 +68,38 @@ describe('CLIProxy user routing config', () => {
       { name: 'first-upstream', alias: 'first-client' },
       { name: 'gpt-5.6-sol', alias: 'gpt-5.6-sol-fast' },
       { name: 'last-upstream', alias: 'last-client' },
+    ]);
+  });
+
+  it('keeps a sequential failover pool: one alias, several upstream names, config order', () => {
+    const body = `  codex:
+    - name: gpt-5
+      alias: g5
+    - name: gpt-5-mini
+      alias: g5
+    - name: gpt-5-nano
+      alias: g5
+`;
+
+    const parsed = parseOAuthModelAliasSection(body);
+    expect(parsed.codex).toEqual([
+      { name: 'gpt-5', alias: 'g5' },
+      { name: 'gpt-5-mini', alias: 'g5' },
+      { name: 'gpt-5-nano', alias: 'g5' },
+    ]);
+
+    // The pool must survive a full parse -> serialize -> parse round-trip:
+    // regenerateConfig() runs exactly this cycle on every `ccs doctor`.
+    expect(parseOAuthModelAliasSection(serializeOAuthModelAliasBody(parsed))).toEqual(parsed);
+
+    // ...and a merge, which is what folds the existing file into the config.
+    const merged = mergeOAuthModelAliases(parsed, {
+      codex: [{ name: 'gpt-5-mini', alias: 'g5', fork: true }],
+    });
+    expect(merged.codex).toEqual([
+      { name: 'gpt-5', alias: 'g5' },
+      { name: 'gpt-5-mini', alias: 'g5', fork: true },
+      { name: 'gpt-5-nano', alias: 'g5' },
     ]);
   });
 
