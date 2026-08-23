@@ -17,7 +17,6 @@ describe('release asset packaging workflow', () => {
     expect(workflow).toContain('name: Package GitHub Release Assets');
     expect(workflow).toContain("tags:");
     expect(workflow).toContain("- 'v*'");
-    expect(workflow).toContain('runs-on: ubuntu-latest');
     expect(workflow).not.toContain('runs-on: [self-hosted');
     expect(workflow).not.toContain('NPM_TOKEN');
     expect(workflow).not.toContain('npx semantic-release');
@@ -25,7 +24,23 @@ describe('release asset packaging workflow', () => {
     expect(workflow).toContain('git merge-base --is-ancestor "$tag_commit" origin/main');
     expect(workflow).toContain('package_version="$(node -p');
     expect(workflow).toContain('gh release view "$TAG"');
-    expect(workflow).toContain('ASSET=ccs_${version}_package.tar.gz');
+    // One asset per platform: optional dependencies resolve per platform
+    // (chokidar pulls fsevents on macOS only), so a single bundle would ship a
+    // degraded tree everywhere but its build host.
+    expect(workflow).toContain('ASSET=ccs_${version}_${PLATFORM}_package.tar.gz');
+    expect(workflow).toContain('runs-on: ${{ matrix.runner }}');
+    for (const platform of [
+      'linux_amd64',
+      'linux_arm64',
+      'darwin_amd64',
+      'darwin_arm64',
+      'windows_amd64',
+    ]) {
+      expect(workflow, `release must build ${platform}`).toContain(`platform: ${platform}`);
+    }
+    // The artifact must be usable without a registry or a compiler.
+    expect(workflow).toContain('npm install --omit=dev --ignore-scripts');
+    expect(workflow).toContain('node_modules');
     expect(workflow).toContain('gh release upload "$TAG" "$ASSET" "$CHECKSUMS"');
     expect(workflow).not.toContain('gh release create');
     expect(workflow).not.toContain('--clobber');
