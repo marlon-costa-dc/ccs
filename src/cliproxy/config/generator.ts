@@ -168,11 +168,50 @@ export function generateOrderedOAuthAliasPoolYaml(
 }
 
 function getOrderedOAuthAliasPoolCapability(): OAuthModelAliasPoolCapability {
+  const runtimeVersion = getInstalledCliproxyVersion();
+  if (runtimeSupportsOrderedOAuthAliasPool(runtimeVersion)) {
+    return { kind: 'ordered' };
+  }
   return {
     kind: 'unsupported',
-    runtimeVersion: getInstalledCliproxyVersion(),
+    runtimeVersion,
     reason: ORDERED_OAUTH_ALIAS_POOL_UNSUPPORTED_REASON,
   };
+}
+
+/**
+ * First CLIProxyAPI runtime whose conductor walks ordered OAuth model-alias
+ * pools sequentially on retryable pre-first-byte errors (fork commits 24b2c6c3
+ * and 78da9867: ordered_pool.go + conductor_ordered_failover.go).
+ */
+const MINIMUM_ORDERED_POOL_VERSION = '7.2.136-dc4';
+
+// Matches fork suffixes like '-dc4' or '-dc12' on a semver base.
+const FORK_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-dc(\d+))?/;
+
+function compareForkVersions(a: string, b: string): number {
+  const matchA = FORK_VERSION_PATTERN.exec(a.trim());
+  const matchB = FORK_VERSION_PATTERN.exec(b.trim());
+  if (!matchA || !matchB) {
+    // Non-parseable versions never unlock the capability (fail closed).
+    return -1;
+  }
+  const triples = [1, 2, 3].map((group) => {
+    const delta = Number(matchA[group]) - Number(matchB[group]);
+    return delta === 0 ? 0 : delta > 0 ? 1 : -1;
+  });
+  for (const delta of triples) {
+    if (delta !== 0) {
+      return delta;
+    }
+  }
+  const forkA = matchA[4] === undefined ? -1 : Number(matchA[4]);
+  const forkB = matchB[4] === undefined ? -1 : Number(matchB[4]);
+  return forkA === forkB ? 0 : forkA > forkB ? 1 : -1;
+}
+
+export function runtimeSupportsOrderedOAuthAliasPool(runtimeVersion: string): boolean {
+  return compareForkVersions(runtimeVersion, MINIMUM_ORDERED_POOL_VERSION) >= 0;
 }
 
 function getConfiguredOrderedOAuthAliasPools(): readonly OrderedOAuthAliasPool[] {
