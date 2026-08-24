@@ -77,3 +77,11 @@ _serve*.log
 # Gas Town runtime artifacts (not product WIP)
 .opencode/
 .runtime/
+
+# Gas Town (added by gt)
+.claude/
+.logs/
+__pycache__/
+state.json
+CLAUDE.md
+GEMINI.md
