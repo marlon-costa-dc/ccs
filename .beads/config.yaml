@@ -80,3 +80,5 @@ routing:
     mode: explicit
 types.custom: agent,role,rig,convoy,slot,queue,event,message,molecule,gate,merge-request
 types.infra: agent,role,message
+sync:
+    remote: "git+https://github.com/marlon-costa-dc/ccs.git"
