@@ -291,6 +291,7 @@ describe('HttpsTunnelProxy', () => {
         path: '/v1/messages',
         method: 'POST',
       });
+      req.on('error', () => undefined);
 
       req.write('{}');
       req.end();
