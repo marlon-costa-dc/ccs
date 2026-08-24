@@ -49,6 +49,14 @@ describe('api create grandfathered force policy', () => {
       ) + '\n'
     );
     const logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    // The command under test can terminate the process on an unexpected path.
+    // Left unguarded that kills the whole shared test runner: the run stops
+    // mid-output, reports no failing test, and exits non-zero with no
+    // diagnostic. Trap it so a regression surfaces as a failed assertion here.
+    const originalExit = process.exit;
+    process.exit = ((code?: number) => {
+      throw new Error(`process.exit(${code ?? 0})`);
+    }) as typeof process.exit;
 
     try {
       await handleApiCreateCommand([
@@ -63,6 +71,7 @@ describe('api create grandfathered force policy', () => {
         'new-model',
       ]);
     } finally {
+      process.exit = originalExit;
       logSpy.mockRestore();
     }
 

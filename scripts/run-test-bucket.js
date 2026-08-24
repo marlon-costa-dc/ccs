@@ -159,6 +159,11 @@ function shouldRunIsolated(file) {
   return (
     file.startsWith('src/') ||
     file.startsWith('tests/npm/') ||
+    // The codex-auth suites drive the CLI through process.env (CCS_HOME,
+    // CODEX_HOME, CCS_CODEX_PROFILE) and spy on fs. Each is green on its own
+    // and flaky in the shared bucket, where a sibling suite overwrites those
+    // variables mid-run. Isolating the directory keeps that per-process.
+    file.startsWith('tests/unit/codex-auth/') ||
     isolatedTests.has(file) ||
     !usesBunTestRunner(file)
   );

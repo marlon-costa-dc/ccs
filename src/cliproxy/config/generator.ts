@@ -821,27 +821,22 @@ function generateOAuthModelAliasSection(
   const orderedPoolYaml = orderedPools
     .map((pool) => generateOrderedOAuthAliasPoolYaml(pool, getOrderedOAuthAliasPoolCapability()))
     .join('\n');
-  const preservedNonAntigravityAliases = extractNonAntigravityAliasChannels(existingAliases);
-  return `oauth-model-alias:\n  antigravity:\n${entries}${orderedPoolYaml ? `\n${orderedPoolYaml}` : ''}${preservedNonAntigravityAliases ? `\n${preservedNonAntigravityAliases}` : ''}`;
-}
 
-function extractNonAntigravityAliasChannels(existingAliases?: string): string {
-  if (!existingAliases) {
-    return '';
-  }
-  const lines = existingAliases.split('\n');
-  const kept: string[] = [];
-  let keepChannel = false;
-  for (const line of lines) {
-    const channelMatch = line.match(/^  ([a-z0-9-]+):\s*$/i);
-    if (channelMatch) {
-      keepChannel = channelMatch[1].toLowerCase() !== 'antigravity';
-    }
-    if (keepChannel) {
-      kept.push(line);
-    }
-  }
-  return kept.join('\n').trimEnd();
+  // Merge the remaining channels through the structured path rather than
+  // copying raw lines: a line scanner reproduces whatever indentation the
+  // source used and cannot reconcile an existing entry with a configured one,
+  // so `fork: true` coming from cliproxy.oauth_model_alias was dropped.
+  // mergeOAuthModelAliases keys on the (name, alias) pair, which also keeps
+  // sequential failover pools intact.
+  const existingAliasConfig = parseOAuthModelAliasSection(existingAliases ?? '');
+  const mergedAliasConfig = mergeOAuthModelAliases(
+    existingAliasConfig,
+    normalizedConfiguredAliases
+  );
+  delete mergedAliasConfig.antigravity;
+  const otherProviders = serializeOAuthModelAliasBody(mergedAliasConfig);
+
+  return `oauth-model-alias:\n  antigravity:\n${entries}${orderedPoolYaml ? `\n${orderedPoolYaml}` : ''}${otherProviders ? `\n${otherProviders}` : ''}`;
 }
 
 /**
@@ -1151,6 +1146,9 @@ export function regenerateConfig(
         }
       );
       existingAliases = extractYamlSection(content, 'oauth-model-alias');
+      // The payload section is user-owned and must survive regeneration; the
+      // generator merges it with the structured CCS rules further down.
+      existingPayload = extractYamlSection(content, 'payload');
       if (preservedAliases.prunedLegacyAliasCount > 0) {
         writeLegacyGeminiAliasCleanupBackup(configPath, content);
       }
