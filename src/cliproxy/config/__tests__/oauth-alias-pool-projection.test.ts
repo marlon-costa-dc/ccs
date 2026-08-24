@@ -5,10 +5,10 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import type { CompositeTierConfig } from '../../../config/schemas/cliproxy';
 import {
   DuplicateOAuthAliasPoolHopError,
-  OrderedOAuthAliasPoolUnsupportedError,
   buildOrderedOAuthAliasPool,
   generateOrderedOAuthAliasPoolYaml,
   regenerateConfig,
+  runtimeSupportsOrderedOAuthAliasPool,
 } from '../generator';
 
 const tempDirs: string[] = [];
@@ -71,60 +71,37 @@ describe('ordered OAuth alias-pool projection', () => {
     );
   });
 
-  it('fails closed when runtime behavior cannot preserve ordered OAuth pools', () => {
-    // Given
-    const pool = buildOrderedOAuthAliasPool('ccs-opus', {
-      provider: 'claude',
-      model: 'claude-opus-4-8',
-      fallback_chain: [{ provider: 'codex', model: 'gpt-5.5' }],
-    });
-
-    // When / Then
-    expect(() =>
-      generateOrderedOAuthAliasPoolYaml(pool, {
-        kind: 'unsupported',
-        runtimeVersion: '7.2.88-1-plus',
-        reason: 'OAuth aliases deduplicate by channel and OpenAI-compatible pools rotate',
-      })
-    ).toThrow(OrderedOAuthAliasPoolUnsupportedError);
+  it('supports ordered pools on fork runtimes at or above 7.2.136-dc4', () => {
+    // Given / When / Then
+    expect(runtimeSupportsOrderedOAuthAliasPool('7.2.136-dc4')).toBe(true);
+    expect(runtimeSupportsOrderedOAuthAliasPool('7.2.136-dc13')).toBe(true);
+    expect(runtimeSupportsOrderedOAuthAliasPool('7.2.137-dc1')).toBe(true);
+    expect(runtimeSupportsOrderedOAuthAliasPool('7.3.0-dc1')).toBe(true);
   });
 
-  it('leaves the existing generated config intact when capability gating fails', async () => {
-    // Given
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-oauth-alias-gate-'));
-    tempDirs.push(tempDir);
-    const previousCcsHome = process.env.CCS_HOME;
-    process.env.CCS_HOME = tempDir;
-    const ccsDir = path.join(tempDir, '.ccs');
-    const unifiedConfigPath = path.join(ccsDir, 'config.yaml');
-    const configPath = path.join(ccsDir, 'cliproxy', 'config.yaml');
-    const authDir = path.join(ccsDir, 'cliproxy', 'auth');
-    fs.mkdirSync(ccsDir, { recursive: true });
-    fs.mkdirSync(path.dirname(configPath), { recursive: true });
-    fs.writeFileSync(
-      unifiedConfigPath,
-      `version: 13\ncliproxy:\n  oauth_accounts: {}\n  providers: []\n  variants:\n    resilient:\n      type: composite\n      default_tier: opus\n      tiers:\n        opus:\n          provider: claude\n          model: claude-opus-4-8\n          fallback_chain:\n            - provider: codex\n              model: gpt-5.5\n        sonnet:\n          provider: claude\n          model: claude-sonnet-4-6\n        haiku:\n          provider: kimi\n          model: kimi-k2.6\n`,
-      'utf8'
-    );
-    const previousConfig = 'port: 8317\n# known-good\n';
-    fs.writeFileSync(configPath, previousConfig, 'utf8');
-    const { invalidateConfigCache } = await import('../../../config/config-loader-facade');
-    invalidateConfigCache();
+  it('fails closed below the ordered-pool floor or on unparseable versions', () => {
+    // Given / When / Then
+    expect(runtimeSupportsOrderedOAuthAliasPool('7.2.136-dc3')).toBe(false);
+    expect(runtimeSupportsOrderedOAuthAliasPool('7.2.136')).toBe(false);
+    expect(runtimeSupportsOrderedOAuthAliasPool('7.2.135-dc9')).toBe(false);
+    expect(runtimeSupportsOrderedOAuthAliasPool('')).toBe(false);
+    expect(runtimeSupportsOrderedOAuthAliasPool('unknown')).toBe(false);
+  });
 
-    try {
-      // When / Then
-      expect(() => regenerateConfig(8317, { configPath, authDir })).toThrow(
-        OrderedOAuthAliasPoolUnsupportedError
-      );
-      expect(fs.readFileSync(configPath, 'utf8')).toBe(previousConfig);
-    } finally {
-      if (previousCcsHome === undefined) {
-        delete process.env.CCS_HOME;
-      } else {
-        process.env.CCS_HOME = previousCcsHome;
-      }
-      invalidateConfigCache();
-    }
+  it('projects an ordered pool without throwing on a capable runtime', () => {
+    // Given
+    const pool = buildOrderedOAuthAliasPool('tier-medium', {
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+      fallback_chain: [{ provider: 'codex', model: 'gpt-5.6-terra' }],
+    });
+
+    // When
+    const yaml = generateOrderedOAuthAliasPoolYaml(pool, { kind: 'ordered' });
+
+    // Then
+    expect(yaml).toContain('  claude:\n    - name: claude-sonnet-5\n      alias: tier-medium\n      fork: true');
+    expect(yaml).toContain('  codex:\n    - name: gpt-5.6-terra\n      alias: tier-medium\n      fork: true');
   });
 
   it('preserves generated cross-channel aliases and antigravity aliases across regeneration', () => {

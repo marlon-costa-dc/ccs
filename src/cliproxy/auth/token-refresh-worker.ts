@@ -5,8 +5,9 @@
  * before they expire. Runs as interval loop with retry logic.
  */
 
-import { CLIProxyProvider } from '../types';
-import { getAllTokenExpiryInfo, TokenExpiryInfo } from './token-expiry-checker';
+import type { CLIProxyProvider } from '../types';
+import type { TokenExpiryInfo } from './token-expiry-checker';
+import { getAllTokenExpiryInfo } from './token-expiry-checker';
 import { refreshToken, isRefreshDelegated } from './provider-refreshers';
 
 /** Worker configuration */

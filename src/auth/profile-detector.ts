@@ -12,8 +12,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { findSimilarStrings, expandPath } from '../utils/helpers';
-import { Config, Settings, ProfileMetadata } from '../types';
-import {
+import type { Config, Settings, ProfileMetadata } from '../types';
+import type {
   UnifiedConfig,
   CopilotConfig,
   CursorConfig,

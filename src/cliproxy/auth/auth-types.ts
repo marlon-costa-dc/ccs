@@ -4,7 +4,7 @@
  * Type definitions and OAuth configurations for CLIProxy authentication.
  */
 
-import { CLIProxyProvider } from '../types';
+import type { CLIProxyProvider } from '../types';
 import { ProfileError, ValidationError } from '../../errors/error-types';
 import type { AccountInfo } from '../accounts/account-manager';
 import {

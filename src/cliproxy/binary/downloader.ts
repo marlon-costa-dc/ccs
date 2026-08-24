@@ -10,7 +10,7 @@ import * as https from 'https';
 import * as http from 'http';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { HttpProxyAgent } from 'http-proxy-agent';
-import { DownloadResult, ProgressCallback } from '../types';
+import type { DownloadResult, ProgressCallback } from '../types';
 import { getProxyUrl, shouldBypassProxy } from '../../utils/proxy-env';
 
 /**
