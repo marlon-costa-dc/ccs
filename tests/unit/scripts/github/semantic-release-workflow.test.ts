@@ -25,6 +25,11 @@ describe('semantic-release workflow', () => {
     expect(workflow).toContain("github.ref == 'refs/heads/main'");
     expect(workflow).toContain('ref: main');
     expect(workflow).toContain('npx semantic-release');
+    expect(workflow).toContain('GITHUB_TOKEN: ${{ github.token }}');
+    expect(workflow).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(workflow).not.toContain('PAT_TOKEN');
+    expect(workflow).not.toContain('NPM_TOKEN');
+    expect(workflow).not.toContain('kaitranntt/ccs.extraheader');
     expect(workflow).not.toContain('branches: [dev]');
     expect(workflow).not.toContain('scripts/dev-release.sh');
   });
