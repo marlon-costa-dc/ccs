@@ -1,0 +1,4 @@
+{"timestamp":"2026-08-20T23:28:11Z","operation":"burn","pinned_bead_id":"ccs-9sa.10","detached_molecule":"ccs-wisp-tep","reason":"force re-sling: burning stale molecules","previous_state":"open"}
+{"timestamp":"2026-08-20T23:36:21Z","operation":"burn","pinned_bead_id":"ccs-9sa.10","detached_molecule":"ccs-wisp-dbc","reason":"polecat nuked: cleaning stale molecule","previous_state":"hooked"}
+{"timestamp":"2026-08-21T18:23:42Z","operation":"burn","pinned_bead_id":"ccs-9sa.10.1","detached_molecule":"ccs-wisp-5gs","reason":"polecat nuked: cleaning stale molecule","previous_state":"hooked"}
+{"timestamp":"2026-08-21T18:24:58Z","operation":"burn","pinned_bead_id":"ccs-9sa.10.1","detached_molecule":"ccs-wisp-mvb","reason":"force re-sling: burning stale molecules","previous_state":"hooked"}
