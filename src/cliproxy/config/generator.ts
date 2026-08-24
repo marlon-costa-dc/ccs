@@ -101,23 +101,28 @@ type OrderedOAuthAliasPool = {
 const ORDERED_OAUTH_ALIAS_POOL_UNSUPPORTED_REASON =
   'OAuth aliases keep one model per alias within each channel, while multi-model OpenAI-compatible pools use request-by-request rotation';
 
+// Parameter properties are TypeScript-only syntax, which `erasableSyntaxOnly`
+// rejects because it cannot be erased to plain JavaScript. Assign the field in
+// the constructor body instead.
 export class OrderedOAuthAliasPoolUnsupportedError extends Error {
   readonly name = 'OrderedOAuthAliasPoolUnsupportedError';
+  readonly capability: Extract<OAuthModelAliasPoolCapability, { kind: 'unsupported' }>;
 
-  constructor(
-    readonly capability: Extract<OAuthModelAliasPoolCapability, { kind: 'unsupported' }>
-  ) {
+  constructor(capability: Extract<OAuthModelAliasPoolCapability, { kind: 'unsupported' }>) {
     super(
       `Ordered cross-channel OAuth fallback is unavailable in CLIProxyAPI ${capability.runtimeVersion}: ${capability.reason}`
     );
+    this.capability = capability;
   }
 }
 
 export class DuplicateOAuthAliasPoolHopError extends Error {
   readonly name = 'DuplicateOAuthAliasPoolHopError';
+  readonly hop: string;
 
-  constructor(readonly hop: string) {
+  constructor(hop: string) {
     super(`duplicate fallback hop ${hop}`);
+    this.hop = hop;
   }
 }
 
