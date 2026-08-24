@@ -943,11 +943,15 @@ ${buildGuessedRange('gemini-3-flash', 'flash')}
       const newConfig = fs.readFileSync(path.join(cliproxyDir, 'config.yaml'), 'utf-8');
       for (const minor of guessedMinors) {
         assert(
-          !newConfig.includes(`alias: gemini-3.${minor}-pro-preview`),
+          !newConfig.includes(
+            `- name: gemini-3-pro-high\n      alias: gemini-3.${minor}-pro-preview`
+          ),
           `Should remove stale generated Pro aliases for 3.${minor}`
         );
         assert(
-          !newConfig.includes(`alias: gemini-3-${minor}-flash-preview-customtools`),
+          !newConfig.includes(
+            `- name: gemini-3-flash\n      alias: gemini-3-${minor}-flash-preview-customtools`
+          ),
           `Should remove stale generated Flash aliases for 3.${minor}`
         );
       }
@@ -1005,7 +1009,9 @@ ${staleRange}
       );
       for (const minor of guessedMinors) {
         assert(
-          !newConfig.includes(`alias: gemini-3.${minor}-pro-preview`),
+          !newConfig.includes(
+            `- name: gemini-3-pro-high\n      alias: gemini-3.${minor}-pro-preview`
+          ),
           `Should prune stale guessed aliases for 3.${minor}`
         );
       }
@@ -1060,7 +1066,9 @@ ${staleRange}
       );
       for (const minor of guessedMinors) {
         assert(
-          !newConfig.includes(`alias: gemini-3.${minor}-pro-preview`),
+          !newConfig.includes(
+            `- name: gemini-3-pro-high\n      alias: gemini-3.${minor}-pro-preview`
+          ),
           `Should prune higher stale guessed aliases for 3.${minor}`
         );
       }
@@ -1095,7 +1103,9 @@ ${partialRange}
       const newConfig = fs.readFileSync(path.join(cliproxyDir, 'config.yaml'), 'utf-8');
       for (const minor of guessedMinors) {
         assert(
-          !newConfig.includes(`alias: gemini-3.${minor}-pro-preview`),
+          !newConfig.includes(
+            `- name: gemini-3-pro-high\n      alias: gemini-3.${minor}-pro-preview`
+          ),
           `Should prune partially retained guessed aliases for 3.${minor}`
         );
       }
