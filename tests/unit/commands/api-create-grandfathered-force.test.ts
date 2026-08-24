@@ -14,7 +14,12 @@ describe('api create grandfathered force policy', () => {
     originalCcsHome = process.env.CCS_HOME;
     originalUnifiedMode = process.env.CCS_UNIFIED_CONFIG;
     process.env.CCS_HOME = tempHome;
-    delete process.env.CCS_UNIFIED_CONFIG;
+    // Pin the mode instead of merely deleting the variable: this suite runs in
+    // the shared bucket, where a sibling file can leave CCS_UNIFIED_CONFIG=1
+    // behind and flip apiProfileExists to the unified registry, which never
+    // sees the legacy config.json this test writes. '0' is the explicit
+    // legacy mode the fixture depends on.
+    process.env.CCS_UNIFIED_CONFIG = '0';
   });
 
   afterEach(() => {

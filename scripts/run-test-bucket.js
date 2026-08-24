@@ -71,6 +71,12 @@ const isolatedTests = new Set([
   'tests/unit/utils/fetch-proxy-setup.test.ts',
   'tests/unit/web-server/usage/account-attribution.test.ts',
   'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
+  // mock.module replaces a shared facade for the whole process and
+  // mock.restore() does not undo module-level replacement in bun, so every
+  // later importer in the shared bucket sees the stub (getBrowserConfig -> {})
+  // and fails on real shapes. Process isolation is the only correct boundary.
+  'tests/unit/cliproxy/router-capability-spike.test.ts',
+  'tests/unit/commands/cliproxy-routing-status-capability.test.ts',
 ]);
 
 const filePattern = /(\.test\.(c|m)?[jt]s|\.spec\.(c|m)?[jt]s|-test\.(c|m)?[jt]s)$/;
