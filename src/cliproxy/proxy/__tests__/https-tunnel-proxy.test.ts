@@ -297,6 +297,10 @@ describe('HttpsTunnelProxy', () => {
 
       // Abort after a short delay to trigger premature close
       await new Promise((resolve) => setTimeout(resolve, 50));
+      // Attach error handler before destroy so the ECONNRESET emitted by the
+      // Node.js HTTP client doesn't surface as an unhandled-rejection and
+      // corrupt the outer test frame (causing port assertions to fail).
+      req.on('error', () => {});
       req.destroy();
 
       // Give time for error handling

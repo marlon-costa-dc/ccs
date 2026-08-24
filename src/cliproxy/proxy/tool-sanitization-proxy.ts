@@ -716,8 +716,11 @@ export class ToolSanitizationProxy {
                     parsed.content = mapper.restoreToolUse(parsed.content as ContentBlock[]);
                     const modifiedResponse = JSON.stringify(parsed);
 
-                    // Update content-length header
+                    // Build response headers: set exact content-length and strip
+                    // transfer-encoding (RFC 7230 §3.3.1 forbids both together).
                     const headers = { ...upstreamRes.headers };
+                    delete headers['transfer-encoding'];
+                    delete headers['Transfer-Encoding'];
                     headers['content-length'] = String(Buffer.byteLength(modifiedResponse));
 
                     clientRes.writeHead(upstreamRes.statusCode || 200, headers);
