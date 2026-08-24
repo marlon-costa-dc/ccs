@@ -1,9 +1,9 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2403,
-    "filesAffected": 252,
-    "hotpathOccurrences": 1164,
+    "totalOccurrences": 2416,
+    "filesAffected": 253,
+    "hotpathOccurrences": 1165,
     "hotpathFilesAffected": 153,
     "topHotpathFiles": [
       {
@@ -490,11 +490,11 @@
   },
   "maintainability": {
     "typedErrors": {
-      "totalThrows": 426,
-      "typedThrows": 79,
+      "totalThrows": 429,
+      "typedThrows": 80,
       "plainThrows": 289,
-      "otherThrows": 58,
-      "adoptionRatio": 0.1854,
+      "otherThrows": 60,
+      "adoptionRatio": 0.1865,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
@@ -729,16 +729,16 @@
           "loc": 1520
         },
         {
+          "file": "src/cliproxy/config/generator.ts",
+          "loc": 1240
+        },
+        {
           "file": "src/cliproxy/model-catalog.ts",
           "loc": 1152
         },
         {
           "file": "src/web-server/model-pricing.ts",
           "loc": 1127
-        },
-        {
-          "file": "src/cliproxy/config/generator.ts",
-          "loc": 1120
         },
         {
           "file": "src/cliproxy/auth/oauth-process.ts",

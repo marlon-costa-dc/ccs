@@ -6,9 +6,9 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 
 | Metric | Value |
 |---|---:|
-| Sync fs occurrences (all) | 2403 |
-| Sync fs files affected (all) | 252 |
-| Sync fs occurrences (runtime hotpaths) | 1164 |
+| Sync fs occurrences (all) | 2416 |
+| Sync fs files affected (all) | 253 |
+| Sync fs occurrences (runtime hotpaths) | 1165 |
 | Sync fs files affected (runtime hotpaths) | 153 |
 | Legacy shim markers | 425 |
 | Legacy shim files affected | 167 |
@@ -56,7 +56,7 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 
 | Metric | Value |
 |---|---:|
-| typed-error adoption (typed/total throws) | 18.5% (79/426) |
+| typed-error adoption (typed/total throws) | 18.6% (80/429) |
 | typed-error adoption (P4 locked subdomains) | 93.3% (28/30), target 40% |
 | hotpath console.error/warn occurrences | 247 (548 total, 301 CLI-UX exempt) |
 | hotpath console.error/warn files | 72 |
@@ -92,9 +92,9 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | `src/web-server/usage/native-quota-collector.ts` | 1758 |
 | `src/web-server/routes/cliproxy-auth-routes.ts` | 1531 |
 | `src/cliproxy/auth/oauth-handler.ts` | 1520 |
+| `src/cliproxy/config/generator.ts` | 1240 |
 | `src/cliproxy/model-catalog.ts` | 1152 |
 | `src/web-server/model-pricing.ts` | 1127 |
-| `src/cliproxy/config/generator.ts` | 1120 |
 | `src/cliproxy/auth/oauth-process.ts` | 1048 |
 | `src/cliproxy/config/env-builder.ts` | 1045 |
 | `src/web-server/routes/settings-routes.ts` | 1042 |

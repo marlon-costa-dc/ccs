@@ -10,7 +10,7 @@
  * - Not implemented: claude
  */
 
-import { CLIProxyProvider } from '../../types';
+import type { CLIProxyProvider } from '../../types';
 import { getProviderAccounts } from '../../accounts/account-manager';
 import {
   getTokenRefreshOwnership,

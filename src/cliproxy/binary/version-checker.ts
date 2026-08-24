@@ -13,7 +13,8 @@ import {
   readStaleVersionListCache,
   writeVersionListCache,
 } from './version-cache';
-import { UpdateCheckResult, VersionListResult, getGitHubApiUrls } from './types';
+import type { UpdateCheckResult, VersionListResult } from './types';
+import { getGitHubApiUrls } from './types';
 import {
   CLIPROXY_MAX_STABLE_VERSION,
   CLIPROXY_FAULTY_RANGE,

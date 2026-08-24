@@ -3,9 +3,9 @@
  * Finding, filtering, and retrieving account information
  */
 
-import { CLIProxyProvider } from '../types';
+import type { CLIProxyProvider } from '../types';
 import { CLIPROXY_PROFILES } from '../../auth/profile-detector';
-import { AccountInfo } from './types';
+import type { AccountInfo } from './types';
 import { hydrateRegistryFromTokenFiles, loadAccountsRegistry } from './registry';
 
 /**
