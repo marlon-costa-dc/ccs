@@ -1189,7 +1189,16 @@ export function regenerateConfig(
             existingConfigVersion < LEGACY_GEMINI_STALE_ALIAS_MIGRATION_VERSION,
         }
       );
-      existingAliases = extractYamlSection(content, 'oauth-model-alias');
+      const existingAliasConfig = parseOAuthModelAliasSection(
+        extractYamlSection(content, 'oauth-model-alias')
+      );
+      const preservedAntigravityConfig = parseOAuthModelAliasSection(preservedAliases.yaml);
+      if (preservedAntigravityConfig.antigravity) {
+        existingAliasConfig.antigravity = preservedAntigravityConfig.antigravity;
+      } else {
+        delete existingAliasConfig.antigravity;
+      }
+      existingAliases = serializeOAuthModelAliasBody(existingAliasConfig);
       // The payload section is user-owned and must survive regeneration; the
       // generator merges it with the structured CCS rules further down.
       existingPayload = extractYamlSection(content, 'payload');

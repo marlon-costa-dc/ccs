@@ -86,8 +86,12 @@ describe('ordered OAuth alias-pool capability gating', () => {
       const generated = fs.readFileSync(configPath, 'utf8');
 
       // Then: the ordered pool alias is projected in config order.
-      expect(generated).toContain('  claude:\n    - name: claude-opus-4-8\n      alias: resilient-opus\n      fork: true');
-      expect(generated).toContain('  codex:\n    - name: gpt-5.5\n      alias: resilient-opus\n      fork: true');
+      expect(generated).toContain(
+        '  claude:\n    - name: claude-opus-4-8\n      alias: resilient-opus\n      fork: true'
+      );
+      expect(generated).toContain(
+        '  codex:\n    - name: gpt-5.5\n      alias: resilient-opus\n      fork: true'
+      );
     } finally {
       if (previousCcsHome === undefined) {
         delete process.env.CCS_HOME;

@@ -100,8 +100,12 @@ describe('ordered OAuth alias-pool projection', () => {
     const yaml = generateOrderedOAuthAliasPoolYaml(pool, { kind: 'ordered' });
 
     // Then
-    expect(yaml).toContain('  claude:\n    - name: claude-sonnet-5\n      alias: tier-medium\n      fork: true');
-    expect(yaml).toContain('  codex:\n    - name: gpt-5.6-terra\n      alias: tier-medium\n      fork: true');
+    expect(yaml).toContain(
+      '  claude:\n    - name: claude-sonnet-5\n      alias: tier-medium\n      fork: true'
+    );
+    expect(yaml).toContain(
+      '  codex:\n    - name: gpt-5.6-terra\n      alias: tier-medium\n      fork: true'
+    );
   });
 
   it('preserves generated cross-channel aliases and antigravity aliases across regeneration', () => {
