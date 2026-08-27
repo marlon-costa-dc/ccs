@@ -9,6 +9,7 @@ import * as chokidar from 'chokidar';
 import * as path from 'path';
 
 import { syncToLocalConfig } from './local-config-sync';
+import { regenerateConfig } from '../config/config-generator';
 import { getCcsDir, loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
 
 /** Debounce delay in milliseconds */
@@ -76,6 +77,26 @@ async function triggerSync(): Promise<void> {
   }
 }
 
+async function triggerRegeneration(): Promise<void> {
+  if (isSyncing) {
+    log('Sync already in progress, skipping');
+    return;
+  }
+  if (!isAutoSyncEnabled()) {
+    log('Auto-sync disabled, skipping');
+    return;
+  }
+  isSyncing = true;
+  try {
+    const configPath = regenerateConfig();
+    log(`Success: regenerated ${configPath}`);
+  } catch (error) {
+    log(`Regeneration error: ${(error as Error).message}`);
+  } finally {
+    isSyncing = false;
+  }
+}
+
 /**
  * Handle file change event with debouncing.
  */
@@ -93,7 +114,8 @@ function onFileChange(filePath: string): void {
   // Set new debounced timeout
   syncTimeout = setTimeout(() => {
     syncTimeout = null;
-    triggerSync().catch((err) => {
+    const operation = fileName === 'config.yaml' ? triggerRegeneration() : triggerSync();
+    operation.catch((err) => {
       log(`Sync error: ${err.message}`);
     });
   }, DEBOUNCE_MS);
@@ -101,7 +123,7 @@ function onFileChange(filePath: string): void {
 
 /**
  * Start the auto-sync watcher.
- * Watches ~/.ccs/*.settings.json for changes.
+ * Watches the unified SSOT and profile settings for changes.
  */
 export function startAutoSyncWatcher(): void {
   if (watcherInstance) {
@@ -115,11 +137,11 @@ export function startAutoSyncWatcher(): void {
   }
 
   const ccsDir = getCcsDir();
-  const watchPattern = path.join(ccsDir, '*.settings.json');
+  const watchPatterns = [path.join(ccsDir, 'config.yaml'), path.join(ccsDir, '*.settings.json')];
 
-  log(`Starting watcher on ${watchPattern}`);
+  log(`Starting watcher on ${watchPatterns.join(', ')}`);
 
-  watcherInstance = chokidar.watch(watchPattern, {
+  watcherInstance = chokidar.watch(watchPatterns, {
     ignoreInitial: true, // Don't trigger on initial scan
     persistent: true,
     awaitWriteFinish: {

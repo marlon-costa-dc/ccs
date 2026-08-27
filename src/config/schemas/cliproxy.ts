@@ -42,6 +42,8 @@ export interface CLIProxyVariantConfig {
  * Per-tier provider+model mapping for composite variants.
  */
 export interface CompositeTierConfig {
+  /** Stable client-visible model alias owned by the control plane. */
+  alias: string;
   /** Provider for this tier */
   provider: CLIProxyProvider;
   /** Model ID to use for this tier */
@@ -65,10 +67,6 @@ export interface CompositeFallbackEntry {
   readonly model: string;
   readonly account?: string;
 }
-
-export type OAuthModelAliasPoolCapability =
-  | { readonly kind: 'ordered' }
-  | { readonly kind: 'unsupported'; readonly runtimeVersion: string; readonly reason: string };
 
 /**
  * Composite variant configuration.
@@ -155,6 +153,8 @@ export interface CLIProxyOAuthModelAliasEntry {
   alias: string;
   /** Keep both the upstream name and alias visible when supported upstream. */
   fork?: boolean;
+  /** Zero-based position in an explicitly ordered cross-provider pool. */
+  order?: number;
 }
 
 /** Provider/protocol keyed OAuth model aliases (for example `codex`). */
@@ -189,6 +189,19 @@ export interface CLIProxyPayloadOverrideRule {
 export interface CLIProxyPayloadConfig {
   override?: CLIProxyPayloadOverrideRule[];
   [section: string]: unknown;
+}
+
+/** Exact, source-attributed price for one routed channel/model identity. */
+export interface CLIProxyModelPricingEntry {
+  channel: string;
+  model: string;
+  input_per_million: number;
+  output_per_million: number;
+  cache_read_per_million?: number | null;
+  currency: 'USD';
+  source: string;
+  source_digest: string;
+  fetched_at: string;
 }
 
 /** Lower bound (inclusive) accepted for CLIProxy retry config fields. */
@@ -277,4 +290,6 @@ export interface CLIProxyConfig {
   oauth_model_alias?: CLIProxyOAuthModelAliasConfig;
   /** Scoped payload rules emitted into managed CLIProxy config. */
   payload?: CLIProxyPayloadConfig;
+  /** AI Hub calculated model prices emitted into managed CLIProxy config. */
+  model_pricing?: CLIProxyModelPricingEntry[];
 }

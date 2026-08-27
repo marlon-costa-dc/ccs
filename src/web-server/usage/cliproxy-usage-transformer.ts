@@ -9,7 +9,6 @@ import type {
   CliproxyUsageApiResponse,
   CliproxyRequestDetail,
 } from '../../cliproxy/services/stats-fetcher';
-import { calculateCost } from '../model-pricing';
 import type { ModelBreakdown, DailyUsage, HourlyUsage, MonthlyUsage } from './types';
 import { getModelsUsed, normalizeUsageProvider } from './model-identity';
 
@@ -29,6 +28,9 @@ export interface CliproxyUsageHistoryDetail {
   cacheReadTokens: number;
   requestCount: number;
   cost: number;
+  costQuality?: 'complete' | 'partial' | 'unavailable';
+  pricingSource?: string;
+  pricingSourceDigest?: string;
   failed: boolean;
 }
 
@@ -89,34 +91,14 @@ function createHistoryDetail(
     outputTokens,
     cacheReadTokens,
     requestCount: 1,
-    cost: calculateHistoryDetailCost(
-      model,
-      pricingProvider,
-      inputTokens,
-      outputTokens,
-      cacheReadTokens
-    ),
+    cost: detail.cost && detail.cost.quality !== 'unavailable' ? detail.cost.estimated_total : 0,
+    costQuality: detail.cost?.quality ?? 'unavailable',
+    ...(detail.cost?.pricing_source && { pricingSource: detail.cost.pricing_source }),
+    ...(detail.cost?.pricing_source_digest && {
+      pricingSourceDigest: detail.cost.pricing_source_digest,
+    }),
     failed: detail.failed,
   };
-}
-
-function calculateHistoryDetailCost(
-  model: string,
-  provider: string | undefined,
-  inputTokens: number,
-  outputTokens: number,
-  cacheReadTokens: number
-): number {
-  return calculateCost(
-    {
-      inputTokens,
-      outputTokens,
-      cacheCreationTokens: 0,
-      cacheReadTokens,
-    },
-    model,
-    provider ? { provider } : undefined
-  );
 }
 
 function normalizePersistedNumber(value: unknown, fallback = 0): number {
@@ -151,20 +133,12 @@ export function normalizeCliproxyUsageHistoryDetail(
   const outputTokens = normalizePersistedNumber(candidate.outputTokens);
   const cacheReadTokens = normalizePersistedNumber(candidate.cacheReadTokens);
   const requestCount = Math.max(1, normalizePersistedNumber(candidate.requestCount, 1));
-  // Compute the cost fallback lazily. calculateHistoryDetailCost is ~6ms/call
-  // (model-pricing lookup); passing it as an eager default argument ran it for
-  // every record even when a persisted cost was already present, turning a few
-  // thousand records into a multi-second event-loop stall.
   const cost =
-    typeof candidate.cost === 'number' && Number.isFinite(candidate.cost)
-      ? candidate.cost
-      : calculateHistoryDetailCost(
-          candidate.model,
-          provider,
-          inputTokens,
-          outputTokens,
-          cacheReadTokens
-        );
+    typeof candidate.cost === 'number' && Number.isFinite(candidate.cost) ? candidate.cost : 0;
+  const costQuality =
+    candidate.costQuality === 'complete' || candidate.costQuality === 'partial'
+      ? candidate.costQuality
+      : 'unavailable';
 
   const accountId =
     typeof candidate.accountId === 'string' && candidate.accountId.length > 0
@@ -181,6 +155,13 @@ export function normalizeCliproxyUsageHistoryDetail(
     cacheReadTokens,
     requestCount,
     cost,
+    costQuality,
+    ...(typeof candidate.pricingSource === 'string' && {
+      pricingSource: candidate.pricingSource,
+    }),
+    ...(typeof candidate.pricingSourceDigest === 'string' && {
+      pricingSourceDigest: candidate.pricingSourceDigest,
+    }),
     failed: candidate.failed === true,
   };
 }
@@ -242,6 +223,9 @@ function sanitizeHistoryDetail(detail: CliproxyUsageHistoryDetail): CliproxyUsag
     cacheReadTokens: detail.cacheReadTokens,
     requestCount: detail.requestCount,
     cost: detail.cost,
+    costQuality: detail.costQuality,
+    ...(detail.pricingSource && { pricingSource: detail.pricingSource }),
+    ...(detail.pricingSourceDigest && { pricingSourceDigest: detail.pricingSourceDigest }),
     failed: detail.failed,
   };
 }
@@ -297,7 +281,14 @@ function hydrateProviderlessHistoryDetails(
     const providers = new Set(matches?.map((match) => match.provider).filter(Boolean));
     if (!matches || providers.size !== 1) return detail;
 
-    return { ...detail, provider: matches[0].provider, cost: matches[0].cost };
+    return {
+      ...detail,
+      provider: matches[0].provider,
+      cost: matches[0].cost,
+      costQuality: matches[0].costQuality,
+      pricingSource: matches[0].pricingSource,
+      pricingSourceDigest: matches[0].pricingSourceDigest,
+    };
   });
 }
 
@@ -330,7 +321,15 @@ export function mergeCliproxyUsageHistoryDetails(
 
   for (const [signature, incomingEntry] of incomingCounts) {
     const existingEntry = existingCounts.get(signature);
-    if (!existingEntry || incomingEntry.count > existingEntry.count) {
+    const incomingHasCanonicalCost = incomingEntry.detail.costQuality !== 'unavailable';
+    const existingHasCanonicalCost = existingEntry?.detail.costQuality !== 'unavailable';
+    if (
+      !existingEntry ||
+      incomingEntry.count > existingEntry.count ||
+      (incomingEntry.count === existingEntry.count &&
+        incomingHasCanonicalCost &&
+        !existingHasCanonicalCost)
+    ) {
       existingCounts.set(signature, {
         detail: incomingEntry.detail,
         count: incomingEntry.count,

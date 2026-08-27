@@ -236,6 +236,7 @@ function formatVariantAccountLabel(account: {
  */
 async function selectTierConfig(
   tierName: string,
+  alias: string,
   verbose: boolean
 ): Promise<CompositeTierConfig | null> {
   console.log(header(`${tierName.charAt(0).toUpperCase() + tierName.slice(1)} Tier`));
@@ -301,7 +302,7 @@ async function selectTierConfig(
   }
 
   console.log('');
-  return { provider, model };
+  return { alias, provider, model };
 }
 
 export async function handleCreate(
@@ -355,15 +356,15 @@ export async function handleCreate(
     console.log('');
 
     const verbose = args.includes('--verbose');
-    const opus = await selectTierConfig('opus', verbose);
+    const opus = await selectTierConfig('opus', `${name}-opus`, verbose);
     if (!opus) {
       return; // User cancelled auth
     }
-    const sonnet = await selectTierConfig('sonnet', verbose);
+    const sonnet = await selectTierConfig('sonnet', `${name}-sonnet`, verbose);
     if (!sonnet) {
       return; // User cancelled auth
     }
-    const haiku = await selectTierConfig('haiku', verbose);
+    const haiku = await selectTierConfig('haiku', `${name}-haiku`, verbose);
     if (!haiku) {
       return; // User cancelled auth
     }
@@ -903,7 +904,7 @@ export async function handleEdit(
       default: false,
     });
     if (shouldEdit) {
-      const newConfig = await selectTierConfig(tierName, verbose);
+      const newConfig = await selectTierConfig(tierName, variant.tiers[tierName].alias, verbose);
       if (!newConfig) {
         console.log(fail('Edit cancelled'));
         process.exit(0);

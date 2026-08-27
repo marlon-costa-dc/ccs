@@ -89,6 +89,16 @@ export interface CliproxyRequestDetail {
     cached_tokens: number;
     total_tokens: number;
   };
+  cost?: {
+    currency?: string;
+    quality: 'complete' | 'partial' | 'unavailable';
+    estimated_total: number;
+    input?: number;
+    cache_read?: number;
+    output?: number;
+    pricing_source?: string;
+    pricing_source_digest?: string;
+  };
   failed: boolean;
 }
 

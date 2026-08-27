@@ -5,6 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 import type { CLIProxyBackend, CLIProxyProvider, ProviderConfig } from '../types';
 import { getProviderDisplayName } from '../provider-capabilities';
 import { getModelMappingFromConfig } from '../config/base-config-loader';
@@ -16,11 +17,10 @@ import { getAuthDir, getProviderAuthDir, getConfigPathForPort } from './path-res
 import { CLIPROXY_DEFAULT_PORT } from './port-manager';
 import { loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
 import { getActiveDockerLegacyApiKeys } from '../../docker/docker-key-rotation';
-import { getInstalledCliproxyVersion } from '../binary-manager';
 import type {
   CompositeFallbackEntry,
   CompositeTierConfig,
-  OAuthModelAliasPoolCapability,
+  CLIProxyModelPricingEntry,
 } from '../../config/schemas/cliproxy';
 import { isValidCliproxyRetryValue } from '../../config/schemas/cliproxy';
 import type { CLIProxyOAuthModelAliasConfig } from '../../config/schemas/cliproxy';
@@ -64,8 +64,9 @@ export const CCS_CONTROL_PANEL_SECRET = 'ccs';
  * v19: Persist backend-aware management panel repository from CCS unified config
  * v20: Pool-gated cooling/routing/retry-cap block; disable-cooling flips to false for pool users
  * v21: Persist user-defined OAuth aliases and scoped payload override rules
+ * v22: Project source-attributed model prices from the unified AI Hub catalog
  */
-export const CLIPROXY_CONFIG_VERSION = 21;
+export const CLIPROXY_CONFIG_VERSION = 22;
 
 export const ORIGINAL_MANAGEMENT_PANEL_REPOSITORY =
   'https://github.com/router-for-me/Cli-Proxy-API-Management-Center';
@@ -86,6 +87,29 @@ interface OAuthModelAliasEntry {
   name: string;
   alias: string;
   fork?: boolean;
+  order?: number;
+}
+
+function serializeModelPricingSection(entries: readonly CLIProxyModelPricingEntry[]): string {
+  if (entries.length === 0) return '';
+  return yaml.dump(
+    {
+      'model-pricing': entries.map((entry) => ({
+        channel: entry.channel,
+        model: entry.model,
+        'input-per-million': entry.input_per_million,
+        'output-per-million': entry.output_per_million,
+        ...(entry.cache_read_per_million === null || entry.cache_read_per_million === undefined
+          ? {}
+          : { 'cache-read-per-million': entry.cache_read_per_million }),
+        currency: entry.currency,
+        source: entry.source,
+        'source-digest': entry.source_digest,
+        'fetched-at': entry.fetched_at,
+      })),
+    },
+    { noRefs: true, lineWidth: -1 }
+  );
 }
 
 type OrderedOAuthAliasHop = {
@@ -98,24 +122,9 @@ type OrderedOAuthAliasPool = {
   readonly hops: readonly OrderedOAuthAliasHop[];
 };
 
-const ORDERED_OAUTH_ALIAS_POOL_UNSUPPORTED_REASON =
-  'OAuth aliases keep one model per alias within each channel, while multi-model OpenAI-compatible pools use request-by-request rotation';
-
 // Parameter properties are TypeScript-only syntax, which `erasableSyntaxOnly`
 // rejects because it cannot be erased to plain JavaScript. Assign the field in
 // the constructor body instead.
-export class OrderedOAuthAliasPoolUnsupportedError extends Error {
-  readonly name = 'OrderedOAuthAliasPoolUnsupportedError';
-  readonly capability: Extract<OAuthModelAliasPoolCapability, { kind: 'unsupported' }>;
-
-  constructor(capability: Extract<OAuthModelAliasPoolCapability, { kind: 'unsupported' }>) {
-    super(
-      `Ordered cross-channel OAuth fallback is unavailable in CLIProxyAPI ${capability.runtimeVersion}: ${capability.reason}`
-    );
-    this.capability = capability;
-  }
-}
-
 export class DuplicateOAuthAliasPoolHopError extends Error {
   readonly name = 'DuplicateOAuthAliasPoolHopError';
   readonly hop: string;
@@ -152,72 +161,10 @@ export function buildOrderedOAuthAliasPool(
   return { alias, hops };
 }
 
-export function generateOrderedOAuthAliasPoolYaml(
-  pool: OrderedOAuthAliasPool,
-  capability: OAuthModelAliasPoolCapability
-): string {
-  if (capability.kind === 'unsupported') {
-    throw new OrderedOAuthAliasPoolUnsupportedError(capability);
-  }
-  return pool.hops
-    .map(
-      (hop) =>
-        `  ${hop.channel}:\n    - name: ${hop.model}\n      alias: ${pool.alias}\n      fork: true`
-    )
-    .join('\n');
-}
-
-function getOrderedOAuthAliasPoolCapability(): OAuthModelAliasPoolCapability {
-  const runtimeVersion = getInstalledCliproxyVersion();
-  if (runtimeSupportsOrderedOAuthAliasPool(runtimeVersion)) {
-    return { kind: 'ordered' };
-  }
-  return {
-    kind: 'unsupported',
-    runtimeVersion,
-    reason: ORDERED_OAUTH_ALIAS_POOL_UNSUPPORTED_REASON,
-  };
-}
-
-/**
- * First CLIProxyAPI runtime whose conductor walks ordered OAuth model-alias
- * pools sequentially on retryable pre-first-byte errors (fork commits 24b2c6c3
- * and 78da9867: ordered_pool.go + conductor_ordered_failover.go).
- */
-const MINIMUM_ORDERED_POOL_VERSION = '7.2.136-dc4';
-
-// Matches fork suffixes like '-dc4' or '-dc12' on a semver base.
-const FORK_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-dc(\d+))?/;
-
-function compareForkVersions(a: string, b: string): number {
-  const matchA = FORK_VERSION_PATTERN.exec(a.trim());
-  const matchB = FORK_VERSION_PATTERN.exec(b.trim());
-  if (!matchA || !matchB) {
-    // Non-parseable versions never unlock the capability (fail closed).
-    return -1;
-  }
-  const triples = [1, 2, 3].map((group) => {
-    const delta = Number(matchA[group]) - Number(matchB[group]);
-    return delta === 0 ? 0 : delta > 0 ? 1 : -1;
-  });
-  for (const delta of triples) {
-    if (delta !== 0) {
-      return delta;
-    }
-  }
-  const forkA = matchA[4] === undefined ? -1 : Number(matchA[4]);
-  const forkB = matchB[4] === undefined ? -1 : Number(matchB[4]);
-  return forkA === forkB ? 0 : forkA > forkB ? 1 : -1;
-}
-
-export function runtimeSupportsOrderedOAuthAliasPool(runtimeVersion: string): boolean {
-  return compareForkVersions(runtimeVersion, MINIMUM_ORDERED_POOL_VERSION) >= 0;
-}
-
-function getConfiguredOrderedOAuthAliasPools(): readonly OrderedOAuthAliasPool[] {
+function getConfiguredOrderedOAuthAliases(): CLIProxyOAuthModelAliasConfig {
   const variants = loadOrCreateUnifiedConfig().cliproxy?.variants ?? {};
-  const pools: OrderedOAuthAliasPool[] = [];
-  for (const [variantName, variant] of Object.entries(variants)) {
+  const aliases: CLIProxyOAuthModelAliasConfig = {};
+  for (const variant of Object.values(variants)) {
     if (!('type' in variant) || variant.type !== 'composite') {
       continue;
     }
@@ -226,10 +173,15 @@ function getConfiguredOrderedOAuthAliasPools(): readonly OrderedOAuthAliasPool[]
       if ((tier.fallback_chain?.length ?? 0) === 0) {
         continue;
       }
-      pools.push(buildOrderedOAuthAliasPool(`${variantName}-${tierName}`, tier));
+      const pool = buildOrderedOAuthAliasPool(tier.alias, tier);
+      for (const [order, hop] of pool.hops.entries()) {
+        const entries = aliases[hop.channel] ?? [];
+        entries.push({ name: hop.model, alias: pool.alias, fork: true, order });
+        aliases[hop.channel] = entries;
+      }
     }
   }
-  return pools;
+  return aliases;
 }
 
 interface PreservedAntigravityAliasesResult {
@@ -453,6 +405,7 @@ function addAliasEntry(
     name: sanitizeYamlScalar(entry.name),
     alias: normalizeAntigravityAlias(entry.alias),
     fork: entry.fork || undefined,
+    order: entry.order,
   };
   if (!normalized.name || !normalized.alias) return;
   if (getDeniedModelIdReasonForProvider(normalized.name, 'agy')) return;
@@ -466,6 +419,7 @@ function addAliasEntry(
   const existingIndex = indexByKey.get(key);
   if (existingIndex !== undefined) {
     if (normalized.fork) entries[existingIndex].fork = true;
+    if (normalized.order !== undefined) entries[existingIndex].order = normalized.order;
     return;
   }
 
@@ -482,6 +436,7 @@ function upsertConfiguredAliasEntry(
     name: sanitizeYamlScalar(entry.name),
     alias: normalizeAntigravityAlias(entry.alias),
     fork: entry.fork || undefined,
+    order: entry.order,
   };
   if (!normalized.name || !normalized.alias) return;
   if (getDeniedModelIdReasonForProvider(normalized.name, 'agy')) return;
@@ -828,7 +783,15 @@ function generateOAuthModelAliasSection(
 ): string {
   const aliasEntries: OAuthModelAliasEntry[] = [];
   const aliasIndexByKey = new Map<string, number>();
-  const normalizedConfiguredAliases = mergeOAuthModelAliases({}, configuredAliases);
+  const normalizedConfiguredAliases = mergeOAuthModelAliases(
+    mergeOAuthModelAliases({}, configuredAliases),
+    getConfiguredOrderedOAuthAliases()
+  );
+  const configuredPoolAliases = new Set(
+    Object.values(normalizedConfiguredAliases)
+      .flat()
+      .map((entry) => entry.alias)
+  );
 
   // Start with default aliases.
   for (const alias of DEFAULT_ANTIGRAVITY_ALIASES) {
@@ -839,6 +802,7 @@ function generateOAuthModelAliasSection(
   if (existingAliases) {
     const parsed = parseExistingAntigravityAliases(existingAliases);
     for (const alias of parsed) {
+      if (configuredPoolAliases.has(alias.alias)) continue;
       addAliasEntry(aliasEntries, aliasIndexByKey, alias);
     }
   }
@@ -857,13 +821,9 @@ function generateOAuthModelAliasSection(
     .map((a) => {
       let entry = `    - name: ${a.name}\n      alias: ${a.alias}`;
       if (a.fork) entry += '\n      fork: true';
+      if (a.order !== undefined) entry += `\n      order: ${a.order}`;
       return entry;
     })
-    .join('\n');
-
-  const orderedPools = getConfiguredOrderedOAuthAliasPools();
-  const orderedPoolYaml = orderedPools
-    .map((pool) => generateOrderedOAuthAliasPoolYaml(pool, getOrderedOAuthAliasPoolCapability()))
     .join('\n');
 
   // Merge the remaining channels through the structured path rather than
@@ -873,6 +833,11 @@ function generateOAuthModelAliasSection(
   // mergeOAuthModelAliases keys on the (name, alias) pair, which also keeps
   // sequential failover pools intact.
   const existingAliasConfig = parseOAuthModelAliasSection(existingAliases ?? '');
+  for (const [provider, providerAliases] of Object.entries(existingAliasConfig)) {
+    existingAliasConfig[provider] = providerAliases.filter(
+      (entry) => !configuredPoolAliases.has(entry.alias)
+    );
+  }
   const mergedAliasConfig = mergeOAuthModelAliases(
     existingAliasConfig,
     normalizedConfiguredAliases
@@ -880,7 +845,7 @@ function generateOAuthModelAliasSection(
   delete mergedAliasConfig.antigravity;
   const otherProviders = serializeOAuthModelAliasBody(mergedAliasConfig);
 
-  return `oauth-model-alias:\n  antigravity:\n${entries}${orderedPoolYaml ? `\n${orderedPoolYaml}` : ''}${otherProviders ? `\n${otherProviders}` : ''}`;
+  return `oauth-model-alias:\n  antigravity:\n${entries}${otherProviders ? `\n${otherProviders}` : ''}`;
 }
 
 /**
@@ -1031,6 +996,7 @@ ${apiKeysYaml}
 auth-dir: "${authDirNormalized}"
 ${generateOAuthModelAliasSection(existingAliases, userRoutingConfig.oauth_model_alias)}
 ${payloadSection ? `${payloadSection}\n` : ''}
+${serializeModelPricingSection(userRoutingConfig.model_pricing ?? [])}
 `;
 
   return config;
@@ -1227,10 +1193,14 @@ export function regenerateConfig(
     configContent += `${section.key}:\n${section.body}\n`;
   }
 
-  if (fs.existsSync(configPath)) {
-    fs.unlinkSync(configPath);
+  const candidatePath = `${configPath}.ccs-candidate-${process.pid}`;
+  try {
+    fs.writeFileSync(candidatePath, configContent, { mode: 0o600, flag: 'wx' });
+    fs.renameSync(candidatePath, configPath);
+  } catch (error) {
+    if (fs.existsSync(candidatePath)) fs.unlinkSync(candidatePath);
+    throw error;
   }
-  fs.writeFileSync(configPath, configContent, { mode: 0o600 });
 
   return configPath;
 }

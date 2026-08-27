@@ -25,6 +25,9 @@ function normalizeAliasEntry(value: unknown): CLIProxyOAuthModelAliasEntry | nul
     name,
     alias,
     ...(value.fork === true ? { fork: true } : {}),
+    ...(typeof value.order === 'number' && Number.isInteger(value.order) && value.order >= 0
+      ? { order: value.order }
+      : {}),
   };
 }
 
