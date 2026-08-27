@@ -122,6 +122,14 @@ export interface SyncStatus {
   remoteUrl?: string;
 }
 
+/** Receipt returned after CLIProxy validates, persists, and reloads a YAML config. */
+export interface ConfigPublicationReceipt {
+  readonly ok: true;
+  readonly generation: number;
+  readonly snapshot_digest: string;
+  readonly projection_digest: string;
+}
+
 /**
  * Remote model thinking support from CLIProxyAPI model-definitions endpoint
  */

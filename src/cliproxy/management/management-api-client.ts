@@ -14,19 +14,69 @@ import type {
   ClaudeKeyPatch,
   RemoteModelInfo,
   GetModelDefinitionsResponse,
+  ConfigPublicationReceipt,
 } from './management-api-types';
 import { CLIPROXY_DEFAULT_PORT } from '../config/port-manager';
 import type { CliproxyRoutingStrategy } from '../types';
+import { ConfigError } from '../../errors/error-types';
 
 /** Default timeout for management operations (longer than health check) */
 const DEFAULT_TIMEOUT_MS = 5000;
 const ROUTING_STRATEGY_PATH = '/v0/management/routing/strategy';
+const CONFIG_YAML_PATH = '/v0/management/config.yaml';
 
 /** Default port for HTTPS protocol */
 const DEFAULT_HTTPS_PORT = 443;
 
 /** Avoid duplicate warnings for repeated invalid port inputs */
 const WARNED_INVALID_PORTS = new Set<string>();
+
+interface EncodedRequestBody {
+  readonly contentType: 'application/json' | 'application/yaml';
+  readonly content: string;
+}
+
+function jsonBody(value: unknown): EncodedRequestBody {
+  return { contentType: 'application/json', content: JSON.stringify(value) };
+}
+
+function yamlBody(value: string): EncodedRequestBody {
+  return { contentType: 'application/yaml', content: value };
+}
+
+function readRecord(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new ConfigError(`${label} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+function readPositiveInteger(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new ConfigError(`${label} must be a positive whole number`);
+  }
+  return value;
+}
+
+function readSha256Digest(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !/^[a-f\d]{64}$/i.test(value)) {
+    throw new ConfigError(`${label} must be a 64-character hexadecimal digest`);
+  }
+  return value;
+}
+
+export function parseConfigPublicationReceipt(value: unknown): ConfigPublicationReceipt {
+  const receipt = readRecord(value, 'config publication receipt');
+  if (receipt.ok !== true) {
+    throw new ConfigError('config publication receipt.ok must be true');
+  }
+  return {
+    ok: true,
+    generation: readPositiveInteger(receipt.generation, 'generation'),
+    snapshot_digest: readSha256Digest(receipt.snapshot_digest, 'snapshot_digest'),
+    projection_digest: readSha256Digest(receipt.projection_digest, 'projection_digest'),
+  };
+}
 
 function isValidPort(port: number | undefined): port is number {
   return port !== undefined && Number.isInteger(port) && port > 0 && port <= 65535;
@@ -205,7 +255,7 @@ export class ManagementApiClient {
    * Update a single claude-api-key entry by index or api-key match.
    */
   async patchClaudeKey(patch: ClaudeKeyPatch): Promise<void> {
-    await this.request('PATCH', '/v0/management/claude-api-key', patch);
+    await this.request('PATCH', '/v0/management/claude-api-key', jsonBody(patch));
   }
 
   /**
@@ -241,8 +291,18 @@ export class ManagementApiClient {
    * Update the global credential routing strategy on CLIProxy.
    */
   async putRoutingStrategy(strategy: CliproxyRoutingStrategy): Promise<CliproxyRoutingStrategy> {
-    await this.request('PUT', ROUTING_STRATEGY_PATH, { value: strategy });
+    await this.request('PUT', ROUTING_STRATEGY_PATH, jsonBody({ value: strategy }));
     return strategy;
+  }
+
+  /**
+   * Atomically replace CLIProxy's complete native config and return its active
+   * model-routing digest receipt. CLIProxy owns validation, persistence, and
+   * online reload for this endpoint.
+   */
+  async putConfigYaml(configYaml: string): Promise<ConfigPublicationReceipt> {
+    const response = await this.request<unknown>('PUT', CONFIG_YAML_PATH, yamlBody(configYaml));
+    return parseConfigPublicationReceipt(response.data);
   }
 
   /**
@@ -258,7 +318,7 @@ export class ManagementApiClient {
    * Replace an entire management section on CLIProxyAPI.
    */
   async putSection<T>(section: string, entries: T[]): Promise<void> {
-    await this.request('PUT', `/v0/management/${section}`, entries);
+    await this.request('PUT', `/v0/management/${section}`, jsonBody(entries));
   }
 
   /**
@@ -267,7 +327,7 @@ export class ManagementApiClient {
   private async request<T>(
     method: string,
     path: string,
-    body?: unknown
+    body?: EncodedRequestBody
   ): Promise<{ data?: T; headers?: Record<string, string> }> {
     const url = buildUrl(this.config, path);
 
@@ -277,7 +337,7 @@ export class ManagementApiClient {
     };
 
     if (body !== undefined) {
-      headers['Content-Type'] = 'application/json';
+      headers['Content-Type'] = body.contentType;
     }
 
     // Use native https for self-signed cert support
@@ -295,7 +355,7 @@ export class ManagementApiClient {
     method: string,
     url: string,
     headers: Record<string, string>,
-    body?: unknown
+    body?: EncodedRequestBody
   ): Promise<{ data?: T; headers?: Record<string, string> }> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -304,7 +364,7 @@ export class ManagementApiClient {
       const response = await fetch(url, {
         method,
         headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
+        body: body?.content,
         signal: controller.signal,
       });
 
@@ -358,11 +418,11 @@ export class ManagementApiClient {
     method: string,
     url: string,
     headers: Record<string, string>,
-    body?: unknown
+    body?: EncodedRequestBody
   ): Promise<{ data?: T; headers?: Record<string, string> }> {
     return new Promise((resolve, reject) => {
       const agent = new https.Agent({ rejectUnauthorized: false });
-      const bodyStr = body !== undefined ? JSON.stringify(body) : undefined;
+      const bodyStr = body?.content;
 
       if (bodyStr) {
         headers['Content-Length'] = Buffer.byteLength(bodyStr).toString();

@@ -138,6 +138,78 @@ describe('management-api-client', () => {
       });
     });
 
+    describe('atomic config publication', () => {
+      it('sends raw YAML and validates the publication receipt', async () => {
+        const client = new ManagementApiClient(config);
+        const configYaml = 'port: 8317\nmodel-routing:\n  schema-version: 1\n';
+        const digest = 'a'.repeat(64);
+        const originalFetch = global.fetch;
+        const fetchMock = mock(() =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify({
+                ok: true,
+                generation: 7,
+                snapshot_digest: digest,
+                projection_digest: digest,
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          )
+        );
+        global.fetch = fetchMock as typeof global.fetch;
+
+        try {
+          const receipt = await client.putConfigYaml(configYaml);
+
+          expect(receipt).toEqual({
+            ok: true,
+            generation: 7,
+            snapshot_digest: digest,
+            projection_digest: digest,
+          });
+          expect(fetchMock).toHaveBeenCalledWith(
+            'http://localhost:8317/v0/management/config.yaml',
+            expect.objectContaining({
+              method: 'PUT',
+              body: configYaml,
+              headers: expect.objectContaining({
+                'Content-Type': 'application/yaml',
+              }),
+            })
+          );
+        } finally {
+          global.fetch = originalFetch;
+        }
+      });
+
+      it('rejects a successful response without a valid digest receipt', async () => {
+        const client = new ManagementApiClient(config);
+        const originalFetch = global.fetch;
+        global.fetch = mock(() =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify({
+                ok: true,
+                generation: 7,
+                snapshot_digest: 'not-a-digest',
+                projection_digest: 'b'.repeat(64),
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
+          )
+        );
+
+        try {
+          await expect(client.putConfigYaml('port: 8317\n')).rejects.toThrow(
+            'snapshot_digest must be a 64-character hexadecimal digest'
+          );
+        } finally {
+          global.fetch = originalFetch;
+        }
+      });
+    });
+
     describe('error code mapping', () => {
       it('should map ENOTFOUND to DNS_FAILED', () => {
         const error = new Error('getaddrinfo ENOTFOUND example.com') as NodeJS.ErrnoException;
