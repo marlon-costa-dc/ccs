@@ -33,6 +33,7 @@ import { normalizeContinuityConfig, normalizeOfficialChannelsConfig } from './no
 import type { LegacyDiscordChannelsConfig } from './normalizers';
 import { canonicalizeImageAnalysisConfig } from '../../utils/hooks/image-analysis-backend-resolver';
 import { normalizeSearxngBaseUrl } from '../../utils/websearch/types';
+import { parseModelPipelineConfig } from '../schemas/model-pipeline';
 
 // ---------------------------------------------------------------------------
 // mergeWithDefaults
@@ -107,6 +108,10 @@ export function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfi
         ),
       },
     },
+    model_pipeline:
+      partial.model_pipeline === undefined
+        ? undefined
+        : parseModelPipelineConfig(partial.model_pipeline),
     proxy: {
       port: partial.proxy?.port ?? DEFAULT_OPENAI_COMPAT_PROXY_CONFIG.port,
       profile_ports: partial.proxy?.profile_ports ?? {

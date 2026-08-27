@@ -39,6 +39,29 @@ export type {
   CLIProxyConfig,
 } from './cliproxy';
 
+// AI Hub-owned immutable model-pipeline snapshot and CCS envelope
+export {
+  MODEL_PIPELINE_SCHEMA_VERSION,
+  isModelPipelineConfig,
+  parseModelPipelineConfig,
+} from './model-pipeline';
+export type {
+  ModelPipelineAssignment,
+  ModelPipelineCandidate,
+  ModelPipelineCatalogModel,
+  ModelPipelineCatalogVariant,
+  ModelPipelineConfig,
+  ModelPipelineHealth,
+  ModelPipelineJsonValue,
+  ModelPipelinePricing,
+  ModelPipelinePublication,
+  ModelPipelineReason,
+  ModelPipelineRetryPolicy,
+  ModelPipelineRetryRule,
+  ModelPipelineSnapshot,
+  ModelPipelineSourceDigest,
+} from './model-pipeline';
+
 // Quota management types and defaults
 export {
   DEFAULT_AUTO_QUOTA_CONFIG,
