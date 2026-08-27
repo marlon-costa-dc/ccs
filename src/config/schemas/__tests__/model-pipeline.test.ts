@@ -1,189 +1,114 @@
 import { describe, expect, it } from 'bun:test';
+import { generateYamlWithComments } from '../../loader/yaml-serializer';
+import fixture from './fixtures/model-pipeline-snapshot-v1.json';
 import { MODEL_PIPELINE_SCHEMA_VERSION, parseModelPipelineConfig } from '../model-pipeline';
 import { createEmptyUnifiedConfig, isUnifiedConfig } from '../unified-config';
-import { generateYamlWithComments } from '../../loader/yaml-serializer';
 
-function createCandidate(overrides: Record<string, unknown> = {}): Record<string, unknown> {
-  return {
-    catalog_provider_id: 'openai',
-    canonical_model_id: 'gpt-5.4',
-    route_channel: 'codex',
-    variant_id: 'high',
-    quota_domain: 'openai-team-a',
-    protocols: ['openai', 'anthropic'],
-    health: {
-      status: 'healthy',
-      latency_ms: 125.5,
-    },
-    restrictions: [],
-    pricing: {
-      currency: 'USD',
-      source: 'models.dev',
-      source_digest: 'sha256:catalog',
-      fetched_at: '2026-08-27T16:00:00Z',
-      input_per_million: '2.500000',
-      output_per_million: '10.000000',
-      cache_read_per_million: '0.250000',
-      cache_write_per_million: null,
-    },
-    eligible: true,
-    rejection_reasons: [],
-    ...overrides,
-  };
+function cloneEnvelope(): Record<string, unknown> {
+  return structuredClone(fixture.model_pipeline) as unknown as Record<string, unknown>;
 }
 
-function createModelPipelineConfig(): Record<string, unknown> {
-  return {
-    schema_version: MODEL_PIPELINE_SCHEMA_VERSION,
-    snapshot: {
-      schema_version: 1,
-      generation: 17,
-      generated_at: '2026-08-27T16:00:00Z',
-      source_digests: [{ source_id: 'models.dev', digest: 'sha256:catalog' }],
-      inventory: { routes: [createCandidate()] },
-      catalog: {
-        models: [
-          {
-            catalog_provider_id: 'openai',
-            canonical_model_id: 'gpt-5.4',
-            variants: [{ variant_id: 'high' }],
-          },
-        ],
-      },
-      observations: [],
-      evaluations: [],
-      rejections: [],
-      assignments: [
-        {
-          tier: 'deep',
-          alias: 'aihub-deep',
-          members: [createCandidate()],
-          candidates: [createCandidate()],
-        },
-      ],
-      retry_policy: {
-        max_attempts: 2,
-        cooldown_seconds: 30,
-        rules: [{ status: 429, classifier: 'quota_exhausted', action: 'failover' }],
-      },
-      publication: {
-        targets: ['ccs', 'cliproxy'],
-        retention: { releases: 1 },
-      },
-      projection_digest: 'sha256:projection',
-      snapshot_digest: 'sha256:snapshot',
-    },
-  };
+function snapshotOf(envelope: Record<string, unknown>): Record<string, unknown> {
+  return envelope.snapshot as Record<string, unknown>;
 }
 
 describe('model pipeline config boundary', () => {
-  it('accepts and freezes the complete AI Hub-owned snapshot', () => {
-    const parsed = parseModelPipelineConfig(createModelPipelineConfig());
+  it('accepts and deeply freezes the exact AI Hub v1 fixture', () => {
+    const parsed = parseModelPipelineConfig(fixture.model_pipeline);
 
     expect(parsed.schema_version).toBe(MODEL_PIPELINE_SCHEMA_VERSION);
-    expect(parsed.snapshot.generation).toBe(17);
-    expect(parsed.snapshot.assignments[0]?.candidates[0]?.pricing.input_per_million).toBe(
-      '2.500000'
+    expect(parsed.snapshot.generation).toBe(42);
+    expect(parsed.snapshot.projection_digest).toBe(
+      'sha256:6d505e335548fe916e49b679e5a5c5265262f1b552217c7afcc54dbd890d451f'
     );
+    expect(parsed.snapshot.snapshot_digest).toBe(
+      'sha256:2d8c52223e9249975146a7383d7e91b4c10a2aadce66d0c31a1cc29be430d34e'
+    );
+    expect(parsed.snapshot.assignments[0]?.candidates[0]?.pricing?.entries).toHaveLength(9);
     expect(Object.isFrozen(parsed)).toBe(true);
     expect(Object.isFrozen(parsed.snapshot)).toBe(true);
-    expect(Object.isFrozen(parsed.snapshot.assignments)).toBe(true);
-    expect(Object.isFrozen(parsed.snapshot.assignments[0]?.candidates)).toBe(true);
+    expect(Object.isFrozen(parsed.snapshot.inventory.models[0]?.routes[0]?.credentials)).toBe(true);
+    expect(Object.isFrozen(parsed.snapshot.assignments[0]?.candidates[0]?.pricing?.entries)).toBe(
+      true
+    );
   });
 
-  it('rejects numeric prices because decimal strings are the canonical contract', () => {
-    const config = createModelPipelineConfig();
-    const snapshot = config.snapshot as Record<string, unknown>;
-    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+  it('rejects fields outside the exact versioned contract', () => {
+    const envelope = cloneEnvelope();
+    snapshotOf(envelope).legacy_models = [];
+
+    expect(() => parseModelPipelineConfig(envelope)).toThrow(
+      'model_pipeline.snapshot.legacy_models is not part of schema version 1'
+    );
+  });
+
+  it('rejects numeric prices because pricing is lossless decimal text', () => {
+    const envelope = cloneEnvelope();
+    const assignments = snapshotOf(envelope).assignments as Array<Record<string, unknown>>;
     const candidates = assignments[0]?.candidates as Array<Record<string, unknown>>;
     const pricing = candidates[0]?.pricing as Record<string, unknown>;
-    pricing.input_per_million = 2.5;
+    const entries = pricing.entries as Array<Record<string, unknown>>;
+    entries[0]!.amount = 0.25;
 
-    expect(() => parseModelPipelineConfig(config)).toThrow(
-      'model_pipeline.snapshot.assignments[0].candidates[0].pricing.input_per_million'
-    );
-  });
-
-  it('rejects one canonical model assigned to more than one tier', () => {
-    const config = createModelPipelineConfig();
-    const snapshot = config.snapshot as Record<string, unknown>;
-    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
-    assignments.push({
-      tier: 'fast',
-      alias: 'aihub-fast',
-      members: [createCandidate({ route_channel: 'openai' })],
-      candidates: [createCandidate({ route_channel: 'openai' })],
-    });
-
-    expect(() => parseModelPipelineConfig(config)).toThrow(
-      'canonical model openai/gpt-5.4 is assigned to both deep and fast'
-    );
-  });
-
-  it('rejects a selected member that is absent from the ordered candidate set', () => {
-    const config = createModelPipelineConfig();
-    const snapshot = config.snapshot as Record<string, unknown>;
-    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
-    assignments[0] = {
-      tier: 'deep',
-      alias: 'aihub-deep',
-      members: [createCandidate({ canonical_model_id: 'o3' })],
-      candidates: [createCandidate()],
-    };
-
-    expect(() => parseModelPipelineConfig(config)).toThrow(
-      'model_pipeline.snapshot.assignments[0].members[0] is not present in candidates'
+    expect(() => parseModelPipelineConfig(envelope)).toThrow(
+      'model_pipeline.snapshot.assignments[0].candidates[0].pricing.entries[0].amount'
     );
   });
 
   it('rejects variants serialized as independent catalog models', () => {
-    const config = createModelPipelineConfig();
-    const snapshot = config.snapshot as Record<string, unknown>;
-    const catalog = snapshot.catalog as Record<string, unknown>;
-    catalog.models = [
-      {
-        catalog_provider_id: 'openai',
-        canonical_model_id: 'gpt-5.4-high',
-        variant_id: 'high',
-        variants: [],
-      },
-    ];
+    const envelope = cloneEnvelope();
+    const catalog = snapshotOf(envelope).catalog as Array<Record<string, unknown>>;
+    catalog[0]!.variant_id = 'high';
 
-    expect(() => parseModelPipelineConfig(config)).toThrow(
-      'model_pipeline.snapshot.catalog.models[0].variant_id is forbidden'
+    expect(() => parseModelPipelineConfig(envelope)).toThrow(
+      'model_pipeline.snapshot.catalog[0].variant_id is not part of schema version 1'
     );
   });
 
-  it('rejects non-UTC generation timestamps and unsupported envelope versions', () => {
-    const invalidTimestamp = createModelPipelineConfig();
-    const timestampSnapshot = invalidTimestamp.snapshot as Record<string, unknown>;
-    timestampSnapshot.generated_at = '2026-08-27T13:00:00-03:00';
-    expect(() => parseModelPipelineConfig(invalidTimestamp)).toThrow(
-      'model_pipeline.snapshot.generated_at'
-    );
+  it('rejects one ModelKey assigned to more than one exclusive tier', () => {
+    const envelope = cloneEnvelope();
+    const snapshot = snapshotOf(envelope);
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    const evaluations = snapshot.evaluations as Array<Record<string, unknown>>;
+    const fastAssignment = structuredClone(assignments[0]!);
+    fastAssignment.tier_id = 'fast';
+    fastAssignment.alias = 'aihub-fast';
+    const fastEvaluation = structuredClone(evaluations[0]!);
+    fastEvaluation.tier_id = 'fast';
+    assignments.unshift(fastAssignment);
+    evaluations.unshift(fastEvaluation);
 
-    const invalidVersion = createModelPipelineConfig();
-    invalidVersion.schema_version = 2;
-    expect(() => parseModelPipelineConfig(invalidVersion)).toThrow(
-      'model_pipeline.schema_version must equal 1'
+    expect(() => parseModelPipelineConfig(envelope)).toThrow(
+      'model_pipeline.snapshot.assignments assigns one ModelKey to more than one tier'
+    );
+  });
+
+  it('rejects semantic drift when the projection digest is stale', () => {
+    const envelope = cloneEnvelope();
+    snapshotOf(envelope).generated_at = '2026-08-27T19:00:00Z';
+
+    expect(() => parseModelPipelineConfig(envelope)).toThrow(
+      'model_pipeline.snapshot.projection_digest must equal sha256:'
     );
   });
 
   it('validates and serializes model_pipeline as a native top-level CCS section', () => {
-    const config = {
-      ...createEmptyUnifiedConfig(),
-      model_pipeline: parseModelPipelineConfig(createModelPipelineConfig()),
-    };
+    const modelPipeline = parseModelPipelineConfig(fixture.model_pipeline);
+    const config = { ...createEmptyUnifiedConfig(), model_pipeline: modelPipeline };
 
     expect(isUnifiedConfig(config)).toBe(true);
-    const yaml = generateYamlWithComments(config);
-    expect(yaml).toContain('\nmodel_pipeline:\n');
-    expect(yaml).toContain('snapshot_digest: sha256:snapshot');
-    expect(yaml.indexOf('\nmodel_pipeline:\n')).toBeLessThan(yaml.indexOf('\ncliproxy_server:\n'));
+    const serialized = generateYamlWithComments(config);
+    expect(serialized).toContain('\nmodel_pipeline:\n');
+    expect(serialized).toContain(
+      'snapshot_digest: sha256:2d8c52223e9249975146a7383d7e91b4c10a2aadce66d0c31a1cc29be430d34e'
+    );
+    expect(serialized.indexOf('\nmodel_pipeline:\n')).toBeLessThan(
+      serialized.indexOf('\ncliproxy_server:\n')
+    );
 
     const invalid = {
       ...config,
-      model_pipeline: { schema_version: 2, snapshot: config.model_pipeline.snapshot },
+      model_pipeline: { schema_version: 2, snapshot: modelPipeline.snapshot },
     };
     expect(isUnifiedConfig(invalid)).toBe(false);
   });

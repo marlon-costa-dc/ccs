@@ -59,8 +59,8 @@ function readPositiveInteger(value: unknown, label: string): number {
 }
 
 function readSha256Digest(value: unknown, label: string): string {
-  if (typeof value !== 'string' || !/^[a-f\d]{64}$/i.test(value)) {
-    throw new ConfigError(`${label} must be a 64-character hexadecimal digest`);
+  if (typeof value !== 'string' || !/^sha256:[a-f\d]{64}$/.test(value)) {
+    throw new ConfigError(`${label} must be a lowercase sha256 digest`);
   }
   return value;
 }

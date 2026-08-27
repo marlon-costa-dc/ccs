@@ -142,7 +142,7 @@ describe('management-api-client', () => {
       it('sends raw YAML and validates the publication receipt', async () => {
         const client = new ManagementApiClient(config);
         const configYaml = 'port: 8317\nmodel-routing:\n  schema-version: 1\n';
-        const digest = 'a'.repeat(64);
+        const digest = `sha256:${'a'.repeat(64)}`;
         const originalFetch = global.fetch;
         const fetchMock = mock(() =>
           Promise.resolve(
@@ -193,7 +193,7 @@ describe('management-api-client', () => {
                 ok: true,
                 generation: 7,
                 snapshot_digest: 'not-a-digest',
-                projection_digest: 'b'.repeat(64),
+                projection_digest: `sha256:${'b'.repeat(64)}`,
               }),
               { status: 200, headers: { 'Content-Type': 'application/json' } }
             )
@@ -202,7 +202,7 @@ describe('management-api-client', () => {
 
         try {
           await expect(client.putConfigYaml('port: 8317\n')).rejects.toThrow(
-            'snapshot_digest must be a 64-character hexadecimal digest'
+            'snapshot_digest must be a lowercase sha256 digest'
           );
         } finally {
           global.fetch = originalFetch;

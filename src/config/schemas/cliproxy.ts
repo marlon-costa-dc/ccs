@@ -191,19 +191,6 @@ export interface CLIProxyPayloadConfig {
   [section: string]: unknown;
 }
 
-/** Exact, source-attributed price for one routed channel/model identity. */
-export interface CLIProxyModelPricingEntry {
-  channel: string;
-  model: string;
-  input_per_million: number;
-  output_per_million: number;
-  cache_read_per_million?: number | null;
-  currency: 'USD';
-  source: string;
-  source_digest: string;
-  fetched_at: string;
-}
-
 /** Lower bound (inclusive) accepted for CLIProxy retry config fields. */
 export const CLIPROXY_RETRY_MIN_VALUE = 0;
 
@@ -290,6 +277,4 @@ export interface CLIProxyConfig {
   oauth_model_alias?: CLIProxyOAuthModelAliasConfig;
   /** Scoped payload rules emitted into managed CLIProxy config. */
   payload?: CLIProxyPayloadConfig;
-  /** AI Hub calculated model prices emitted into managed CLIProxy config. */
-  model_pricing?: CLIProxyModelPricingEntry[];
 }

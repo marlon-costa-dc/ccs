@@ -5,7 +5,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
 import type { CLIProxyBackend, CLIProxyProvider, ProviderConfig } from '../types';
 import { getProviderDisplayName } from '../provider-capabilities';
 import { getModelMappingFromConfig } from '../config/base-config-loader';
@@ -17,11 +16,7 @@ import { getAuthDir, getProviderAuthDir, getConfigPathForPort } from './path-res
 import { CLIPROXY_DEFAULT_PORT } from './port-manager';
 import { loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
 import { getActiveDockerLegacyApiKeys } from '../../docker/docker-key-rotation';
-import type {
-  CompositeFallbackEntry,
-  CompositeTierConfig,
-  CLIProxyModelPricingEntry,
-} from '../../config/schemas/cliproxy';
+import type { CompositeFallbackEntry, CompositeTierConfig } from '../../config/schemas/cliproxy';
 import { isValidCliproxyRetryValue } from '../../config/schemas/cliproxy';
 import type { CLIProxyOAuthModelAliasConfig } from '../../config/schemas/cliproxy';
 import {
@@ -34,6 +29,7 @@ import {
   parsePayloadSection,
   serializePayloadSection,
 } from './payload-rule-config';
+import { serializeModelRoutingSection } from './model-routing-projector';
 
 /** Internal API key for CCS-managed requests */
 export const CCS_INTERNAL_API_KEY = 'ccs-internal-managed';
@@ -65,8 +61,9 @@ export const CCS_CONTROL_PANEL_SECRET = 'ccs';
  * v20: Pool-gated cooling/routing/retry-cap block; disable-cooling flips to false for pool users
  * v21: Persist user-defined OAuth aliases and scoped payload override rules
  * v22: Project source-attributed model prices from the unified AI Hub catalog
+ * v23: Replace the legacy price list with the canonical model-routing projection
  */
-export const CLIPROXY_CONFIG_VERSION = 22;
+export const CLIPROXY_CONFIG_VERSION = 23;
 
 export const ORIGINAL_MANAGEMENT_PANEL_REPOSITORY =
   'https://github.com/router-for-me/Cli-Proxy-API-Management-Center';
@@ -88,28 +85,6 @@ interface OAuthModelAliasEntry {
   alias: string;
   fork?: boolean;
   order?: number;
-}
-
-function serializeModelPricingSection(entries: readonly CLIProxyModelPricingEntry[]): string {
-  if (entries.length === 0) return '';
-  return yaml.dump(
-    {
-      'model-pricing': entries.map((entry) => ({
-        channel: entry.channel,
-        model: entry.model,
-        'input-per-million': entry.input_per_million,
-        'output-per-million': entry.output_per_million,
-        ...(entry.cache_read_per_million === null || entry.cache_read_per_million === undefined
-          ? {}
-          : { 'cache-read-per-million': entry.cache_read_per_million }),
-        currency: entry.currency,
-        source: entry.source,
-        'source-digest': entry.source_digest,
-        'fetched-at': entry.fetched_at,
-      })),
-    },
-    { noRefs: true, lineWidth: -1 }
-  );
 }
 
 type OrderedOAuthAliasHop = {
@@ -877,7 +852,8 @@ function generateUnifiedConfigContent(
   const requestRetry = getRequestRetry();
   const maxRetryInterval = getMaxRetryInterval();
   const managementPanelRepository = getManagementPanelRepository();
-  const userRoutingConfig = loadOrCreateUnifiedConfig().cliproxy;
+  const unifiedConfig = loadOrCreateUnifiedConfig();
+  const userRoutingConfig = unifiedConfig.cliproxy;
   const payloadSection = serializePayloadSection(
     mergePayloadConfig(parsePayloadSection(existingPayload ?? ''), userRoutingConfig.payload)
   );
@@ -996,7 +972,7 @@ ${apiKeysYaml}
 auth-dir: "${authDirNormalized}"
 ${generateOAuthModelAliasSection(existingAliases, userRoutingConfig.oauth_model_alias)}
 ${payloadSection ? `${payloadSection}\n` : ''}
-${serializeModelPricingSection(userRoutingConfig.model_pricing ?? [])}
+${unifiedConfig.model_pipeline ? serializeModelRoutingSection(unifiedConfig.model_pipeline.snapshot) : ''}
 `;
 
   return config;
