@@ -15,7 +15,7 @@ import type {
   ClaudeKeyPatch,
   RemoteModelInfo,
   GetModelDefinitionsResponse,
-  ConfigPublicationReceipt,
+  CLIProxyActivationReceipt,
 } from './management-api-types';
 import { ConfigError, ProxyError, UserAbortError } from '../../errors/error-types';
 import {
@@ -86,23 +86,97 @@ function readSha256Digest(value: unknown, label: string): string {
   return value;
 }
 
-export function parseConfigPublicationReceipt(value: unknown): ConfigPublicationReceipt {
-  const receipt = readRecord(value, 'config publication receipt');
-  const allowedKeys = new Set(['ok', 'generation', 'snapshot_digest', 'projection_digest']);
-  for (const key of Object.keys(receipt)) {
-    if (!allowedKeys.has(key)) {
-      throw new ConfigError(`config publication receipt.${key} is not part of the contract`);
-    }
+function exactResponseKeys(
+  record: Record<string, unknown>,
+  allowedKeys: readonly string[],
+  path: string
+): void {
+  const allowed = new Set(allowedKeys);
+  for (const key of Object.keys(record)) {
+    if (!allowed.has(key)) throw new ConfigError(`${path}.${key} is not part of the contract`);
   }
-  if (receipt.ok !== true) {
-    throw new ConfigError('config publication receipt.ok must be true');
+}
+
+function parseActiveIdentity(
+  value: unknown,
+  path: string
+): NonNullable<CLIProxyActivationReceipt['previous_active']> {
+  const identity = readRecord(value, path);
+  exactResponseKeys(
+    identity,
+    ['generation', 'snapshot_digest', 'projection_digest', 'config_digest'],
+    path
+  );
+  return {
+    generation: readPositiveInteger(identity.generation, `${path}.generation`),
+    snapshot_digest: readSha256Digest(identity.snapshot_digest, `${path}.snapshot_digest`),
+    projection_digest: readSha256Digest(identity.projection_digest, `${path}.projection_digest`),
+    config_digest: readSha256Digest(identity.config_digest, `${path}.config_digest`),
+  };
+}
+
+function readTimestamp(value: unknown, path: string): string {
+  if (
+    typeof value !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) ||
+    !Number.isFinite(Date.parse(value))
+  ) {
+    throw new ConfigError(`${path} must be a valid UTC RFC3339 timestamp`);
+  }
+  return value;
+}
+
+export function parseCLIProxyActivationReceipt(value: unknown): CLIProxyActivationReceipt {
+  const receipt = readRecord(value, 'config publication receipt');
+  exactResponseKeys(
+    receipt,
+    ['previous_active', 'active', 'routing_schema', 'binary_provenance', 'loaded_at'],
+    'config publication receipt'
+  );
+  const routingSchema = readRecord(receipt.routing_schema, 'receipt.routing_schema');
+  exactResponseKeys(routingSchema, ['version', 'digest'], 'receipt.routing_schema');
+  if (routingSchema.version !== 2) {
+    throw new ConfigError('receipt.routing_schema.version must equal 2');
+  }
+  const provenance = readRecord(receipt.binary_provenance, 'receipt.binary_provenance');
+  exactResponseKeys(provenance, ['version', 'commit', 'built_at'], 'receipt.binary_provenance');
+  const version = provenance.version;
+  const commit = provenance.commit;
+  if (typeof version !== 'string' || version.length === 0) {
+    throw new ConfigError('receipt.binary_provenance.version must be a non-empty string');
+  }
+  if (typeof commit !== 'string' || commit.length === 0) {
+    throw new ConfigError('receipt.binary_provenance.commit must be a non-empty string');
   }
   return {
-    ok: true,
-    generation: readPositiveInteger(receipt.generation, 'generation'),
-    snapshot_digest: readSha256Digest(receipt.snapshot_digest, 'snapshot_digest'),
-    projection_digest: readSha256Digest(receipt.projection_digest, 'projection_digest'),
+    previous_active:
+      receipt.previous_active === null
+        ? null
+        : parseActiveIdentity(receipt.previous_active, 'receipt.previous_active'),
+    active: parseActiveIdentity(receipt.active, 'receipt.active'),
+    routing_schema: {
+      version: 2,
+      digest: readSha256Digest(routingSchema.digest, 'receipt.routing_schema.digest'),
+    },
+    binary_provenance: {
+      version,
+      commit,
+      built_at: readTimestamp(provenance.built_at, 'receipt.binary_provenance.built_at'),
+    },
+    loaded_at: readTimestamp(receipt.loaded_at, 'receipt.loaded_at'),
   };
+}
+
+export function formatActiveIdentityEtag(
+  identity: NonNullable<CLIProxyActivationReceipt['previous_active']>
+): string {
+  const canonical = JSON.stringify({
+    config_digest: identity.config_digest,
+    generation: identity.generation,
+    projection_digest: identity.projection_digest,
+    snapshot_digest: identity.snapshot_digest,
+  });
+  return `"aihub-v2.${Buffer.from(canonical, 'utf8').toString('base64url')}"`;
 }
 
 function readPort(port: number | undefined): number {
@@ -309,14 +383,30 @@ export class ManagementApiClient {
    * model-routing digest receipt. CLIProxy owns validation, persistence, and
    * online reload for this endpoint.
    */
-  async putConfigYaml(configYaml: string, signal?: AbortSignal): Promise<ConfigPublicationReceipt> {
+  async putConfigYaml(
+    configYaml: string,
+    expectedActive: CLIProxyActivationReceipt['previous_active'],
+    signal?: AbortSignal
+  ): Promise<CLIProxyActivationReceipt> {
+    const preconditionHeaders: Readonly<Record<string, string>> = expectedActive
+      ? { 'If-Match': formatActiveIdentityEtag(expectedActive) }
+      : { 'If-None-Match': '*' };
     const response = await this.request<unknown>(
       'PUT',
       CONFIG_YAML_PATH,
       yamlBody(configYaml),
-      signal
+      signal,
+      'json',
+      preconditionHeaders
     );
-    return parseConfigPublicationReceipt(response.data);
+    const receipt = parseCLIProxyActivationReceipt(response.data);
+    const expectedEtag = formatActiveIdentityEtag(receipt.active);
+    if (response.headers?.etag !== expectedEtag) {
+      throw new ConfigError(
+        `CLIProxy activation ETag mismatch: expected ${expectedEtag}, got ${response.headers?.etag ?? 'missing'}`
+      );
+    }
+    return receipt;
   }
 
   /** Read the exact active native config without re-encoding or secret logging. */
@@ -369,7 +459,8 @@ export class ManagementApiClient {
     path: string,
     body?: EncodedRequestBody,
     signal?: AbortSignal,
-    responseFormat: ResponseFormat = 'json'
+    responseFormat: ResponseFormat = 'json',
+    additionalHeaders: Readonly<Record<string, string>> = {}
   ): Promise<{ data?: T; headers?: Record<string, string> }> {
     const url = buildUrl(this.config, path);
 
@@ -381,6 +472,7 @@ export class ManagementApiClient {
     if (body !== undefined) {
       headers['Content-Type'] = body.contentType;
     }
+    Object.assign(headers, additionalHeaders);
 
     // Use native https for self-signed cert support
     if (this.config.protocol === 'https' && this.config.allowSelfSigned) {
@@ -439,9 +531,11 @@ export class ManagementApiClient {
       const version = response.headers.get('x-cpa-version');
       const commit = response.headers.get('x-cpa-commit');
       const contentType = response.headers.get('content-type');
+      const etag = response.headers.get('etag');
       if (version) responseHeaders['x-cpa-version'] = version;
       if (commit) responseHeaders['x-cpa-commit'] = commit;
       if (contentType) responseHeaders['content-type'] = contentType;
+      if (etag) responseHeaders.etag = etag;
 
       const data = decodeResponseBody<T>(await response.text(), responseFormat);
 
@@ -509,9 +603,11 @@ export class ManagementApiClient {
             const version = res.headers['x-cpa-version'];
             const commit = res.headers['x-cpa-commit'];
             const contentType = res.headers['content-type'];
+            const etag = res.headers.etag;
             if (typeof version === 'string') responseHeaders['x-cpa-version'] = version;
             if (typeof commit === 'string') responseHeaders['x-cpa-commit'] = commit;
             if (typeof contentType === 'string') responseHeaders['content-type'] = contentType;
+            if (typeof etag === 'string') responseHeaders.etag = etag;
 
             let parsed: T | undefined;
             try {

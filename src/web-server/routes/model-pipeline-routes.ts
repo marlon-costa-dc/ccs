@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from 'express';
 import { UserAbortError } from '../../errors/error-types';
 import {
-  parseModelPipelineConfig,
+  parseModelPipelinePublicationRequest,
   type ModelPipelineConfig,
+  type ModelPipelinePublicationRequest,
 } from '../../config/schemas/model-pipeline';
 import {
   ModelPipelineGenerationConflictError,
@@ -82,9 +83,9 @@ export function createModelPipelineRouter(
 
   router.put('/model-pipeline', async (req: Request, res: Response): Promise<void> => {
     const cancellation = requestCancellation(req, res);
-    let pipeline: ModelPipelineConfig;
+    let publication: ModelPipelinePublicationRequest;
     try {
-      pipeline = parseModelPipelineConfig(req.body);
+      publication = parseModelPipelinePublicationRequest(req.body);
     } catch (error) {
       res.status(400).json({ error: errorMessage(error), stage: 'validation' });
       cancellation.dispose();
@@ -92,12 +93,12 @@ export function createModelPipelineRouter(
     }
 
     try {
-      const receipt = await dependencies.publishPipeline(pipeline, cancellation.signal);
+      const receipt = await dependencies.publishPipeline(publication, cancellation.signal);
       res.json(receipt);
     } catch (error) {
       if (res.destroyed) return;
       if (error instanceof ModelPipelineGenerationConflictError) {
-        res.status(409).json({ error: errorMessage(error), stage: 'persist' });
+        res.status(409).json({ error: errorMessage(error), stage: 'compare-and-swap' });
         return;
       }
       res.status(502).json({ error: errorMessage(error), stage: 'cliproxy-verification' });

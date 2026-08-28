@@ -1,4 +1,3 @@
-import * as yaml from 'js-yaml';
 import type {
   ModelPipelineCatalogRoute,
   ModelPipelineCredentialReference,
@@ -10,15 +9,17 @@ import type {
   ModelPipelineSnapshot,
 } from '../../config/schemas/model-pipeline';
 import { ConfigError } from '../../errors/error-types';
+import { canonicalJsonSha256Digest } from '../../utils/canonical-json';
 
-export const CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION = 1 as const;
+export const CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION = 2 as const;
 
 export interface CLIProxyModelKey {
   readonly 'catalog-provider-id': string;
   readonly 'canonical-model-id': string;
 }
 
-export interface CLIProxyRouteKey extends CLIProxyModelKey {
+export interface CLIProxyRouteKey {
+  readonly 'model-key': CLIProxyModelKey;
   readonly 'route-channel': string;
 }
 
@@ -57,14 +58,13 @@ export interface CLIProxyPricing {
 }
 
 export interface CLIProxyRoutingCandidate {
-  readonly 'model-key': CLIProxyModelKey;
-  readonly 'route-channel': string;
+  readonly 'route-key': CLIProxyRouteKey;
   readonly 'catalog-route-provider-id': string;
   readonly 'catalog-route-model-id': string;
   readonly 'runtime-model-id': string;
   readonly 'route-selector': string;
   readonly 'variant-id': string | null;
-  readonly rank: number;
+  readonly 'route-rank': number;
   readonly 'quota-domains': readonly string[];
   readonly 'credential-refs': readonly CLIProxyCredentialReference[];
   readonly protocols: readonly string[];
@@ -74,16 +74,27 @@ export interface CLIProxyRoutingCandidate {
   readonly 'selection-reason': string;
 }
 
+export interface CLIProxyRoutingMember {
+  readonly 'model-key': CLIProxyModelKey;
+  readonly 'member-rank': number;
+  readonly 'model-score': string;
+  readonly 'selection-reason': string;
+  readonly candidates: readonly CLIProxyRoutingCandidate[];
+}
+
 export interface CLIProxyRoutingAlias {
   readonly name: string;
   readonly 'tier-id': string;
   readonly selectable: boolean;
   readonly reason: string;
-  readonly candidates: readonly CLIProxyRoutingCandidate[];
+  readonly members: readonly CLIProxyRoutingMember[];
 }
 
 export interface CLIProxyDirectVariant {
-  readonly 'variant-key': CLIProxyModelKey & { readonly 'variant-id': string };
+  readonly 'variant-key': {
+    readonly 'model-key': CLIProxyModelKey;
+    readonly 'variant-id': string;
+  };
   readonly 'display-name': string | null;
   readonly 'reasoning-option': string | null;
   readonly protocols: readonly string[];
@@ -147,7 +158,7 @@ function projectModelKey(value: ModelPipelineModelKey): CLIProxyModelKey {
 
 function projectRouteKey(value: ModelPipelineRouteKey): CLIProxyRouteKey {
   return {
-    ...projectModelKey(value),
+    'model-key': projectModelKey(value.model_key),
     'route-channel': value.route_channel,
   };
 }
@@ -193,17 +204,19 @@ function projectPricing(value: ModelPipelinePricing | null): CLIProxyPricing | n
 }
 
 function projectCandidate(
-  candidate: ModelPipelineSnapshot['assignments'][number]['candidates'][number]
+  candidate: ModelPipelineSnapshot['assignments'][number]['members'][number]['candidates'][number]
 ): CLIProxyRoutingCandidate {
   return {
-    'model-key': projectModelKey(candidate),
-    'route-channel': candidate.route_channel,
+    'route-key': {
+      'model-key': projectModelKey(candidate.route_key.model_key),
+      'route-channel': candidate.route_key.route_channel,
+    },
     'catalog-route-provider-id': candidate.catalog_route_provider_id,
     'catalog-route-model-id': candidate.catalog_route_model_id,
     'runtime-model-id': candidate.runtime_model_id,
     'route-selector': candidate.route_selector,
     'variant-id': candidate.variant_id,
-    rank: candidate.rank,
+    'route-rank': candidate.route_rank,
     'quota-domains': candidate.quota_domains,
     'credential-refs': candidate.credential_refs.map(projectCredentialReference),
     protocols: candidate.protocols,
@@ -220,8 +233,8 @@ function routeIdentity(
   catalogRouteModelId: string
 ): string {
   return [
-    routeKey.catalog_provider_id,
-    routeKey.canonical_model_id,
+    routeKey.model_key.catalog_provider_id,
+    routeKey.model_key.canonical_model_id,
     routeKey.route_channel,
     catalogRouteProviderId,
     catalogRouteModelId,
@@ -254,13 +267,28 @@ function catalogRoutesByIdentity(
 
 function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxyDirectModel[] {
   const catalogRoutes = catalogRoutesByIdentity(snapshot);
-  const catalogModels = new Map(snapshot.catalog.map((model) => [modelIdentity(model), model]));
+  const catalogModels = new Map(
+    snapshot.catalog.map((model) => [modelIdentity(model.model_key), model])
+  );
   const projected: CLIProxyDirectModel[] = [];
 
-  for (const model of snapshot.inventory.models) {
+  for (const model of snapshot.inventory.direct_models) {
+    if (!model.active) continue;
     const routes: CLIProxyDirectRoute[] = [];
     for (const route of model.routes) {
       if (!route.selectable) continue;
+      const credentials = route.credentials.filter(
+        (credential) =>
+          credential.health.selectable &&
+          credential.quota.status === 'available' &&
+          !credential.suspension.active &&
+          credential.restrictions.every((restriction) => !restriction.active)
+      );
+      if (credentials.length === 0) {
+        throw new ConfigError(
+          `model_pipeline selectable route ${route.route_selector} has no usable credential`
+        );
+      }
       const catalogRoute = catalogRoutes.get(
         routeIdentity(
           route.route_key,
@@ -270,7 +298,7 @@ function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxy
       );
       if (!catalogRoute) {
         throw new ConfigError(
-          `model_pipeline selectable route ${route.route_key.catalog_provider_id}/${route.route_key.canonical_model_id}/${route.route_key.route_channel} has no matching catalog route`
+          `model_pipeline selectable route ${route.route_key.model_key.catalog_provider_id}/${route.route_key.model_key.canonical_model_id}/${route.route_key.route_channel} has no matching catalog route`
         );
       }
       routes.push({
@@ -279,8 +307,10 @@ function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxy
         'catalog-route-model-id': route.catalog_route_model_id,
         'runtime-model-id': route.runtime_model_id,
         'route-selector': route.route_selector,
-        'quota-domains': route.quota_domains,
-        'credential-refs': route.credentials.map((credential) =>
+        'quota-domains': [
+          ...new Set(credentials.map((credential) => credential.quota_domain)),
+        ].sort(),
+        'credential-refs': credentials.map((credential) =>
           projectCredentialReference(credential.credential_ref)
         ),
         protocols: route.protocols,
@@ -299,7 +329,7 @@ function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxy
       );
     }
     const catalogVariants = new Map(
-      catalogModel.variants.map((variant) => [variant.variant_id, variant])
+      catalogModel.variants.map((variant) => [variant.variant_key.variant_id, variant])
     );
     projected.push({
       'model-key': projectModelKey(model.model_key),
@@ -314,7 +344,7 @@ function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxy
         }
         return {
           'variant-key': {
-            ...projectModelKey(variant.variant_key),
+            'model-key': projectModelKey(variant.variant_key.model_key),
             'variant-id': variant.variant_key.variant_id,
           },
           'display-name': variant.display_name,
@@ -329,18 +359,31 @@ function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxy
   return projected;
 }
 
-export function projectModelRouting(snapshot: ModelPipelineSnapshot): CLIProxyModelRouting {
+type CLIProxyModelRoutingPayload = Omit<CLIProxyModelRouting, 'projection-digest'>;
+
+export function computeProjectionDigest(payload: CLIProxyModelRoutingPayload): string {
+  return canonicalJsonSha256Digest(payload);
+}
+
+export function projectModelRoutingPayload(
+  snapshot: ModelPipelineSnapshot
+): CLIProxyModelRoutingPayload {
   return {
     'schema-version': CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
     generation: snapshot.generation,
     'snapshot-digest': snapshot.snapshot_digest,
-    'projection-digest': snapshot.projection_digest,
     aliases: snapshot.assignments.map((assignment) => ({
       name: assignment.alias,
       'tier-id': assignment.tier_id,
       selectable: assignment.selectable,
       reason: assignment.reason,
-      candidates: assignment.candidates.map(projectCandidate),
+      members: assignment.members.map((member) => ({
+        'model-key': projectModelKey(member.model_key),
+        'member-rank': member.member_rank,
+        'model-score': member.model_score,
+        'selection-reason': member.selection_reason,
+        candidates: member.candidates.map(projectCandidate),
+      })),
     })),
     'direct-models': projectDirectModels(snapshot),
     'failure-policy': {
@@ -364,9 +407,7 @@ export function projectModelRouting(snapshot: ModelPipelineSnapshot): CLIProxyMo
   };
 }
 
-export function serializeModelRoutingSection(snapshot: ModelPipelineSnapshot): string {
-  return yaml.dump(
-    { 'model-routing': projectModelRouting(snapshot) },
-    { noRefs: true, lineWidth: -1, noCompatMode: true }
-  );
+export function projectModelRouting(snapshot: ModelPipelineSnapshot): CLIProxyModelRouting {
+  const payload = projectModelRoutingPayload(snapshot);
+  return { ...payload, 'projection-digest': computeProjectionDigest(payload) };
 }

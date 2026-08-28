@@ -123,11 +123,29 @@ export interface SyncStatus {
 }
 
 /** Receipt returned after CLIProxy validates, persists, and reloads a YAML config. */
-export interface ConfigPublicationReceipt {
-  readonly ok: true;
-  readonly generation: number;
-  readonly snapshot_digest: string;
-  readonly projection_digest: string;
+export interface CLIProxyActivationReceipt {
+  readonly previous_active: {
+    readonly generation: number;
+    readonly snapshot_digest: string;
+    readonly projection_digest: string;
+    readonly config_digest: string;
+  } | null;
+  readonly active: {
+    readonly generation: number;
+    readonly snapshot_digest: string;
+    readonly projection_digest: string;
+    readonly config_digest: string;
+  };
+  readonly routing_schema: {
+    readonly version: 2;
+    readonly digest: string;
+  };
+  readonly binary_provenance: {
+    readonly version: string;
+    readonly commit: string;
+    readonly built_at: string;
+  };
+  readonly loaded_at: string;
 }
 
 /**

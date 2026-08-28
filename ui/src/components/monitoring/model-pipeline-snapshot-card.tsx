@@ -24,16 +24,17 @@ function CandidateCard({ candidate }: { readonly candidate: ModelPipelineCandida
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">rank {candidate.rank}</Badge>
+            <Badge variant="outline">route rank {candidate.route_rank}</Badge>
             <span className="font-mono text-sm font-semibold">
-              {candidate.catalog_provider_id}/{candidate.canonical_model_id}
+              {candidate.route_key.model_key.catalog_provider_id}/
+              {candidate.route_key.model_key.canonical_model_id}
             </span>
             {candidate.variant_id !== null && (
               <Badge variant="secondary">variant {candidate.variant_id}</Badge>
             )}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            runtime {candidate.runtime_model_id} via {candidate.route_channel}
+            runtime {candidate.runtime_model_id} via {candidate.route_key.route_channel}
           </p>
         </div>
 
@@ -146,7 +147,7 @@ export function ModelPipelineSnapshotCardView({
     );
   }
 
-  const { snapshot } = pipeline;
+  const { snapshot, receipt } = pipeline;
 
   return (
     <Card data-testid="model-pipeline-snapshot">
@@ -175,7 +176,37 @@ export function ModelPipelineSnapshotCardView({
           </div>
           <div>
             <dt className="text-muted-foreground">Projection digest</dt>
-            <dd className="break-all font-mono">{snapshot.projection_digest}</dd>
+            <dd className="break-all font-mono">{receipt.active.projection_digest}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Exact config digest</dt>
+            <dd className="break-all font-mono">{receipt.active.config_digest}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Snapshot schema digest</dt>
+            <dd className="break-all font-mono">{receipt.snapshot_schema_digest}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Routing schema digest</dt>
+            <dd className="break-all font-mono">{receipt.routing_schema_digest}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Activation loaded at</dt>
+            <dd className="break-all font-mono">{receipt.loaded_at}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">CCS binary</dt>
+            <dd className="break-all font-mono">
+              {receipt.ccs_binary.version} · {receipt.ccs_binary.commit} ·{' '}
+              {receipt.ccs_binary.built_at}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">CLIProxy binary</dt>
+            <dd className="break-all font-mono">
+              {receipt.cliproxy_binary.version} · {receipt.cliproxy_binary.commit} ·{' '}
+              {receipt.cliproxy_binary.built_at}
+            </dd>
           </div>
         </dl>
       </CardHeader>
@@ -213,11 +244,31 @@ export function ModelPipelineSnapshotCardView({
               </div>
 
               <div className="space-y-3">
-                {assignment.candidates.map((candidate) => (
-                  <CandidateCard
-                    key={`${candidate.catalog_provider_id}:${candidate.canonical_model_id}:${candidate.route_channel}:${candidate.variant_id ?? ''}`}
-                    candidate={candidate}
-                  />
+                {assignment.members.map((member) => (
+                  <div
+                    key={`${member.model_key.catalog_provider_id}:${member.model_key.canonical_model_id}`}
+                    className="space-y-3 rounded-lg border p-3"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2 text-xs">
+                      <div>
+                        <p className="font-mono font-semibold">
+                          {member.model_key.catalog_provider_id}/
+                          {member.model_key.canonical_model_id}
+                        </p>
+                        <p className="text-muted-foreground">{member.selection_reason}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Badge variant="outline">member rank {member.member_rank}</Badge>
+                        <Badge variant="secondary">score {member.model_score}</Badge>
+                      </div>
+                    </div>
+                    {member.candidates.map((candidate) => (
+                      <CandidateCard
+                        key={`${candidate.route_key.model_key.catalog_provider_id}:${candidate.route_key.model_key.canonical_model_id}:${candidate.route_key.route_channel}:${candidate.variant_id ?? ''}`}
+                        candidate={candidate}
+                      />
+                    ))}
+                  </div>
                 ))}
               </div>
             </article>
@@ -236,12 +287,13 @@ export function ModelPipelineSnapshotCardView({
             <div className="space-y-2">
               {snapshot.rejections.map((rejection) => (
                 <div
-                  key={`${rejection.tier_id}:${rejection.catalog_provider_id}:${rejection.canonical_model_id}:${rejection.route_channel}:${rejection.variant_id ?? ''}:${rejection.rule_id}`}
+                  key={`${rejection.tier_id}:${rejection.route_key.model_key.catalog_provider_id}:${rejection.route_key.model_key.canonical_model_id}:${rejection.route_key.route_channel}:${rejection.variant_id ?? ''}:${rejection.rule_id}`}
                   className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs"
                 >
                   <p className="font-mono font-medium">
-                    {rejection.catalog_provider_id}/{rejection.canonical_model_id} ·{' '}
-                    {rejection.route_channel}
+                    {rejection.route_key.model_key.catalog_provider_id}/
+                    {rejection.route_key.model_key.canonical_model_id} ·{' '}
+                    {rejection.route_key.route_channel}
                     {rejection.variant_id !== null ? ` · variant ${rejection.variant_id}` : ''}
                   </p>
                   <p className="mt-1 text-muted-foreground">

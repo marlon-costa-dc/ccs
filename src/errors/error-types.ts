@@ -47,8 +47,8 @@ export class CCSError extends Error {
 export class ConfigError extends CCSError {
   readonly configPath?: string;
 
-  constructor(message: string, configPath?: string) {
-    super(message, ExitCode.CONFIG_ERROR, false);
+  constructor(message: string, configPath?: string, cause?: unknown) {
+    super(message, ExitCode.CONFIG_ERROR, false, cause);
     this.name = 'ConfigError';
     this.configPath = configPath;
   }

@@ -26,6 +26,7 @@ yarn-error.log*
 # TypeScript build output
 dist/
 *.tsbuildinfo
+src/generated/build-provenance.ts
 
 # Package lock files (use bun.lock only)
 yarn.lock
