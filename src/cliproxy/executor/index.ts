@@ -74,6 +74,7 @@ import { buildProxyChain } from './proxy-chain-builder';
 import { warnBrokenModels } from './model-warnings';
 import { launchClaude } from './claude-launcher';
 import { maybeWarnClaudeShadow, maybeShowClaudeRoutingNotice } from '../claude-shadow-warning';
+import { ProxyError } from '../../errors/error-types';
 
 /** Local alias so internal call sites need no change */
 const resolveRuntimeQuotaMonitorProviders = _resolveRuntimeQuotaMonitorProviders;
@@ -382,7 +383,7 @@ export async function execClaudeWithCLIProxy(
     } catch (error) {
       const err = error as Error;
       process.stderr.write(`${warn(`Failed to start HTTPS tunnel: ${err.message}`)}\n`);
-      throw new Error(`HTTPS tunnel startup failed: ${err.message}`);
+      throw new ProxyError(`HTTPS tunnel startup failed: ${err.message}`, undefined, error);
     }
   } else if (useRemoteProxy && proxyConfig.protocol === 'https' && provider === 'codex') {
     log('HTTPS tunnel skipped for Codex; local proxy chain will connect to remote HTTPS directly');

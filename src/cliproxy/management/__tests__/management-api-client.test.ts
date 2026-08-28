@@ -4,10 +4,7 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import * as net from 'node:net';
 import fixture from '../../../config/schemas/__tests__/fixtures/model-pipeline-snapshot-v1.json';
-import {
-  ManagementApiClient,
-  parseConfigPublicationReceipt,
-} from '../management-api-client';
+import { ManagementApiClient, parseConfigPublicationReceipt } from '../management-api-client';
 import type {
   ManagementClientConfig,
   ManagementHealthStatus,
@@ -524,18 +521,19 @@ describe('management-api-client', () => {
         const client = new ManagementApiClient(config);
         const originalFetch = global.fetch;
         let ownedSignalAborted = false;
-        global.fetch = mock((_url, init) =>
-          new Promise<Response>((_resolve, reject) => {
-            const ownedSignal = init?.signal;
-            ownedSignal?.addEventListener(
-              'abort',
-              () => {
-                ownedSignalAborted = true;
-                reject(ownedSignal.reason);
-              },
-              { once: true }
-            );
-          })
+        global.fetch = mock(
+          (_url, init) =>
+            new Promise<Response>((_resolve, reject) => {
+              const ownedSignal = init?.signal;
+              ownedSignal?.addEventListener(
+                'abort',
+                () => {
+                  ownedSignalAborted = true;
+                  reject(ownedSignal.reason);
+                },
+                { once: true }
+              );
+            })
         );
         const controller = new AbortController();
 

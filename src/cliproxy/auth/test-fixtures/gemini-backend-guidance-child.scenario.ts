@@ -135,7 +135,6 @@ async function registerScenarioMocks(): Promise<void> {
     ...realAccountSafetyCrossLane,
     checkCrossLaneEmailOverlap: () => null,
   }));
-
 }
 
 afterEach(() => {

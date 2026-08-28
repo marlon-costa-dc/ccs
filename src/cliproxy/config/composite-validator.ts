@@ -96,7 +96,6 @@ export function validateCompositeTiers(
     if (deniedTierModelReason) {
       return `Invalid model for tier '${tier}': ${deniedTierModelReason}`;
     }
-
   }
 
   return null;

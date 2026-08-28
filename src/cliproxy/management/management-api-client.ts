@@ -531,7 +531,6 @@ export class ManagementApiClient {
         'TIMEOUT'
       );
       let terminationReason: Error | undefined;
-      let reqTimeout: ReturnType<typeof setTimeout> | undefined;
       const destroyOwnedSocket = (socket: Socket, reason: Error): void => {
         if (socket.destroyed) return;
         if (typeof socket.resetAndDestroy === 'function') {
@@ -554,7 +553,7 @@ export class ManagementApiClient {
         );
       };
       const cleanup = (): void => {
-        if (reqTimeout !== undefined) clearTimeout(reqTimeout);
+        clearTimeout(reqTimeout);
         signal?.removeEventListener('abort', cancel);
         agent.destroy();
       };
@@ -578,7 +577,7 @@ export class ManagementApiClient {
         terminate(timeoutError);
       });
 
-      reqTimeout = setTimeout(() => terminate(timeoutError), this.timeout);
+      const reqTimeout = setTimeout(() => terminate(timeoutError), this.timeout);
       signal?.addEventListener('abort', cancel, { once: true });
       if (signal?.aborted) cancel();
 

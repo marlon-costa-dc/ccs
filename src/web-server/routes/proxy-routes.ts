@@ -84,10 +84,7 @@ router.put('/', (req: Request, res: Response) => {
         'cliproxy_server must exist before applying a partial configuration update'
       );
     }
-    const currentLocalPort = readPort(
-      currentServer.local.port,
-      'cliproxy_server.local.port'
-    );
+    const currentLocalPort = readPort(currentServer.local.port, 'cliproxy_server.local.port');
     const requestedLocalPort = updates.local?.port;
 
     if (
@@ -127,8 +124,7 @@ router.put('/', (req: Request, res: Response) => {
           ...currentServer.remote,
           ...updates.remote,
         },
-        management_timeout_ms:
-          updates.management_timeout_ms ?? currentServer.management_timeout_ms,
+        management_timeout_ms: updates.management_timeout_ms ?? currentServer.management_timeout_ms,
         local: {
           ...currentServer.local,
           ...updates.local,

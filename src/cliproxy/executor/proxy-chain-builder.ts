@@ -33,6 +33,7 @@ import { shouldDisableCodexReasoning } from './thinking-override-resolver';
 import type { CLIProxyProvider, ExecutorConfig, ResolvedProxyConfig } from '../types';
 import type { ThinkingConfig } from '../../config/unified-config-types';
 import { buildCliproxyProviderPath } from '../config/provider-route';
+import { ProxyError } from '../../errors/error-types';
 
 // ── Proxy constructor types (for dependency injection in tests) ───────────────
 
@@ -80,8 +81,8 @@ export interface ProxyChainResult {
 
 /**
  * Build and start the two env-dependent proxy layers (tool-sanitization and
- * codex-reasoning).  Each layer is started independently; a failed start is
- * swallowed with a verbose warning so the session can continue degraded.
+ * codex-reasoning). Any failed layer startup aborts the session and preserves
+ * the causal error; a degraded proxy chain is not a valid runtime.
  *
  * Note: HttpsTunnelProxy is started inline in the orchestrator (index.ts)
  * before this function is called, because tunnelPort is required for
@@ -120,9 +121,11 @@ export async function buildProxyChain(context: ProxyChainContext): Promise<Proxy
     } catch (error) {
       toolSanitizationProxy = null;
       toolSanitizationPort = null;
-      throw new Error(`Tool sanitization proxy startup failed: ${(error as Error).message}`, {
-        cause: error,
-      });
+      throw new ProxyError(
+        `Tool sanitization proxy startup failed: ${error instanceof Error ? error.message : String(error)}`,
+        undefined,
+        error
+      );
     }
   }
 
@@ -168,9 +171,11 @@ export async function buildProxyChain(context: ProxyChainContext): Promise<Proxy
       } catch (error) {
         codexReasoningProxy = null;
         codexReasoningPort = null;
-        throw new Error(`Codex reasoning proxy startup failed: ${(error as Error).message}`, {
-          cause: error,
-        });
+        throw new ProxyError(
+          `Codex reasoning proxy startup failed: ${error instanceof Error ? error.message : String(error)}`,
+          undefined,
+          error
+        );
       }
     }
   }

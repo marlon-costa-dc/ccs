@@ -97,10 +97,7 @@ export function mergeOAuthModelAliases(
       const entries = merged[provider] ?? [];
       const indexByKey = new Map(entries.map((entry, index) => [aliasKey(entry), index]));
       for (const [entryIndex, rawEntry] of rawEntries.entries()) {
-        const entry = normalizeAliasEntry(
-          rawEntry,
-          `oauth-model-alias.${provider}[${entryIndex}]`
-        );
+        const entry = normalizeAliasEntry(rawEntry, `oauth-model-alias.${provider}[${entryIndex}]`);
 
         const key = aliasKey(entry);
         const existingIndex = indexByKey.get(key);

@@ -11,6 +11,7 @@ import * as path from 'path';
 import { syncToLocalConfig } from './local-config-sync';
 import { regenerateConfig } from '../config/config-generator';
 import { getCcsDir, loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
+import { ConfigError } from '../../errors/error-types';
 
 /** Debounce delay in milliseconds */
 const DEBOUNCE_MS = 3000;
@@ -38,7 +39,7 @@ function log(message: string): void {
 function resolveConfiguredLocalPort(): number {
   const port = loadOrCreateUnifiedConfig().cliproxy_server?.local?.port;
   if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error('cliproxy_server.local.port must be a whole number between 1 and 65535');
+    throw new ConfigError('cliproxy_server.local.port must be a whole number between 1 and 65535');
   }
   return port;
 }
@@ -48,7 +49,7 @@ function resolveConfiguredLocalPort(): number {
  */
 async function triggerSync(): Promise<void> {
   if (isSyncing) {
-    throw new Error('Auto-sync received overlapping work while a sync is active');
+    throw new ConfigError('Auto-sync received overlapping work while a sync is active');
   }
 
   if (!isAutoSyncEnabled()) {
@@ -62,7 +63,7 @@ async function triggerSync(): Promise<void> {
     const result = syncToLocalConfig();
 
     if (!result.success) {
-      throw new Error(`Auto-sync failed: ${result.error}`);
+      throw new ConfigError(`Auto-sync failed: ${result.error}`);
     }
 
     if (result.syncedCount === 0) {
@@ -78,7 +79,7 @@ async function triggerSync(): Promise<void> {
 
 async function triggerRegeneration(): Promise<void> {
   if (isSyncing) {
-    throw new Error('Auto-sync received overlapping regeneration work');
+    throw new ConfigError('Auto-sync received overlapping regeneration work');
   }
   if (!isAutoSyncEnabled()) {
     log('Auto-sync disabled, skipping');
@@ -174,7 +175,7 @@ export async function stopAutoSyncWatcher(): Promise<void> {
   if (watcherInstance) {
     const closePromise = watcherInstance.close();
     const timeoutPromise = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error('Close timeout')), 5000)
+      setTimeout(() => reject(new ConfigError('Auto-sync watcher close timed out')), 5000)
     );
     await Promise.race([closePromise, timeoutPromise]);
     watcherInstance = null;
@@ -197,7 +198,7 @@ export async function restartAutoSyncWatcher(): Promise<void> {
   }
 
   if (isSyncing) {
-    throw new Error('Auto-sync remained active after the 10 second restart deadline');
+    throw new ConfigError('Auto-sync remained active after the 10 second restart deadline');
   }
 
   await stopAutoSyncWatcher();

@@ -39,6 +39,7 @@ import { handleTokenExpiration } from './failure-handler';
 import { applyAccountSafetyGuards, touchDefaultAccount } from './account-resolution';
 import type { ParsedExecutorFlags } from './arg-parser';
 import type { UnifiedConfig } from '../../config/schemas/unified-config';
+import { AuthError } from '../../errors/error-types';
 
 // ── Context / Result types ─────────────────────────────────────────────────────
 
@@ -170,8 +171,9 @@ export async function runAntigravityGate(
       acceptedByFlag: acceptAgyRisk,
     });
     if (!acknowledged) {
-      throw new Error(
-        `Antigravity auth blocked. Re-run after completing confirmation or pass ${ANTIGRAVITY_ACCEPT_RISK_FLAGS[0]}.`
+      throw new AuthError(
+        `Antigravity auth blocked. Re-run after completing confirmation or pass ${ANTIGRAVITY_ACCEPT_RISK_FLAGS[0]}.`,
+        provider
       );
     }
     process.stderr.write(
@@ -311,7 +313,7 @@ export async function ensureProviderAuthentication(
         ...(portForward ? { portForward: true } : {}),
       });
       if (!authSuccess) {
-        throw new Error(`Authentication required for ${providerConfig.displayName}`);
+        throw new AuthError(`Authentication required for ${providerConfig.displayName}`, provider);
       }
       if (forceAuth) {
         process.exit(0);

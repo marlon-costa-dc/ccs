@@ -22,6 +22,7 @@ import { resolveProxyTarget } from '../proxy/proxy-target-resolver';
 import type { ResolvedProxyConfig } from '../types';
 import type { UnifiedConfig } from '../../config/schemas/unified-config';
 import { isNetworkError, handleNetworkError } from './failure-handler';
+import { BinaryError, NetworkError } from '../../errors/error-types';
 
 export interface ResolvedExecutorProxyConfig {
   /** Proxy config resolved once from the validated CCS configuration snapshot. */
@@ -118,7 +119,10 @@ export async function resolveExecutorProxy(
         )
       );
     } else {
-      throw new Error(`Remote proxy unreachable: ${status.error ?? 'unknown error'}`);
+      throw new NetworkError(
+        `Remote proxy unreachable: ${status.error ?? 'unknown error'}`,
+        `${proxyConfig.protocol}://${proxyConfig.host}:${proxyConfig.port}`
+      );
     }
   }
 
@@ -131,7 +135,7 @@ export async function resolveExecutorProxy(
         console.error('');
         console.error(fail(getPlusBackendUnavailableMessage(p)));
         console.error('');
-        throw new Error(`Provider ${p} requires local CLIProxy Plus backend`);
+        throw new BinaryError(`Provider ${p} requires local CLIProxy Plus backend`);
       }
     }
   }

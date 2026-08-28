@@ -73,8 +73,7 @@ function parseInput(body: unknown): UpsertAiProviderEntryInput {
     models: Array.isArray(payload.models)
       ? payload.models
           .filter(
-            (item): item is Record<string, unknown> =>
-              typeof item === 'object' && item !== null
+            (item): item is Record<string, unknown> => typeof item === 'object' && item !== null
           )
           .map((item) => ({
             name: typeof item.name === 'string' ? item.name : '',

@@ -21,6 +21,7 @@ import {
   type ClaudeExtensionHostDefinition,
   getClaudeExtensionHostDefinition,
 } from './claude-extension-hosts';
+import { ProfileError } from '../errors/error-types';
 
 export interface ClaudeExtensionProfileOption {
   name: string;
@@ -217,7 +218,10 @@ async function resolveExtensionEnv(
         (result.settingsPath ? loadSettingsFromFile(expandPath(result.settingsPath)) : {}))
       : (() => {
           if (!result.provider) {
-            throw new Error(`Profile "${requestedProfile}" is missing CLIProxy provider metadata.`);
+            throw new ProfileError(
+              `Profile "${requestedProfile}" is missing CLIProxy provider metadata.`,
+              requestedProfile
+            );
           }
           const proxyTarget = getProxyTarget();
           const port = result.port || CLIPROXY_DEFAULT_PORT;
@@ -265,7 +269,10 @@ async function resolveExtensionEnv(
   new SharedManager().normalizeSharedPluginMetadataPathsLocked(env.CLAUDE_CONFIG_DIR);
 
   if (Object.keys(env).length === 0) {
-    throw new Error(`Profile "${requestedProfile}" has no extension environment to export.`);
+    throw new ProfileError(
+      `Profile "${requestedProfile}" has no extension environment to export.`,
+      requestedProfile
+    );
   }
 
   return { extensionEnv: sortEnvRecord(env), warnings, notes, disableLoginPrompt: true };

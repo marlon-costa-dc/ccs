@@ -23,6 +23,7 @@ import { startAutoSyncWatcher, stopAutoSyncWatcher } from '../cliproxy/sync';
 import { shutdownUsageAggregator } from './usage/aggregator';
 import { createLogger } from '../services/logging';
 import { DEFAULT_DASHBOARD_HOST, isLoopbackHost } from '../commands/config-dashboard-host';
+import { ProxyError } from '../errors/error-types';
 
 export interface ServerOptions {
   port: number;
@@ -281,7 +282,7 @@ function assertSafeDashboardBind(
     return;
   }
 
-  throw new Error(
+  throw new ProxyError(
     `Dashboard host ${listenHost} resolved to non-loopback address ${address.address}; pass --host explicitly to allow network exposure.`
   );
 }
