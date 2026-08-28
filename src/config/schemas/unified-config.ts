@@ -24,11 +24,11 @@ import type {
 import {
   DEFAULT_COPILOT_CONFIG,
   DEFAULT_CURSOR_CONFIG,
-  DEFAULT_CLIPROXY_SERVER_CONFIG,
   DEFAULT_OPENAI_COMPAT_PROXY_CONFIG,
   DEFAULT_IMAGE_ANALYSIS_CONFIG,
   DEFAULT_GLOBAL_ENV,
 } from './providers';
+import { withCliproxyServerDefaults } from './proxy-server';
 import { UNIFIED_CONFIG_VERSION } from './version';
 import type { QuotaManagementConfig } from './quota';
 import { DEFAULT_QUOTA_MANAGEMENT_CONFIG } from './quota';
@@ -180,7 +180,7 @@ export function createEmptyUnifiedConfig(): UnifiedConfig {
     },
     copilot: { ...DEFAULT_COPILOT_CONFIG },
     cursor: { ...DEFAULT_CURSOR_CONFIG },
-    cliproxy_server: { ...DEFAULT_CLIPROXY_SERVER_CONFIG },
+    cliproxy_server: withCliproxyServerDefaults(),
     quota_management: { ...DEFAULT_QUOTA_MANAGEMENT_CONFIG },
     thinking: { ...DEFAULT_THINKING_CONFIG },
     channels: { ...DEFAULT_OFFICIAL_CHANNELS_CONFIG },

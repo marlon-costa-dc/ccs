@@ -17,7 +17,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { initUI, header, ok, info, warn } from '../utils/ui';
 
-import { DEFAULT_CLIPROXY_SERVER_CONFIG } from '../config/unified-config-types';
+import { withCliproxyServerDefaults } from '../config/schemas/proxy-server';
 
 import { CLIPROXY_DEFAULT_PORT } from '../cliproxy/config/port-manager';
 import {
@@ -317,10 +317,8 @@ async function runSetupWizard(force: boolean = false): Promise<void> {
       // Configure remote proxy
       const remoteConfig = await configureRemoteProxy(rl);
 
-      config.cliproxy_server = {
-        ...DEFAULT_CLIPROXY_SERVER_CONFIG,
+      config.cliproxy_server = withCliproxyServerDefaults({
         remote: {
-          ...DEFAULT_CLIPROXY_SERVER_CONFIG.remote,
           enabled: true,
           host: remoteConfig.host,
           port: remoteConfig.port,
@@ -328,10 +326,9 @@ async function runSetupWizard(force: boolean = false): Promise<void> {
           auth_token: remoteConfig.authToken,
         },
         local: {
-          ...DEFAULT_CLIPROXY_SERVER_CONFIG.local,
           auto_start: false, // Disable local auto-start when using remote
         },
-      };
+      });
 
       console.log('');
       console.log(ok('Remote proxy configured successfully!'));
@@ -342,19 +339,7 @@ async function runSetupWizard(force: boolean = false): Promise<void> {
       console.log(`  Auth: ${remoteConfig.authToken ? '[configured]' : '[none]'}`);
     } else if (proxyMode === 'local') {
       // Ensure local mode is configured
-      config.cliproxy_server = {
-        ...DEFAULT_CLIPROXY_SERVER_CONFIG,
-        remote: {
-          enabled: false,
-          host: '',
-          protocol: 'http',
-          auth_token: '',
-        },
-        local: {
-          port: CLIPROXY_DEFAULT_PORT,
-          auto_start: true,
-        },
-      };
+      config.cliproxy_server = withCliproxyServerDefaults();
 
       console.log('');
       console.log(ok('Local proxy mode configured!'));
@@ -411,7 +396,7 @@ async function runSetupWizard(force: boolean = false): Promise<void> {
 
     if (proxyMode === 'remote') {
       console.log(info('Remote proxy tip:'));
-      console.log('  If connection fails, CCS will offer to start local proxy as fallback.');
+      console.log('  CLIProxy launches stop if the configured remote server cannot be reached.');
       console.log('  Edit ~/.ccs/config.yaml to adjust remote settings.');
       console.log('');
     }
