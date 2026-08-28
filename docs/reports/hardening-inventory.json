@@ -1,10 +1,10 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2424,
-    "filesAffected": 254,
-    "hotpathOccurrences": 1165,
-    "hotpathFilesAffected": 153,
+    "totalOccurrences": 2199,
+    "filesAffected": 245,
+    "hotpathOccurrences": 1166,
+    "hotpathFilesAffected": 152,
     "topHotpathFiles": [
       {
         "file": "src/management/shared-manager/diverged-file-adopter.ts",
@@ -162,32 +162,6 @@
     ],
     "topFilesOverall": [
       {
-        "file": "src/cliproxy/__tests__/pool-routing-phase3.test.ts",
-        "count": 96,
-        "calls": [
-          "existsSync",
-          "mkdirSync",
-          "mkdtempSync",
-          "readFileSync",
-          "rmSync",
-          "writeFileSync"
-        ],
-        "markers": []
-      },
-      {
-        "file": "src/cliproxy/config/__tests__/config-generator.test.js",
-        "count": 88,
-        "calls": [
-          "existsSync",
-          "mkdirSync",
-          "mkdtempSync",
-          "readFileSync",
-          "rmSync",
-          "writeFileSync"
-        ],
-        "markers": []
-      },
-      {
         "file": "src/cliproxy/config/__tests__/claude-model-neutral.test.ts",
         "count": 63,
         "calls": [
@@ -262,8 +236,8 @@
         "markers": []
       },
       {
-        "file": "src/cliproxy/executor/__tests__/composite-variant-service.test.ts",
-        "count": 33,
+        "file": "src/cliproxy/config/__tests__/config-generator.test.js",
+        "count": 34,
         "calls": [
           "existsSync",
           "mkdirSync",
@@ -288,6 +262,19 @@
         "markers": []
       },
       {
+        "file": "src/cliproxy/executor/__tests__/composite-variant-service.test.ts",
+        "count": 32,
+        "calls": [
+          "existsSync",
+          "mkdirSync",
+          "mkdtempSync",
+          "readFileSync",
+          "rmSync",
+          "writeFileSync"
+        ],
+        "markers": []
+      },
+      {
         "file": "src/utils/browser/mcp-installer.ts",
         "count": 32,
         "calls": [
@@ -302,12 +289,26 @@
           "writeFileSync"
         ],
         "markers": []
+      },
+      {
+        "file": "src/cliproxy/__tests__/session-tracker-port.test.js",
+        "count": 31,
+        "calls": [
+          "existsSync",
+          "mkdirSync",
+          "readdirSync",
+          "readFileSync",
+          "rmSync",
+          "unlinkSync",
+          "writeFileSync"
+        ],
+        "markers": []
       }
     ]
   },
   "legacyShim": {
-    "totalMarkers": 425,
-    "filesAffected": 167,
+    "totalMarkers": 382,
+    "filesAffected": 160,
     "topFiles": [
       {
         "file": "src/web-server/usage/native-quota-collector.ts",
@@ -368,25 +369,6 @@
           "// Legacy mode - read from config.json only",
           "// Legacy mode: read config.json",
           "// Merge legacy profiles into available list (avoid duplicates)"
-        ]
-      },
-      {
-        "file": "src/cliproxy/__tests__/pool-onboarding-phase5.test.ts",
-        "count": 12,
-        "calls": [],
-        "markers": [
-          "*  12. Legacy-only install: dismissOnboardingHint does not create config.yaml",
-          "*  14. Legacy-only install: hasUnifiedConfig() returns false, enforcing call-site gate",
-          "/** Create a legacy-only home: has profiles.json but NO config.yaml */",
-          "// ── 12. Legacy-only install: dismissal does not create config.yaml ────────",
-          "// ── 14. Legacy-only install: hasUnifiedConfig() is false at account-flow / create-command sites ──",
-          "// Intentionally no config.yaml - legacy install",
-          "// meaning those call sites silently skip the hint and legacy users receive",
-          "// Override tempHome with a legacy-only home (no config.yaml)",
-          "// The call-site guard must return false - legacy install has no config.yaml",
-          "const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-pool-onboarding-legacy-'));",
-          "it('dismissOnboardingHint does not create config.yaml for legacy profiles.json-only installs', async () => {",
-          "it('hasUnifiedConfig returns false for legacy profiles.json-only installs (call-site gate)', async () => {"
         ]
       },
       {
@@ -464,17 +446,28 @@
         ]
       },
       {
-        "file": "src/cliproxy/config/__tests__/config-generator.test.js",
+        "file": "src/commands/setup-command.ts",
         "count": 7,
         "calls": [],
         "markers": [
-          "'Should preserve lone manual high-version aliases during legacy cleanup'",
-          "'Should preserve manual aliases after legacy migration has already run'",
-          "'Should preserve the manual 3.2 compatibility cluster during legacy cleanup'",
-          "'Should preserve the pruned legacy alias in the migration backup'",
-          "assert(fs.existsSync(backupPath), 'Should keep a backup of the legacy config before pruning');",
-          "it('prunes partially retained broad guessed ranges during legacy cleanup', () => {",
-          "it('writes a one-time backup before pruning legacy Gemini aliases during migration', () => {"
+          "* 3. Legacy config.json profiles (GLM, Kimi)",
+          "* 4. Legacy profiles.json accounts",
+          "// Also check legacy config.json for existing profiles",
+          "// Has legacy accounts - NOT first time",
+          "// Has legacy profiles - NOT first time",
+          "// Legacy config exists but is invalid - ignore and continue",
+          "// Legacy profiles exists but is invalid - ignore and continue"
+        ]
+      },
+      {
+        "file": "src/utils/websearch/status.ts",
+        "count": 7,
+        "calls": [],
+        "markers": [
+          "'Deprecated legacy fallback (Google retired the gemini CLI). Prefer Antigravity.',",
+          "description: 'Optional legacy LLM fallback via OpenCode.',",
+          "description: 'Optional legacy LLM fallback with xAI Grok.',",
+          "kind: 'legacy-cli',"
         ]
       }
     ],
@@ -490,17 +483,23 @@
   },
   "maintainability": {
     "typedErrors": {
-      "totalThrows": 429,
-      "typedThrows": 80,
-      "plainThrows": 289,
-      "otherThrows": 60,
-      "adoptionRatio": 0.1865,
+      "totalThrows": 560,
+      "typedThrows": 226,
+      "plainThrows": 256,
+      "otherThrows": 78,
+      "adoptionRatio": 0.4036,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
-          "count": 102,
-          "typed": 15,
-          "plain": 45
+          "count": 109,
+          "typed": 23,
+          "plain": 44
+        },
+        {
+          "subdomain": "cliproxy/services",
+          "count": 69,
+          "typed": 50,
+          "plain": 3
         },
         {
           "subdomain": "commands",
@@ -522,9 +521,9 @@
         },
         {
           "subdomain": "utils",
-          "count": 33,
+          "count": 34,
           "typed": 0,
-          "plain": 33
+          "plain": 31
         },
         {
           "subdomain": "targets",
@@ -533,28 +532,22 @@
           "plain": 16
         },
         {
-          "subdomain": "cliproxy/auth",
-          "count": 16,
-          "typed": 16,
-          "plain": 0
-        },
-        {
-          "subdomain": "cliproxy/accounts",
-          "count": 13,
-          "typed": 0,
-          "plain": 13
-        },
-        {
-          "subdomain": "auth",
-          "count": 12,
-          "typed": 12,
-          "plain": 0
-        },
-        {
           "subdomain": "cliproxy/ai-providers",
-          "count": 12,
-          "typed": 0,
-          "plain": 12
+          "count": 25,
+          "typed": 19,
+          "plain": 6
+        },
+        {
+          "subdomain": "cliproxy/config",
+          "count": 24,
+          "typed": 19,
+          "plain": 4
+        },
+        {
+          "subdomain": "cliproxy/management",
+          "count": 20,
+          "typed": 19,
+          "plain": 0
         }
       ]
     },
@@ -571,9 +564,9 @@
       "targetRatio": 0.4
     },
     "loggerCoverage": {
-      "filesWithCreateLogger": 60,
-      "totalSourceFiles": 721,
-      "coverageRatio": 0.0832,
+      "filesWithCreateLogger": 59,
+      "totalSourceFiles": 720,
+      "coverageRatio": 0.0819,
       "subdomainsWithZeroCreateLogger": [
         "api",
         "bin",
@@ -588,6 +581,7 @@
         "cliproxy/types",
         "config",
         "dispatcher",
+        "generated",
         "shared",
         "types"
       ],
@@ -599,7 +593,7 @@
         },
         {
           "subdomain": "commands",
-          "count": 107,
+          "count": 104,
           "withLogger": 2
         },
         {
@@ -618,14 +612,14 @@
           "withLogger": 1
         },
         {
+          "subdomain": "config",
+          "count": 32,
+          "withLogger": 0
+        },
+        {
           "subdomain": "cliproxy/quota",
           "count": 31,
           "withLogger": 5
-        },
-        {
-          "subdomain": "config",
-          "count": 27,
-          "withLogger": 0
         },
         {
           "subdomain": "codex-auth",
@@ -645,10 +639,10 @@
       ]
     },
     "hotpathConsoleErrors": {
-      "totalOccurrences": 548,
+      "totalOccurrences": 540,
       "exemptOccurrences": 301,
-      "hotpathOccurrences": 247,
-      "filesAffected": 72,
+      "hotpathOccurrences": 239,
+      "filesAffected": 69,
       "topFiles": [
         {
           "file": "src/errors/error-handler.ts",
@@ -703,17 +697,17 @@
           "count": 7
         },
         {
-          "file": "src/cliproxy/auth/oauth-handler.ts",
+          "file": "src/targets/droid-detector.ts",
           "count": 6
         },
         {
-          "file": "src/targets/droid-detector.ts",
+          "file": "src/utils/hooks/image-analyzer-hook-installer.ts",
           "count": 6
         }
       ]
     },
     "largeFiles": {
-      "countOver400": 84,
+      "countOver400": 88,
       "countOver600": 41,
       "topOver400": [
         {
@@ -726,11 +720,11 @@
         },
         {
           "file": "src/cliproxy/auth/oauth-handler.ts",
-          "loc": 1520
+          "loc": 1491
         },
         {
-          "file": "src/cliproxy/config/generator.ts",
-          "loc": 1288
+          "file": "src/config/schemas/model-pipeline.ts",
+          "loc": 1480
         },
         {
           "file": "src/cliproxy/model-catalog.ts",
@@ -758,7 +752,7 @@
         },
         {
           "file": "src/commands/cliproxy/variant-subcommand.ts",
-          "loc": 997
+          "loc": 998
         },
         {
           "file": "src/cliproxy/quota/quota-manager.ts",
