@@ -272,7 +272,8 @@ git commit -m "update file"
 Releases are automated with semantic-release.
 
 - Merges to `main` publish the `@latest` channel.
-- Do not manually bump versions, create tags, or run manual `npm publish`.
+- Do not manually bump versions or create tags. This fork publishes GitHub
+  releases only.
 - [`docs/release-process.md`](./docs/release-process.md) is the canonical
   release authority and documents downstream packaging and Docker promotion.
 

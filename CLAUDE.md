@@ -16,7 +16,8 @@ Factory Droid, CLIProxy, and compatible provider profiles.
   `getCcsDir()` from `src/utils/config-manager.ts`; it respects `CCS_HOME`.
 - Do not commit directly to `main`.
 - Do not manually bump versions or create release tags. Semantic-release owns
-  versions, changelog, tags, npm publish, and GitHub releases.
+  versions, changelog, tags, and GitHub releases. This fork does not publish to
+  npm.
 - CLI terminal output must be ASCII only: `[OK]`, `[!]`, `[X]`, `[i]`.
 - Respect `NO_COLOR` and TTY-aware output.
 

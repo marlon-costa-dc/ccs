@@ -2,13 +2,12 @@
  * Semantic Release Configuration
  *
  * Main-only configuration:
- * - main branch: Uses production release configuration (stable, npm @latest)
+ * - main branch: publishes an immutable GitHub release.
  *
  * RC soak window for Docker mutable tags is handled entirely in docker-release.yml:
  * every release event publishes the immutable :<ver> Docker tag immediately;
  * mutable :latest/:MAJOR/:MINOR tags require an explicit operator action via
  * `gh workflow run promote-release.yml -f tag=vX.Y.Z` (workflow_dispatch).
- * npm @latest is always set immediately on stable release — no rc soak needed.
  */
 
 // Shared plugin config
@@ -49,7 +48,7 @@ const releaseNotesGenerator = [
 ];
 
 // Production release configuration
-// Every merge to main publishes a stable vX.Y.Z release immediately to npm @latest.
+// Every releasable merge to main publishes a stable vX.Y.Z GitHub release.
 // Docker immutable :<ver> tag is pushed by docker-release.yml on the release: published event.
 // Docker mutable :latest/:MAJOR/:MINOR tags require a separate manual promote step — see
 // docs/release-process.md and promote-release.yml for the soak + promote procedure.
@@ -64,12 +63,17 @@ const config = {
         changelogFile: 'CHANGELOG.md',
       },
     ],
-    '@semantic-release/npm',
+    [
+      '@semantic-release/npm',
+      {
+        npmPublish: false,
+      },
+    ],
     [
       '@semantic-release/github',
       {
         successComment:
-          ':tada: This issue has been resolved in version ${nextRelease.version} :tada:\n\nThe release is available on:\n- [npm package (@latest)](https://www.npmjs.com/package/@kaitranntt/ccs)\n- [GitHub release](${releases[0].url})',
+          ':tada: This issue has been resolved in version ${nextRelease.version} :tada:\n\nThe release is available on GitHub: ${releases[0].url}',
         releasedLabels: ['released'],
       },
     ],
