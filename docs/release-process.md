@@ -1,9 +1,10 @@
 # CCS Release Process
 
 Semantic-release is the sole authority for the CCS package version,
-`CHANGELOG.md`, npm publication, package tag, and package GitHub release. It
-runs only after changes land on `main`. Packaging and container workflows
-consume its immutable tag and release; they do not create a competing release.
+`CHANGELOG.md`, package tag, and package GitHub release. This fork publishes
+only through GitHub. It runs after changes land on `main`. Packaging and
+container workflows consume its immutable tag and release; they do not create a
+competing release.
 
 ## Release lanes
 
@@ -13,7 +14,7 @@ consume its immutable tag and release; they do not create a competing release.
 | Semantic-release tag or operator replay of an existing tag | [`release.yml`](../.github/workflows/release.yml) | Package assets added to the existing GitHub release after provenance checks |
 | Published stable or `rc` GitHub release | [`docker-release.yml`](../.github/workflows/docker-release.yml) | Immutable integrated Docker version tag, signature, and smoke test |
 | Operator-approved stable promotion | [`promote-release.yml`](../.github/workflows/promote-release.yml) | Docker `:latest`, major, and minor aliases |
-| Operator-dispatched CCS Bar publication | [`bar-release.yml`](../.github/workflows/bar-release.yml) | Floating `ccs-bar-latest` assets; no package version, npm publication, or package tag |
+| Operator-dispatched CCS Bar publication | [`bar-release.yml`](../.github/workflows/bar-release.yml) | Floating `ccs-bar-latest` assets; no package version or package tag |
 
 ## Package release authority
 
@@ -29,9 +30,10 @@ scope produces no release, regardless of commit type. Other commits may also
 produce no release.
 
 When a release is required, semantic-release updates `CHANGELOG.md` and
-`package.json`, publishes npm `@latest`, creates the package tag and GitHub
-release, and pushes its generated commit to `main`. Never bump a version,
-publish npm, create a package tag, or create a package GitHub release manually.
+`package.json`, creates the package tag and GitHub release, and pushes its
+generated commit to `main`. The npm plugin runs only to prepare the versioned
+package; `npmPublish: false` prevents registry publication. Never bump a
+version, create a package tag, or create a package GitHub release manually.
 
 ## Downstream package assets
 
@@ -99,7 +101,7 @@ publish on semantic-release's behalf.
 ## Verification
 
 ```bash
-npm view @kaitranntt/ccs dist-tags
+gh release view vX.Y.Z --repo marlon-costa-dc/ccs
 docker buildx imagetools inspect ghcr.io/kaitranntt/ccs:X.Y.Z
 docker buildx imagetools inspect ghcr.io/kaitranntt/ccs:latest
 ```
@@ -110,8 +112,6 @@ commit.
 
 ## Recovery
 
-- For a bad npm release, publish a corrected patch. Do not unpublish a version
-  used by downstream consumers.
 - For a bad package asset, publish a corrected package release. Do not overwrite
   an asset attached to an immutable tag.
 - For a bad immutable Docker image, leave its tag unchanged and publish a

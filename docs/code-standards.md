@@ -181,7 +181,7 @@ feat(cliproxy): add provider quota check
 docs(contributing): clarify validation
 ```
 
-Semantic-release owns versions, changelog entries, tags, npm publishing, and
+Semantic-release owns versions, changelog entries, tags, GitHub releases, and
 GitHub releases. Do not bump versions, tag, or publish manually. Release effects
 and downstream packaging are defined in the canonical
 [release process](./release-process.md); commit analysis is configured in

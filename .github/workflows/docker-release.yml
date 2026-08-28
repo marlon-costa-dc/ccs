@@ -159,7 +159,7 @@ jobs:
   # Mutable :latest / major / minor aliases are added by promote-mutable-tags
   # ONLY via explicit workflow_dispatch (promote_to_latest=true) after the
   # operator has verified the immutable image is stable. This keeps the rc.1
-  # soak window entirely in the Docker promotion path — npm @latest is always
+  # soak window entirely in the Docker promotion path — the GitHub release is
   # published immediately by semantic-release on the stable release.
   # ---------------------------------------------------------------------------
   publish-integrated:
