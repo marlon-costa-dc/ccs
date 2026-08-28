@@ -63,21 +63,6 @@ describe('validateCompositeTiers', () => {
     expect(error).toBeNull();
   });
 
-  it('rejects circular fallback definitions', () => {
-    const error = validateCompositeTiers(
-      {
-        opus: {
-          provider: 'gemini',
-          model: 'gemini-2.5-pro',
-          fallback: { provider: 'gemini', model: 'gemini-2.5-pro' },
-        },
-      },
-      { defaultTier: 'opus' }
-    );
-
-    expect(error).toContain("Circular fallback in tier 'opus'");
-  });
-
   it('rejects denylisted agy 4.5 models', () => {
     const error = validateCompositeTiers(
       {

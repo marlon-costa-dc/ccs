@@ -18,7 +18,6 @@ import {
   DEFAULT_COPILOT_CONFIG,
   DEFAULT_CURSOR_CONFIG,
   DEFAULT_GLOBAL_ENV,
-  DEFAULT_CLIPROXY_SERVER_CONFIG,
   DEFAULT_CLIPROXY_SAFETY_CONFIG,
   DEFAULT_OPENAI_COMPAT_PROXY_CONFIG,
   DEFAULT_QUOTA_MANAGEMENT_CONFIG,
@@ -28,11 +27,14 @@ import {
   DEFAULT_LOGGING_CONFIG,
 } from '../unified-config-types';
 import type { UnifiedConfig } from '../unified-config-types';
-import { canonicalizeBrowserConfig, normalizeSessionAffinityTtl } from './normalizers';
+import { canonicalizeBrowserConfig } from './normalizers';
 import { normalizeContinuityConfig, normalizeOfficialChannelsConfig } from './normalizers';
 import type { LegacyDiscordChannelsConfig } from './normalizers';
 import { canonicalizeImageAnalysisConfig } from '../../utils/hooks/image-analysis-backend-resolver';
 import { normalizeSearxngBaseUrl } from '../../utils/websearch/types';
+import { parseModelPipelineConfig } from '../schemas/model-pipeline';
+import { withCliproxyServerDefaults } from '../schemas/proxy-server';
+import type { CliproxyServerOverrides } from '../schemas/proxy-server';
 
 // ---------------------------------------------------------------------------
 // mergeWithDefaults
@@ -51,7 +53,11 @@ function normalizeOptionalString(value: unknown): string | undefined {
  * Merge partial config with defaults.
  * Preserves existing data while filling in missing sections.
  */
-export function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfig {
+export type UnifiedConfigDefaultsInput = Omit<Partial<UnifiedConfig>, 'cliproxy_server'> & {
+  readonly cliproxy_server?: CliproxyServerOverrides;
+};
+
+export function mergeWithDefaults(partial: UnifiedConfigDefaultsInput): UnifiedConfig {
   const defaults = createEmptyUnifiedConfig();
   const continuity = normalizeContinuityConfig(partial);
   return {
@@ -91,22 +97,11 @@ export function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfi
       ),
       // Auto-sync - default to true
       auto_sync: partial.cliproxy?.auto_sync ?? defaults.cliproxy.auto_sync ?? true,
-      routing: {
-        strategy:
-          partial.cliproxy?.routing?.strategy === 'fill-first' ||
-          partial.cliproxy?.routing?.strategy === 'round-robin'
-            ? partial.cliproxy.routing.strategy
-            : defaults.cliproxy.routing?.strategy,
-        session_affinity:
-          typeof partial.cliproxy?.routing?.session_affinity === 'boolean'
-            ? partial.cliproxy.routing.session_affinity
-            : defaults.cliproxy.routing?.session_affinity,
-        session_affinity_ttl: normalizeSessionAffinityTtl(
-          partial.cliproxy?.routing?.session_affinity_ttl,
-          defaults.cliproxy.routing?.session_affinity_ttl ?? '1h'
-        ),
-      },
     },
+    model_pipeline:
+      partial.model_pipeline === undefined
+        ? undefined
+        : parseModelPipelineConfig(partial.model_pipeline),
     proxy: {
       port: partial.proxy?.port ?? DEFAULT_OPENAI_COMPAT_PROXY_CONFIG.port,
       profile_ports: partial.proxy?.profile_ports ?? {
@@ -217,37 +212,7 @@ export function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfi
     },
     continuity,
     // CLIProxy server config - remote/local CLIProxyAPI settings
-    cliproxy_server: {
-      remote: {
-        enabled:
-          partial.cliproxy_server?.remote?.enabled ?? DEFAULT_CLIPROXY_SERVER_CONFIG.remote.enabled,
-        host: partial.cliproxy_server?.remote?.host ?? DEFAULT_CLIPROXY_SERVER_CONFIG.remote.host,
-        // Port is optional - undefined means use protocol default (443 for HTTPS, 8317 for HTTP)
-        port: partial.cliproxy_server?.remote?.port,
-        protocol:
-          partial.cliproxy_server?.remote?.protocol ??
-          DEFAULT_CLIPROXY_SERVER_CONFIG.remote.protocol,
-        auth_token:
-          partial.cliproxy_server?.remote?.auth_token ??
-          DEFAULT_CLIPROXY_SERVER_CONFIG.remote.auth_token,
-        // management_key is optional - falls back to auth_token when not set
-        management_key: partial.cliproxy_server?.remote?.management_key,
-      },
-      fallback: {
-        enabled:
-          partial.cliproxy_server?.fallback?.enabled ??
-          DEFAULT_CLIPROXY_SERVER_CONFIG.fallback.enabled,
-        auto_start:
-          partial.cliproxy_server?.fallback?.auto_start ??
-          DEFAULT_CLIPROXY_SERVER_CONFIG.fallback.auto_start,
-      },
-      local: {
-        port: partial.cliproxy_server?.local?.port ?? DEFAULT_CLIPROXY_SERVER_CONFIG.local.port,
-        auto_start:
-          partial.cliproxy_server?.local?.auto_start ??
-          DEFAULT_CLIPROXY_SERVER_CONFIG.local.auto_start,
-      },
-    },
+    cliproxy_server: withCliproxyServerDefaults(partial.cliproxy_server),
     // Quota management config - hybrid auto+manual account selection
     quota_management: {
       mode: partial.quota_management?.mode ?? DEFAULT_QUOTA_MANAGEMENT_CONFIG.mode,

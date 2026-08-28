@@ -9,7 +9,6 @@ import {
   FolderOpen,
   ChevronRight,
   BarChart3,
-  Gauge,
   ScrollText,
   Puzzle,
   TerminalSquare,
@@ -98,7 +97,6 @@ function buildNavGroups(t: (key: string) => string): SidebarGroupDef[] {
           children: [
             { path: '/cliproxy', label: t('nav.cliproxyOverview') },
             { path: '/cliproxy/ai-providers', icon: Key, label: 'AI Providers' },
-            { path: '/cliproxy/control-panel', icon: Gauge, label: t('nav.controlPanel') },
           ],
         },
         {
@@ -155,7 +153,7 @@ export function AppSidebar() {
   const isRouteActive = (path: string) => location.pathname === path;
 
   // Helper to check if a group/parent should be open based on active child
-  // Also handles sub-routes (e.g., /cliproxy/control-panel matches /cliproxy)
+  // Also handles sub-routes under a registered parent route.
   const isParentActive = (children: { path: string }[]) => {
     return children.some(
       (child) => isRouteActive(child.path) || location.pathname.startsWith(child.path + '/')

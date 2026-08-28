@@ -7,7 +7,6 @@ import type {
   CLIProxyOAuthModelAliasConfig,
   CLIProxyPayloadConfig,
 } from '../../config/schemas/cliproxy';
-import type { CliproxyRoutingStrategy } from './provider-types';
 
 /** CLIProxy config.yaml structure (minimal) */
 export interface CLIProxyConfig {
@@ -17,12 +16,6 @@ export interface CLIProxyConfig {
   debug: boolean;
   'oauth-model-alias'?: CLIProxyOAuthModelAliasConfig;
   payload?: CLIProxyPayloadConfig;
-  routing?: {
-    strategy?: CliproxyRoutingStrategy;
-    'session-affinity'?: boolean;
-    'session-affinity-ttl'?: string;
-    'claude-code-session-affinity'?: boolean;
-  };
   'gemini-api-key'?: Array<{
     'api-key': string;
     'base-url'?: string;
@@ -81,18 +74,14 @@ export interface ExecutorConfig {
   browserRuntimeEnv?: Record<string, string>;
 }
 
-/** Resolved proxy configuration after merging CLI > ENV > config.yaml > defaults */
+/** Resolved explicit proxy configuration. */
 export interface ResolvedProxyConfig {
   mode: 'local' | 'remote';
-  host?: string;
+  host: string;
   port: number;
   protocol: 'http' | 'https';
   authToken?: string;
   managementKey?: string;
-  fallbackEnabled: boolean;
-  autoStartLocal: boolean;
-  remoteOnly: boolean;
-  forceLocal: boolean;
-  timeout?: number;
-  allowSelfSigned?: boolean;
+  timeout: number;
+  allowSelfSigned: boolean;
 }

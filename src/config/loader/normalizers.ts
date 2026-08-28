@@ -172,13 +172,15 @@ export function normalizeContinuityInheritanceMap(
  * Normalize continuity section.
  * Supports legacy root key: continuity_inherit_from_account.
  */
+export interface ContinuityConfigInput {
+  readonly continuity?: ContinuityConfig;
+  readonly continuity_inherit_from_account?: unknown;
+}
+
 export function normalizeContinuityConfig(
-  partial: Partial<UnifiedConfig>
+  partial: ContinuityConfigInput
 ): ContinuityConfig | undefined {
-  const legacyMap = normalizeContinuityInheritanceMap(
-    (partial as Partial<UnifiedConfig> & { continuity_inherit_from_account?: unknown })
-      .continuity_inherit_from_account
-  );
+  const legacyMap = normalizeContinuityInheritanceMap(partial.continuity_inherit_from_account);
   const continuityMap = normalizeContinuityInheritanceMap(partial.continuity?.inherit_from_account);
 
   if (!legacyMap && !continuityMap) {

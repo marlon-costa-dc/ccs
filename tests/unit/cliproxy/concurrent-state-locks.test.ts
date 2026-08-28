@@ -10,6 +10,7 @@ import { withSyncLockRetry } from '../../../src/utils/sync-lock-retry';
 
 const ORIGINAL_CCS_HOME = process.env.CCS_HOME;
 const LOCK_HOLD_MS = 400;
+const PROCESS_START_TIMEOUT_MS = 10_000;
 
 let tempDir: string;
 let cliproxyDir: string;
@@ -134,20 +135,23 @@ registerSession(8317, proxyPid);
       'utf8'
     );
 
-    const workers = Array.from({ length: workerCount }, (_, index) => {
-      const readyPath = path.join(tempDir, `session-writer-ready-${index}`);
-      return {
-        readyPath,
-        child: spawn(process.execPath, [workerScript, gatePath, readyPath, String(process.pid)], {
-          cwd: process.cwd(),
-          env: { ...process.env, CCS_HOME: tempDir },
-          stdio: ['ignore', 'ignore', 'pipe'],
-        }),
-      };
-    });
+    const workers: Array<{ readyPath: string; child: ChildProcess }> = [];
 
     try {
-      await Promise.all(workers.map(({ readyPath, child }) => waitForFile(readyPath, child)));
+      for (let index = 0; index < workerCount; index += 1) {
+        const readyPath = path.join(tempDir, `session-writer-ready-${index}`);
+        const child = spawn(
+          process.execPath,
+          [workerScript, gatePath, readyPath, String(process.pid)],
+          {
+            cwd: process.cwd(),
+            env: { ...process.env, CCS_HOME: tempDir },
+            stdio: ['ignore', 'ignore', 'pipe'],
+          }
+        );
+        workers.push({ readyPath, child });
+        await waitForFile(readyPath, child);
+      }
       fs.writeFileSync(gatePath, 'go');
       await Promise.all(workers.map(({ child }) => waitForSuccessfulExit(child)));
 
@@ -227,7 +231,11 @@ process.on('SIGTERM', () => {
   return child;
 }
 
-async function waitForFile(filePath: string, child: ChildProcess, timeoutMs = 2000): Promise<void> {
+async function waitForFile(
+  filePath: string,
+  child: ChildProcess,
+  timeoutMs = PROCESS_START_TIMEOUT_MS
+): Promise<void> {
   const startedAt = Date.now();
   while (!fs.existsSync(filePath)) {
     if (child.exitCode !== null || child.signalCode !== null) {

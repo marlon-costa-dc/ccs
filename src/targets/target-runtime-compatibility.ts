@@ -46,7 +46,7 @@ export function evaluateTargetRuntimeCompatibility(
   if (input.profileType === 'account') {
     return unsupported(
       'Codex CLI does not support Claude account-based profiles.',
-      'Native Codex: ccs --target codex. CLIProxy Codex pool: ccs codex --target codex or ccsxp. Manage pool/routing with: ccs codex --auth and ccs cliproxy routing.'
+      'Use an explicitly configured Codex profile; CCS does not reroute unsupported account profiles.'
     );
   }
 

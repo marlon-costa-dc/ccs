@@ -118,7 +118,6 @@ describe('CCS_FLAGS and filterCcsFlags', () => {
     expect(CCS_FLAGS).toContain('--thinking');
     expect(CCS_FLAGS).toContain('--1m');
     expect(CCS_FLAGS).toContain('--no-1m');
-    expect(CCS_FLAGS).toContain('--proxy-host');
   });
 
   it('filterCcsFlags strips known flags and their values', () => {

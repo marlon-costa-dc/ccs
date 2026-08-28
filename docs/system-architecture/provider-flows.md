@@ -11,7 +11,7 @@ capabilities are linked to their source registries.
 | Canonical provider IDs, aliases, auth-flow type, callback ports, refresh ownership | [`src/cliproxy/provider-capabilities.ts`](../../src/cliproxy/provider-capabilities.ts) |
 | Original vs Plus backend restrictions | [`src/cliproxy/types/provider-types.ts`](../../src/cliproxy/types/provider-types.ts) |
 | Provider/backend enforcement | [`src/cliproxy/services/variant-service.ts`](../../src/cliproxy/services/variant-service.ts) |
-| Remote proxy precedence and fallback | [`src/cliproxy/proxy/proxy-config-resolver.ts`](../../src/cliproxy/proxy/proxy-config-resolver.ts) |
+| Remote proxy precedence and fallback | [`src/cliproxy/proxy/proxy-target-resolver.ts`](../../src/cliproxy/proxy/proxy-target-resolver.ts) |
 | Provider capability regression tests | [`src/cliproxy/__tests__/provider-capabilities.test.ts`](../../src/cliproxy/__tests__/provider-capabilities.test.ts) |
 
 Do not copy provider inventories, callback ports, or quota-supported lists into
@@ -89,7 +89,7 @@ reachable   unreachable
 ```
 
 Configuration precedence and accepted environment names are implemented in
-[`proxy-config-resolver.ts`](../../src/cliproxy/proxy/proxy-config-resolver.ts).
+[`proxy-target-resolver.ts`](../../src/cliproxy/proxy/proxy-target-resolver.ts).
 The stable behavioral contract is:
 
 - CLI flags override other sources where supported;

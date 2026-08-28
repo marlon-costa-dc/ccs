@@ -38,12 +38,6 @@ export const mockProxyConfig = {
     protocol: 'https' as const,
     authToken: 'test-token',
   },
-  fallback: {
-    enabled: false,
-    host: '',
-    port: 0,
-    protocol: 'http' as const,
-  },
   local: {
     enabled: true,
     port: 3001,

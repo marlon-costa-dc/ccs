@@ -118,6 +118,7 @@ async function resolveProxyReadiness(
       port: target.port,
       protocol: target.protocol,
       authToken: target.authToken,
+      timeout: target.managementTimeoutMs,
       allowSelfSigned: target.allowSelfSigned,
     });
 

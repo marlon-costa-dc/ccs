@@ -20,7 +20,6 @@ import type {
   DownloadResult,
   CLIProxyProvider,
   CLIProxyBackend,
-  CliproxyRoutingStrategy,
   CLIProxyConfig,
   ExecutorConfig,
   ProviderConfig,
@@ -79,10 +78,8 @@ describe('types.ts backward compatibility', () => {
   it('exports all provider types', () => {
     const provider: CLIProxyProvider = 'gemini';
     const backend: CLIProxyBackend = 'original';
-    const strategy: CliproxyRoutingStrategy = 'round-robin';
     expect(provider).toBe('gemini');
     expect(backend).toBe('original');
-    expect(strategy).toBe('round-robin');
   });
 
   it('exports PLUS_ONLY_PROVIDERS constant', () => {
@@ -106,12 +103,11 @@ describe('types.ts backward compatibility', () => {
 
     const resolved: ResolvedProxyConfig = {
       mode: 'local',
+      host: '127.0.0.1',
       port: 8317,
       protocol: 'http',
-      fallbackEnabled: true,
-      autoStartLocal: true,
-      remoteOnly: false,
-      forceLocal: false,
+      timeout: 2_000,
+      allowSelfSigned: false,
     };
     expect(resolved.mode).toBe('local');
   });

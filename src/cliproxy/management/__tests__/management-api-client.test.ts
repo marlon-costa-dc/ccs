@@ -1,13 +1,41 @@
 /**
  * Unit tests for management-api-client module
  */
-import { describe, it, expect, beforeEach, mock, spyOn } from 'bun:test';
-import { ManagementApiClient } from '../management-api-client';
+import { describe, it, expect, beforeEach, mock } from 'bun:test';
+import * as net from 'node:net';
+import { modelPipelineSnapshotFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
+import {
+  formatActiveIdentityEtag,
+  ManagementApiClient,
+  parseCLIProxyActivationReceipt,
+} from '../management-api-client';
 import type {
   ManagementClientConfig,
   ManagementHealthStatus,
   ClaudeKey,
 } from '../management-api-types';
+import { UserAbortError } from '../../../errors/error-types';
+
+const digestA = `sha256:${'a'.repeat(64)}`;
+const digestB = `sha256:${'b'.repeat(64)}`;
+const digestC = `sha256:${'c'.repeat(64)}`;
+const activeIdentity = {
+  generation: 7,
+  snapshot_digest: digestA,
+  projection_digest: digestB,
+  config_digest: digestC,
+};
+const validActivationReceipt = {
+  previous_active: null,
+  active: activeIdentity,
+  routing_schema: { version: 2 as const, digest: digestA },
+  binary_provenance: {
+    version: 'cliproxy-fixture-v2',
+    commit: 'cliproxy-fixture-commit',
+    built_at: '2026-08-28T11:13:01Z',
+  },
+  loaded_at: '2026-08-28T11:20:57Z',
+};
 
 describe('management-api-client', () => {
   describe('ManagementApiClient', () => {
@@ -31,11 +59,12 @@ describe('management-api-client', () => {
         expect(client.getBaseUrl()).toBe('http://localhost:8317');
       });
 
-      it('should use default timeout if not provided', () => {
+      it('rejects a missing timeout instead of selecting a default', () => {
         const configWithoutTimeout = { ...config };
         delete configWithoutTimeout.timeout;
-        const client = new ManagementApiClient(configWithoutTimeout);
-        expect(client).toBeDefined();
+        expect(
+          () => new ManagementApiClient(configWithoutTimeout as ManagementClientConfig)
+        ).toThrow('CLIProxy management timeout must be a positive whole number');
       });
     });
 
@@ -63,79 +92,201 @@ describe('management-api-client', () => {
         expect(client.getBaseUrl()).toBe('https://localhost');
       });
 
-      it('should use default port 8317 for HTTP when port is undefined', () => {
+      it('rejects a missing HTTP port instead of selecting a default', () => {
         const configNoPort = { ...config };
         delete configNoPort.port;
-        const client = new ManagementApiClient(configNoPort);
-        expect(client.getBaseUrl()).toBe('http://localhost:8317');
+        expect(() => new ManagementApiClient(configNoPort as ManagementClientConfig)).toThrow(
+          'CLIProxy management port must be a whole number between 1 and 65535'
+        );
       });
 
-      it('should use default port 443 for HTTPS when port is undefined', () => {
+      it('rejects a missing HTTPS port instead of selecting a default', () => {
         const configNoPort = { ...config, protocol: 'https' as const };
         delete configNoPort.port;
-        const client = new ManagementApiClient(configNoPort);
-        expect(client.getBaseUrl()).toBe('https://localhost');
+        expect(() => new ManagementApiClient(configNoPort as ManagementClientConfig)).toThrow(
+          'CLIProxy management port must be a whole number between 1 and 65535'
+        );
       });
 
-      it('should warn and fall back when configured port is invalid', () => {
-        const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
-
-        const client = new ManagementApiClient({ ...config, port: 99999 });
-        expect(client.getBaseUrl()).toBe('http://localhost:8317');
-        expect(warnSpy).toHaveBeenCalledWith(
-          '[management-api-client] Invalid port "99999", using default 8317'
+      it('rejects an invalid port instead of warning and falling back', () => {
+        expect(() => new ManagementApiClient({ ...config, port: 99999 })).toThrow(
+          'CLIProxy management port must be a whole number between 1 and 65535'
         );
-
-        warnSpy.mockRestore();
       });
     });
 
-    describe('routing strategy helpers', () => {
-      it('reads the routing strategy from the management endpoint', async () => {
+    describe('atomic config publication', () => {
+      it('sends raw YAML and validates the publication receipt', async () => {
         const client = new ManagementApiClient(config);
+        const configYaml = 'port: 8317\nmodel-routing:\n  schema-version: 2\n';
         const originalFetch = global.fetch;
         const fetchMock = mock(() =>
           Promise.resolve(
-            new Response(JSON.stringify({ strategy: 'fill-first' }), {
+            new Response(JSON.stringify(validActivationReceipt), {
               status: 200,
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                ETag: formatActiveIdentityEtag(activeIdentity),
+              },
             })
           )
         );
         global.fetch = fetchMock as typeof global.fetch;
 
-        const strategy = await client.getRoutingStrategy();
+        try {
+          const receipt = await client.putConfigYaml(configYaml, null);
 
-        expect(strategy).toBe('fill-first');
-        expect(fetchMock).toHaveBeenCalled();
-        global.fetch = originalFetch;
+          expect(receipt).toEqual(validActivationReceipt);
+          expect(fetchMock).toHaveBeenCalledWith(
+            'http://localhost:8317/v0/management/config.yaml',
+            expect.objectContaining({
+              method: 'PUT',
+              body: configYaml,
+              headers: expect.objectContaining({
+                'Content-Type': 'application/yaml',
+                'If-None-Match': '*',
+              }),
+            })
+          );
+        } finally {
+          global.fetch = originalFetch;
+        }
       });
 
-      it('writes the routing strategy using the expected payload shape', async () => {
+      it('rejects a successful response without a valid digest receipt', async () => {
         const client = new ManagementApiClient(config);
         const originalFetch = global.fetch;
-        const fetchMock = mock(() =>
+        global.fetch = mock(() =>
           Promise.resolve(
-            new Response(JSON.stringify({ ok: true }), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            })
+            new Response(
+              JSON.stringify({
+                ok: true,
+                generation: 7,
+                snapshot_digest: 'not-a-digest',
+                projection_digest: `sha256:${'b'.repeat(64)}`,
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            )
           )
         );
-        global.fetch = fetchMock as typeof global.fetch;
 
-        const strategy = await client.putRoutingStrategy('round-robin');
+        try {
+          await expect(client.putConfigYaml('port: 8317\n', null)).rejects.toThrow(
+            'config publication receipt.ok is not part of the contract'
+          );
+        } finally {
+          global.fetch = originalFetch;
+        }
+      });
 
-        expect(strategy).toBe('round-robin');
-        expect(fetchMock).toHaveBeenCalledWith(
-          'http://localhost:8317/v0/management/routing/strategy',
-          expect.objectContaining({
-            method: 'PUT',
-            body: JSON.stringify({ value: 'round-robin' }),
+      it('rejects extra, missing, and mistyped receipt fields at the boundary', () => {
+        expect(() =>
+          parseCLIProxyActivationReceipt({ ...validActivationReceipt, ignored: true })
+        ).toThrow('config publication receipt.ignored is not part of the contract');
+        const { active: _active, ...missingActive } = validActivationReceipt;
+        expect(() => parseCLIProxyActivationReceipt(missingActive)).toThrow(
+          'receipt.active must be an object'
+        );
+        expect(() =>
+          parseCLIProxyActivationReceipt({
+            ...validActivationReceipt,
+            active: { ...activeIdentity, config_digest: 'not-a-digest' },
           })
-        );
-        global.fetch = originalFetch;
+        ).toThrow('receipt.active.config_digest must be a lowercase sha256 digest');
       });
+
+      it('reads and validates the active route-aware model inventory', async () => {
+        const client = new ManagementApiClient(config);
+        const originalFetch = global.fetch;
+        const fetchMock = mock(() =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify(modelPipelineSnapshotFixture().inventory as Record<string, unknown>),
+              {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              }
+            )
+          )
+        );
+        global.fetch = fetchMock as typeof global.fetch;
+
+        try {
+          const inventory = await client.getModelInventory();
+
+          expect(inventory.active).toBeNull();
+          expect(inventory.direct_models[0]?.routes[0]?.catalog_route_model_id).toBe('gpt-5.4-pro');
+          expect(fetchMock).toHaveBeenCalledWith(
+            'http://localhost:8317/v0/management/model-inventory',
+            expect.objectContaining({ method: 'GET' })
+          );
+        } finally {
+          global.fetch = originalFetch;
+        }
+      });
+
+      it('rejects an untyped model inventory response', async () => {
+        const client = new ManagementApiClient(config);
+        const originalFetch = global.fetch;
+        global.fetch = mock(() =>
+          Promise.resolve(
+            new Response(JSON.stringify({ schema_version: 1, routes: [] }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          )
+        );
+
+        try {
+          await expect(client.getModelInventory()).rejects.toThrow(
+            'model_inventory.routes is not part of schema version 2'
+          );
+        } finally {
+          global.fetch = originalFetch;
+        }
+      });
+
+      it('rejects malformed JSON instead of treating it as an empty success', async () => {
+        const client = new ManagementApiClient(config);
+        const originalFetch = global.fetch;
+        global.fetch = mock(() =>
+          Promise.resolve(
+            new Response('{not-json', {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          )
+        );
+
+        try {
+          await expect(client.getModelInventory()).rejects.toThrow(
+            'CLIProxy management response is not valid JSON'
+          );
+        } finally {
+          global.fetch = originalFetch;
+        }
+      });
+
+      it.each([401, 402, 403, 429, 500, 503])(
+        'preserves HTTP %i and performs no alternate publication',
+        async (status) => {
+          const client = new ManagementApiClient(config);
+          const originalFetch = global.fetch;
+          const fetchMock = mock(() =>
+            Promise.resolve(new Response('', { status, statusText: `status-${status}` }))
+          );
+          global.fetch = fetchMock as typeof global.fetch;
+
+          try {
+            await expect(client.putConfigYaml('model-routing: {}\n', null)).rejects.toThrow(
+              `HTTP ${status}: status-${status}`
+            );
+            expect(fetchMock).toHaveBeenCalledTimes(1);
+          } finally {
+            global.fetch = originalFetch;
+          }
+        }
+      );
     });
 
     describe('error code mapping', () => {
@@ -380,6 +531,67 @@ describe('management-api-client', () => {
         expect(status.errorCode).toBe('TIMEOUT');
 
         global.fetch = originalFetch;
+      });
+
+      it('propagates caller cancellation and aborts the owned fetch', async () => {
+        const client = new ManagementApiClient(config);
+        const originalFetch = global.fetch;
+        let ownedSignalAborted = false;
+        global.fetch = mock(
+          (_url, init) =>
+            new Promise<Response>((_resolve, reject) => {
+              const ownedSignal = init?.signal;
+              ownedSignal?.addEventListener(
+                'abort',
+                () => {
+                  ownedSignalAborted = true;
+                  reject(ownedSignal.reason);
+                },
+                { once: true }
+              );
+            })
+        );
+        const controller = new AbortController();
+
+        try {
+          const request = client.getModelInventory(controller.signal);
+          controller.abort(new UserAbortError('dashboard disconnected'));
+          await expect(request).rejects.toThrow('dashboard disconnected');
+          expect(ownedSignalAborted).toBe(true);
+        } finally {
+          global.fetch = originalFetch;
+        }
+      });
+
+      it('terminates a hung native HTTPS request on timeout', async () => {
+        const server = net.createServer();
+        const sockets = new Set<net.Socket>();
+        server.on('connection', (socket) => {
+          sockets.add(socket);
+          socket.once('close', () => sockets.delete(socket));
+        });
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+          throw new UserAbortError('test server has no TCP address');
+        }
+        const client = new ManagementApiClient({
+          ...config,
+          host: '127.0.0.1',
+          port: address.port,
+          protocol: 'https',
+          timeout: 50,
+          allowSelfSigned: true,
+        });
+
+        try {
+          const status = await client.health();
+          expect(status).toMatchObject({ healthy: false, errorCode: 'TIMEOUT' });
+          expect(status.error).toContain('timed out');
+        } finally {
+          for (const socket of sockets) socket.destroy();
+          if (server.listening) await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
       });
     });
 

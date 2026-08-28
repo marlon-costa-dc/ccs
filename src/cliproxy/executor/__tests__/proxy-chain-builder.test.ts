@@ -62,12 +62,11 @@ function makeThinkingCfg() {
 function makeProxyConfig() {
   return {
     mode: 'local' as const,
+    host: '127.0.0.1',
     port: 8317,
     protocol: 'http' as const,
-    fallbackEnabled: false,
-    autoStartLocal: true,
-    remoteOnly: false,
-    forceLocal: false,
+    timeout: 2_000,
+    allowSelfSigned: false,
   };
 }
 
@@ -133,21 +132,15 @@ describe('buildProxyChain — tool sanitization: skipped when no ANTHROPIC_BASE_
   });
 });
 
-// ── Tool sanitization: start failure swallowed ────────────────────────────────
+// ── Tool sanitization: start failure propagated ───────────────────────────────
 
-describe('buildProxyChain — tool sanitization: start failure swallowed', () => {
-  it('returns null and emits verbose warn without throwing', async () => {
+describe('buildProxyChain — tool sanitization: start failure propagated', () => {
+  it('preserves the first startup error instead of disabling the layer', async () => {
     const { ctor } = makeFailCtor('port in use');
-    const warnSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    const result = await buildProxyChain(
-      baseCtx({ verbose: true, _ToolSanitizationProxy: ctor as never })
-    );
-
-    expect(result.toolSanitizationProxy).toBeNull();
-    expect(result.toolSanitizationPort).toBeNull();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('port in use'));
-    warnSpy.mockRestore();
+    await expect(
+      buildProxyChain(baseCtx({ verbose: true, _ToolSanitizationProxy: ctor as never }))
+    ).rejects.toThrow('Tool sanitization proxy startup failed: port in use');
   });
 });
 
@@ -227,24 +220,23 @@ describe('buildProxyChain — codex reasoning: uses post-sanitization base URL',
   });
 });
 
-// ── Codex reasoning: start failure swallowed ─────────────────────────────────
+// ── Codex reasoning: start failure propagated ────────────────────────────────
 
-describe('buildProxyChain — codex reasoning: start failure swallowed', () => {
-  it('returns null codex proxy/port without throwing', async () => {
+describe('buildProxyChain — codex reasoning: start failure propagated', () => {
+  it('preserves the first startup error instead of disabling the layer', async () => {
     const sanCtorPair = makeStubCtor(13050);
     const { ctor: codexFailCtor } = makeFailCtor('bind failed');
 
-    const result = await buildProxyChain(
-      baseCtx({
-        provider: 'codex',
-        cfg: makeCfg({ isComposite: false }),
-        _ToolSanitizationProxy: sanCtorPair.ctor as never,
-        _CodexReasoningProxy: codexFailCtor as never,
-      })
-    );
-
-    expect(result.codexReasoningProxy).toBeNull();
-    expect(result.codexReasoningPort).toBeNull();
+    await expect(
+      buildProxyChain(
+        baseCtx({
+          provider: 'codex',
+          cfg: makeCfg({ isComposite: false }),
+          _ToolSanitizationProxy: sanCtorPair.ctor as never,
+          _CodexReasoningProxy: codexFailCtor as never,
+        })
+      )
+    ).rejects.toThrow('Codex reasoning proxy startup failed: bind failed');
   });
 });
 
