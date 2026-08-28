@@ -141,6 +141,22 @@ describe('run-test-bucket', () => {
     ]);
   });
 
+  test('isolates suites that mutate process termination state', () => {
+    const terminationSuites = [
+      'tests/unit/commands/browser-command.test.ts',
+      'tests/unit/commands/root-command-router.test.ts',
+    ];
+    const runs = bucket.getBunRuns('fast', [
+      'tests/unit/scripts/run-test-bucket.test.js',
+      ...terminationSuites,
+    ]);
+
+    expect(terminationSuites.every((file) => bucket.mutatesProcessTerminationState(file))).toBe(
+      true
+    );
+    expect(runs.map((run) => run.label)).toEqual(['shared', ...terminationSuites]);
+  });
+
   test('isolates subprocess launch suites in the slow bucket', () => {
     const runs = bucket.getBunRuns('slow', [
       'tests/unit/commands/persist-command-handler.test.ts',
@@ -154,7 +170,7 @@ describe('run-test-bucket', () => {
     ]);
 
     expect(runs.map((run) => run.label)).toEqual([
-      'shared',
+      'tests/unit/commands/persist-command-handler.test.ts',
       'tests/unit/cliproxy/concurrent-state-locks.test.ts',
       'tests/npm/cli.test.js',
       'tests/unit/targets/droid-command-routing-integration.test.ts',

@@ -127,6 +127,11 @@ function usesBunTestRunner(relativePath) {
   return source.includes('bun:test') || /(^|[^\w.])(?:describe|it)\s*\(/m.test(source);
 }
 
+function mutatesProcessTerminationState(relativePath) {
+  const source = fs.readFileSync(path.join(rootDir, relativePath), 'utf8');
+  return /\bprocess\.exit(?:Code)?\s*=(?!=)/.test(source);
+}
+
 function getSlowSet() {
   const discovered = getDiscoveredTests();
   const forceSlow = discovered.filter((file) => shouldForceSlow(file));
@@ -173,6 +178,7 @@ function shouldRunIsolated(file) {
     // variables mid-run. Isolating the directory keeps that per-process.
     file.startsWith('tests/unit/codex-auth/') ||
     isolatedTests.has(file) ||
+    mutatesProcessTerminationState(file) ||
     !usesBunTestRunner(file)
   );
 }
@@ -275,16 +281,14 @@ function collectFilesByExtension(dir, extension, files = []) {
 
 function isTestSourcePath(sourcePath) {
   const normalized = sourcePath.split(path.sep).join('/');
-  return (
-    normalized.includes('/__tests__/') ||
-    /\.(?:test|spec)\.ts$/.test(normalized)
-  );
+  return normalized.includes('/__tests__/') || /\.(?:test|spec)\.ts$/.test(normalized);
 }
 
 function hasCompleteBuildArtifacts(baseDir = rootDir) {
   const requiredBuildArtifacts = getRequiredBuildArtifacts(baseDir);
-  return requiredBuildArtifacts.length > 0 && requiredBuildArtifacts.every((relativePath) =>
-    fs.existsSync(path.join(baseDir, relativePath))
+  return (
+    requiredBuildArtifacts.length > 0 &&
+    requiredBuildArtifacts.every((relativePath) => fs.existsSync(path.join(baseDir, relativePath)))
   );
 }
 
@@ -329,6 +333,7 @@ function runBunTest(run) {
   const exitCode = result.status ?? 1;
   if (exitCode !== 0) {
     writeOutput();
+    console.error(`[X] ${run.label} exited with status ${exitCode}.`);
     return exitCode;
   }
 
@@ -433,6 +438,7 @@ module.exports = {
   toBunTestPath,
   getBunArgs,
   usesBunTestRunner,
+  mutatesProcessTerminationState,
   shouldRunIsolated,
   getBunRuns,
   parseBunFileCount,
