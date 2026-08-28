@@ -3,6 +3,7 @@ import * as yaml from 'js-yaml';
 import { mergeWithDefaults } from '../../loader/defaults-merger';
 import { generateYamlWithComments } from '../../loader/yaml-serializer';
 import type { UnifiedConfig } from '../unified-config';
+import { DEFAULT_CLIPROXY_SERVER_CONFIG } from '../proxy-server';
 
 describe('CLIProxy user routing schema', () => {
   it('survives default merging and YAML serialization', () => {
@@ -33,5 +34,21 @@ describe('CLIProxy user routing schema', () => {
 
     expect(serialized.cliproxy.oauth_model_alias).toEqual(configuredRouting.oauth_model_alias);
     expect(serialized.cliproxy.payload).toEqual(configuredRouting.payload);
+  });
+
+  it('materializes the canonical management deadline unless explicitly overridden', () => {
+    const omitted = mergeWithDefaults({ version: 14 });
+    expect(omitted.cliproxy_server?.management_timeout_ms).toBe(
+      DEFAULT_CLIPROXY_SERVER_CONFIG.management_timeout_ms
+    );
+
+    const configured = mergeWithDefaults({
+      version: 14,
+      cliproxy_server: {
+        ...DEFAULT_CLIPROXY_SERVER_CONFIG,
+        management_timeout_ms: 2_000,
+      },
+    });
+    expect(configured.cliproxy_server?.management_timeout_ms).toBe(2_000);
   });
 });

@@ -78,7 +78,7 @@ export interface OpenAICompatProxyConfig {
  */
 export interface CliproxyServerConfig {
   /** Required deadline for CCS-owned CLIProxy management calls. */
-  management_timeout_ms?: number;
+  management_timeout_ms: number;
   /** Remote proxy settings */
   remote: ProxyRemoteConfig;
   /** Local proxy settings */
@@ -122,6 +122,7 @@ export const DEFAULT_GLOBAL_ENV: Record<string, string> = {
  * Port is optional for remote - defaults based on protocol.
  */
 export const DEFAULT_CLIPROXY_SERVER_CONFIG: CliproxyServerConfig = {
+  management_timeout_ms: 5_000,
   remote: {
     enabled: false,
     host: '',

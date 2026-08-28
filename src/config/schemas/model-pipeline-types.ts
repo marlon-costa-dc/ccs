@@ -172,7 +172,8 @@ export interface ModelPipelineReasoningOption {
 }
 
 export interface ModelPipelineCatalogVariant {
-  readonly variant_key: ModelPipelineVariantKey;
+  readonly model_key: ModelPipelineModelKey;
+  readonly variant_id: string;
   readonly display_name: string | null;
   readonly reasoning_option: string | null;
   readonly own_capabilities: readonly string[];
@@ -180,10 +181,28 @@ export interface ModelPipelineCatalogVariant {
   readonly source_id: string;
 }
 
+export interface ModelPipelineCatalogLink {
+  readonly label: string | null;
+  readonly url: string;
+  readonly type: string | null;
+}
+
+export interface ModelPipelineCatalogWeight {
+  readonly label: string | null;
+  readonly url: string;
+  readonly format: string | null;
+  readonly quantization: string | null;
+}
+
 export interface ModelPipelineCatalogModel {
-  readonly model_key: ModelPipelineModelKey;
+  readonly catalog_provider_id: string;
+  readonly canonical_model_id: string;
   readonly display_name: string;
+  readonly description: string;
   readonly family: string | null;
+  readonly license: string | null;
+  readonly links: readonly ModelPipelineCatalogLink[];
+  readonly weights: readonly ModelPipelineCatalogWeight[];
   readonly source_id: string;
   readonly status: string | null;
   readonly release_date: string | null;
@@ -198,12 +217,57 @@ export interface ModelPipelineCatalogModel {
   readonly routes: readonly ModelPipelineCatalogRoute[];
 }
 
+export interface ModelPipelineCatalogJsonPathSegment {
+  readonly property_name: string | null;
+  readonly array_index: number | null;
+}
+
+export interface ModelPipelineCatalogJsonNode {
+  readonly path: readonly ModelPipelineCatalogJsonPathSegment[];
+  readonly kind: 'object' | 'array' | 'string' | 'integer' | 'decimal' | 'boolean' | 'null';
+  readonly string_value: string | null;
+  readonly integer_value: number | null;
+  readonly decimal_value: string | null;
+  readonly boolean_value: boolean | null;
+}
+
+export interface ModelPipelineCatalogHeader {
+  readonly name: string;
+  readonly value: string;
+}
+
+export interface ModelPipelineCatalogProviderRequest {
+  readonly npm: string | null;
+  readonly api: string | null;
+  readonly shape: 'responses' | 'completions' | null;
+  readonly body: readonly ModelPipelineCatalogJsonNode[] | null;
+  readonly headers: readonly ModelPipelineCatalogHeader[] | null;
+}
+
+export interface ModelPipelineCatalogInterleaved {
+  readonly enabled: true;
+  readonly field: 'reasoning_content' | 'reasoning_details' | null;
+}
+
+export interface ModelPipelineCatalogExperimentalMode {
+  readonly name: string;
+  readonly pricing: ModelPipelinePricing | null;
+  readonly request: ModelPipelineCatalogProviderRequest | null;
+}
+
 export interface ModelPipelineCatalogRoute {
   readonly route_key: ModelPipelineRouteKey;
   readonly catalog_route_provider_id: string;
   readonly catalog_route_model_id: string;
   readonly source_id: string;
+  readonly provider_name: string;
+  readonly provider_env: readonly string[];
+  readonly provider_npm: string;
+  readonly provider_api: string | null;
+  readonly provider_doc: string;
   readonly display_name: string;
+  readonly description: string;
+  readonly family: string | null;
   readonly status: string | null;
   readonly release_date: string | null;
   readonly last_updated: string | null;
@@ -212,6 +276,9 @@ export interface ModelPipelineCatalogRoute {
   readonly modalities: ModelPipelineModalities;
   readonly capabilities: ModelPipelineCapabilities;
   readonly reasoning_options: readonly ModelPipelineReasoningOption[];
+  readonly interleaved: ModelPipelineCatalogInterleaved | null;
+  readonly provider_request: ModelPipelineCatalogProviderRequest | null;
+  readonly experimental_modes: readonly ModelPipelineCatalogExperimentalMode[];
   readonly pricing: ModelPipelinePricing | null;
 }
 

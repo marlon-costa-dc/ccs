@@ -267,9 +267,7 @@ function catalogRoutesByIdentity(
 
 function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxyDirectModel[] {
   const catalogRoutes = catalogRoutesByIdentity(snapshot);
-  const catalogModels = new Map(
-    snapshot.catalog.map((model) => [modelIdentity(model.model_key), model])
-  );
+  const catalogModels = new Map(snapshot.catalog.map((model) => [modelIdentity(model), model]));
   const projected: CLIProxyDirectModel[] = [];
 
   for (const model of snapshot.inventory.direct_models) {
@@ -329,7 +327,7 @@ function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxy
       );
     }
     const catalogVariants = new Map(
-      catalogModel.variants.map((variant) => [variant.variant_key.variant_id, variant])
+      catalogModel.variants.map((variant) => [variant.variant_id, variant])
     );
     projected.push({
       'model-key': projectModelKey(model.model_key),

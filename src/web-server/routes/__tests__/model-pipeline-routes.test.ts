@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test';
 import express from 'express';
 import * as http from 'node:http';
-import fixture from '../../../config/schemas/__tests__/fixtures/model-pipeline-snapshot-v1.json';
+import {
+  modelPipelineConfigFixture,
+  modelPipelineRequestFixture,
+} from '../../../config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
 import { parseModelPipelineConfig } from '../../../config/schemas/model-pipeline';
 import { ConfigError } from '../../../errors/error-types';
 import {
@@ -13,7 +16,7 @@ import {
   type ModelPipelineRouteDependencies,
 } from '../model-pipeline-routes';
 
-const pipeline = parseModelPipelineConfig(fixture.model_pipeline);
+const pipeline = parseModelPipelineConfig(modelPipelineConfigFixture());
 const servers: http.Server[] = [];
 
 async function request(
@@ -41,14 +44,7 @@ async function request(
 function dependencies(): ModelPipelineRouteDependencies {
   return {
     loadPipeline: async () => pipeline,
-    publishPipeline: async () => ({
-      ok: true,
-      generation: pipeline.snapshot.generation,
-      snapshot_digest: pipeline.snapshot.snapshot_digest,
-      projection_digest: pipeline.snapshot.projection_digest,
-      loaded_at: '2026-08-27T19:00:00Z',
-      binary_provenance: pipeline.snapshot.inventory.binary_provenance,
-    }),
+    publishPipeline: async () => pipeline.receipt,
   };
 }
 
@@ -71,18 +67,22 @@ describe('model pipeline config routes', () => {
     const publish = mock(deps.publishPipeline);
     deps.publishPipeline = publish;
 
-    const response = await request(deps, 'PUT', fixture.model_pipeline);
+    const publication = modelPipelineRequestFixture();
+    const response = await request(deps, 'PUT', publication);
     const result = (await response.json()) as Record<string, unknown>;
 
     expect(response.status).toBe(200);
     expect(result).toMatchObject({
+      schema_version: 2,
       ok: true,
-      generation: 42,
-      snapshot_digest: pipeline.snapshot.snapshot_digest,
-      projection_digest: pipeline.snapshot.projection_digest,
+      active: {
+        generation: 1,
+        snapshot_digest: pipeline.snapshot.snapshot_digest,
+        projection_digest: pipeline.receipt.active.projection_digest,
+      },
     });
     expect(publish).toHaveBeenCalledTimes(1);
-    expect(publish.mock.calls[0]?.[0]).toEqual(pipeline);
+    expect(publish.mock.calls[0]?.[0]).toEqual(publication);
     expect(publish.mock.calls[0]?.[1]).toBeInstanceOf(AbortSignal);
   });
 
@@ -95,7 +95,7 @@ describe('model pipeline config routes', () => {
     const result = (await response.json()) as Record<string, unknown>;
 
     expect(response.status).toBe(400);
-    expect(result.error).toContain('model_pipeline.snapshot.schema_version');
+    expect(result.error).toContain('model_pipeline_publication.schema_version');
     expect(publish).not.toHaveBeenCalled();
   });
 
@@ -105,11 +105,11 @@ describe('model pipeline config routes', () => {
       throw new ModelPipelineGenerationConflictError('stale generation');
     };
 
-    const response = await request(deps, 'PUT', fixture.model_pipeline);
+    const response = await request(deps, 'PUT', modelPipelineRequestFixture());
     const result = (await response.json()) as Record<string, unknown>;
 
     expect(response.status).toBe(409);
-    expect(result).toEqual({ error: 'stale generation', stage: 'persist' });
+    expect(result).toEqual({ error: 'stale generation', stage: 'compare-and-swap' });
   });
 
   it('surfaces publish, reload or inventory failure as a bad gateway', async () => {
@@ -118,7 +118,7 @@ describe('model pipeline config routes', () => {
       throw new ConfigError('CLIProxy active snapshot_digest mismatch');
     };
 
-    const response = await request(deps, 'PUT', fixture.model_pipeline);
+    const response = await request(deps, 'PUT', modelPipelineRequestFixture());
     const result = (await response.json()) as Record<string, unknown>;
 
     expect(response.status).toBe(502);

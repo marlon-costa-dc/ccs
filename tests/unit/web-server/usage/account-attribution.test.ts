@@ -62,6 +62,13 @@ function makeResponse(
         cached_tokens: 0,
         total_tokens: e.input + e.output,
       },
+      cost: {
+        currency: 'USD',
+        quality: 'complete',
+        estimated_total: (e.input + e.output) / 1_000_000,
+        pricing_source: 'ai-hub-snapshot',
+        pricing_source_digest: `sha256:${'a'.repeat(64)}`,
+      },
       failed: e.failed ?? false,
     });
   }
@@ -88,8 +95,6 @@ const twoAccountResponse = makeResponse([
     output: 800,
   },
   // auth_index 0 again — same account, second request.
-  // output=201 (not 200) ensures alice's two-request total ($0.018025) strictly
-  // exceeds bob's single-request total ($0.018), avoiding a floating-point tie.
   {
     provider: 'anthropic',
     model: 'claude-opus-4-5',
@@ -233,9 +238,6 @@ describe('getTodayCostByAccount', () => {
       '../../../../src/web-server/usage/data-aggregator'
     );
 
-    const details = [];
-
-    // Simulate alice's two requests today
     const { extractCliproxyUsageHistoryDetails } = await import(
       '../../../../src/web-server/usage/cliproxy-usage-transformer'
     );
@@ -245,13 +247,10 @@ describe('getTodayCostByAccount', () => {
 
     // Alice has auth_index 0: two requests (claude-sonnet + claude-opus)
     // Bob has auth_index 1: one request (claude-sonnet)
-    expect(typeof result['alice@example.com']).toBe('number');
-    expect(typeof result['bob@example.com']).toBe('number');
-    expect(result['alice@example.com']).toBeGreaterThan(0);
-    expect(result['bob@example.com']).toBeGreaterThan(0);
-    // Alice has two requests across two models; Bob has one request with more tokens.
-    // Alice's two-request total ($0.018025) exceeds Bob's single-request total ($0.018).
-    expect(result['alice@example.com']).toBeGreaterThan(result['bob@example.com']);
+    expect(result).toEqual({
+      'alice@example.com': 0.002201,
+      'bob@example.com': 0.0028,
+    });
   });
 
   it('returns empty object when no details exist for today', async () => {

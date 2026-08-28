@@ -1,17 +1,22 @@
 import { describe, expect, it, mock } from 'bun:test';
-import fixture from '../../../config/schemas/__tests__/fixtures/model-pipeline-snapshot-v1.json';
+import { modelPipelineRequestFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
 import {
-  parseModelPipelineConfig,
+  parseModelPipelinePublicationRequest,
+  type ActiveIdentityV2,
   type ModelPipelineConfig,
   type ModelPipelineInventory,
+  type ModelPipelinePublicationRequest,
+  type PublicationReceiptV2,
 } from '../../../config/schemas/model-pipeline';
 import {
   createEmptyUnifiedConfig,
   type UnifiedConfig,
 } from '../../../config/schemas/unified-config';
 import { ConfigError, UserAbortError } from '../../../errors/error-types';
-import type { ConfigPublicationReceipt } from '../../management/management-api-types';
+import { sha256Digest } from '../../../utils/canonical-json';
+import type { CLIProxyActivationReceipt } from '../../management/management-api-types';
 import type { ProxyTarget } from '../../proxy/proxy-target-resolver';
+import { projectModelRouting } from '../../config/model-routing-projector';
 import {
   ModelPipelineGenerationConflictError,
   ModelPipelinePublisher,
@@ -19,8 +24,28 @@ import {
   replaceModelPipeline,
   type ModelPipelinePublisherDependencies,
 } from '../model-pipeline-publisher';
+import type {
+  ModelPipelinePublicationIntent,
+  ModelPipelineTransactionStore,
+} from '../model-pipeline-transaction-store';
 
-const pipeline = parseModelPipelineConfig(fixture.model_pipeline);
+const request = parseModelPipelinePublicationRequest(modelPipelineRequestFixture());
+const activeConfigYaml = 'port: 8317\n';
+const stagedConfigYaml = 'port: 8317\nmodel-routing:\n  schema-version: 2\n';
+const loadedAt = '2026-08-28T11:20:57Z';
+const snapshotSchemaDigest =
+  'sha256:de6a5b76c5b9529ddd894f331ff1754d514ff15efaba617c01047eb7191fdea9';
+const ccsBinary = {
+  version: 'ccs-fixture-v2',
+  commit: 'ccs-fixture-commit',
+  built_at: '2026-08-28T11:15:00Z',
+};
+const proposedActive: ActiveIdentityV2 = {
+  generation: request.snapshot.generation,
+  snapshot_digest: request.snapshot.snapshot_digest,
+  projection_digest: projectModelRouting(request.snapshot)['projection-digest'],
+  config_digest: sha256Digest(Buffer.from(stagedConfigYaml, 'utf8')),
+};
 const target: ProxyTarget = {
   host: '127.0.0.1',
   port: 8317,
@@ -30,251 +55,307 @@ const target: ProxyTarget = {
   isRemote: false,
 };
 
-function configuredPipeline(): UnifiedConfig {
+function configWith(pipeline?: ModelPipelineConfig): UnifiedConfig {
   const config = createEmptyUnifiedConfig();
-  config.model_pipeline = pipeline;
+  if (pipeline) config.model_pipeline = pipeline;
   if (!config.cliproxy_server) throw new ConfigError('test cliproxy_server missing');
   config.cliproxy_server.management_timeout_ms = 2_000;
   return config;
 }
 
-function receipt(overrides: Partial<ConfigPublicationReceipt> = {}): ConfigPublicationReceipt {
+function changeObservedAt(inventory: ModelPipelineInventory, value: string): void {
+  for (const model of inventory.direct_models) {
+    for (const route of model.routes) {
+      route.health.observed_at = value;
+      for (const credential of route.credentials) credential.health.observed_at = value;
+    }
+  }
+}
+
+function initialInventory(): ModelPipelineInventory {
+  const inventory = structuredClone(request.snapshot.inventory);
+  changeObservedAt(inventory, '2026-08-28T11:21:30Z');
+  return inventory;
+}
+
+function activatedInventory(): ModelPipelineInventory {
+  const inventory = initialInventory();
+  inventory.active = proposedActive;
+  inventory.activation_loaded_at = loadedAt;
+  changeObservedAt(inventory, '2026-08-28T11:22:00Z');
+  return inventory;
+}
+
+function activationReceipt(
+  overrides: Partial<CLIProxyActivationReceipt> = {}
+): CLIProxyActivationReceipt {
   return {
-    ok: true,
-    generation: pipeline.snapshot.generation,
-    snapshot_digest: pipeline.snapshot.snapshot_digest,
-    projection_digest: pipeline.snapshot.projection_digest,
+    previous_active: null,
+    active: proposedActive,
+    routing_schema: request.snapshot.inventory.routing_schema,
+    binary_provenance: request.snapshot.inventory.binary_provenance,
+    loaded_at: loadedAt,
     ...overrides,
   };
 }
 
-function activeInventory(): ModelPipelineInventory {
-  const inventory = structuredClone(pipeline.snapshot.inventory);
-  inventory.active = {
-    generation: pipeline.snapshot.generation,
-    snapshot_digest: pipeline.snapshot.snapshot_digest,
-    projection_digest: pipeline.snapshot.projection_digest,
-    loaded_at: '2026-08-27T19:00:00Z',
+function publicationReceipt(): PublicationReceiptV2 {
+  return {
+    schema_version: 2,
+    ok: true,
+    previous_active: null,
+    active: proposedActive,
+    snapshot_schema_digest: snapshotSchemaDigest,
+    routing_schema_digest: request.snapshot.inventory.routing_schema.digest,
+    ccs_binary: ccsBinary,
+    cliproxy_binary: request.snapshot.inventory.binary_provenance,
+    loaded_at: loadedAt,
   };
-  return inventory;
 }
 
-function dependencies(events: string[] = []): ModelPipelinePublisherDependencies {
-  const config = configuredPipeline();
-  return {
-    loadConfig: mock((): UnifiedConfig => {
+function persistedPipeline(): ModelPipelineConfig {
+  return { schema_version: 2, snapshot: request.snapshot, receipt: publicationReceipt() };
+}
+
+interface DependencyHarness {
+  readonly dependencies: ModelPipelinePublisherDependencies;
+  readonly config: UnifiedConfig;
+  readonly events: string[];
+  getPersisted(): ModelPipelineConfig | undefined;
+}
+
+function dependencyHarness(options?: {
+  readonly initial?: ModelPipelineInventory;
+  readonly activated?: ModelPipelineInventory;
+  readonly persisted?: ModelPipelineConfig;
+  readonly activationReceipt?: CLIProxyActivationReceipt;
+}): DependencyHarness {
+  const events: string[] = [];
+  const config = configWith(options?.persisted);
+  let persisted = options?.persisted;
+  let intent: ModelPipelinePublicationIntent | null = null;
+  let inventoryReads = 0;
+  let configReads = 0;
+  const store = {
+    readIntent() {
+      events.push('intent:read');
+      return intent;
+    },
+    writeIntent(value: ModelPipelinePublicationIntent) {
+      events.push('intent:write');
+      intent = value;
+    },
+    removeIntent() {
+      events.push('intent:remove');
+      intent = null;
+    },
+  } as ModelPipelineTransactionStore;
+  const initial = options?.initial ?? initialInventory();
+  const activated = options?.activated ?? activatedInventory();
+  const receipt = options?.activationReceipt ?? activationReceipt();
+
+  const dependencies: ModelPipelinePublisherDependencies = {
+    loadConfig: mock(() => {
       events.push('load');
       return config;
     }),
-    persistPipeline: mock((_incoming: ModelPipelineConfig): UnifiedConfig => {
+    persistPipeline: mock((incoming, expectedActive) => {
       events.push('persist');
+      replaceModelPipeline(config, incoming, expectedActive);
+      persisted = incoming;
       return config;
     }),
-    renderConfig: mock((_config: UnifiedConfig, port: number): string => {
-      events.push(`render:${port}`);
-      return 'port: 8317\nmodel-routing:\n  schema-version: 1\n';
+    renderConfig: mock((yaml, snapshot) => {
+      events.push(
+        `render:${yaml === activeConfigYaml}:${snapshot.snapshot_digest === request.snapshot.snapshot_digest}`
+      );
+      return stagedConfigYaml;
     }),
-    resolveTarget: mock((_config: UnifiedConfig): ProxyTarget => {
+    resolveTarget: mock(() => {
       events.push('target');
       return target;
     }),
     createClient: mock(() => ({
-      putConfigYaml: async (content: string) => {
-        events.push(`put:${content.includes('model-routing:')}`);
-        return receipt();
+      async getConfigYaml() {
+        configReads += 1;
+        events.push(`yaml:${configReads}`);
+        return configReads === 1 ? activeConfigYaml : stagedConfigYaml;
       },
-      getModelInventory: async () => {
-        events.push('inventory');
-        return activeInventory();
+      async putConfigYaml(configYaml: string, expectedActive: ActiveIdentityV2 | null) {
+        events.push('put');
+        expect(configYaml).toBe(stagedConfigYaml);
+        expect(expectedActive).toBeNull();
+        return receipt;
+      },
+      async getModelInventory() {
+        inventoryReads += 1;
+        events.push(`inventory:${inventoryReads}`);
+        return inventoryReads <= 2 ? initial : activated;
       },
     })),
+    snapshotSchemaDigest: () => snapshotSchemaDigest,
+    ccsBinary: () => ccsBinary,
+    withTransaction: (operation) => operation(store),
+  };
+  return {
+    dependencies,
+    config,
+    events,
+    getPersisted: () => persisted,
   };
 }
 
-describe('model pipeline publisher', () => {
-  it('persists, renders, publishes and confirms one exact generation in order', async () => {
-    const events: string[] = [];
-    const publisher = new ModelPipelinePublisher(dependencies(events));
+describe('model pipeline v2 publisher', () => {
+  it('durably stages, activates, reads exact bytes, and persists one bootstrap generation', async () => {
+    const harness = dependencyHarness();
+    const publisher = new ModelPipelinePublisher(harness.dependencies);
 
-    const published = await publisher.publish(pipeline);
-
-    expect(events).toEqual(['load', 'target', 'render:8317', 'put:true', 'inventory', 'persist']);
-    expect(published).toEqual({
-      ...receipt(),
-      loaded_at: '2026-08-27T19:00:00Z',
-      binary_provenance: pipeline.snapshot.inventory.binary_provenance,
-    });
-  });
-
-  it('fails closed before inventory confirmation when the reload receipt drifts', async () => {
-    const deps = dependencies();
-    const persistPipeline = deps.persistPipeline;
-    const getModelInventory = mock(async () => activeInventory());
-    deps.createClient = () => ({
-      putConfigYaml: async () => receipt({ generation: 43 }),
-      getModelInventory,
-    });
-    const publisher = new ModelPipelinePublisher(deps);
-
-    await expect(publisher.publish(pipeline)).rejects.toThrow(
-      'CLIProxy receipt generation mismatch: expected 42, got 43'
+    await expect(publisher.publish(modelPipelineRequestFixture())).resolves.toEqual(
+      publicationReceipt()
     );
-    expect(getModelInventory).not.toHaveBeenCalled();
-    expect(persistPipeline).not.toHaveBeenCalled();
+    expect(harness.getPersisted()).toEqual(persistedPipeline());
+    expect(harness.events).toEqual([
+      'intent:read',
+      'load',
+      'target',
+      'inventory:1',
+      'yaml:1',
+      'render:true:true',
+      'intent:write',
+      'inventory:2',
+      'put',
+      'inventory:3',
+      'yaml:2',
+      'persist',
+      'intent:remove',
+    ]);
   });
 
-  it('fails closed when GET inventory does not confirm the loaded digests', async () => {
-    const deps = dependencies();
-    const persistPipeline = deps.persistPipeline;
-    const inventory = activeInventory();
-    inventory.active!.snapshot_digest = `sha256:${'f'.repeat(64)}`;
-    deps.createClient = () => ({
-      putConfigYaml: async () => receipt(),
-      getModelInventory: async () => inventory,
-    });
-    const publisher = new ModelPipelinePublisher(deps);
+  it('accepts refreshed observation instants but preserves every other routing fact', async () => {
+    const harness = dependencyHarness();
+    await expect(
+      new ModelPipelinePublisher(harness.dependencies).publish(modelPipelineRequestFixture())
+    ).resolves.toEqual(publicationReceipt());
 
-    await expect(publisher.publish(pipeline)).rejects.toThrow(
-      'CLIProxy active snapshot_digest mismatch'
+    const stale = initialInventory();
+    stale.direct_models[0]!.routes[0]!.health.status = 'degraded';
+    const rejected = dependencyHarness({ initial: stale });
+    await expect(
+      new ModelPipelinePublisher(rejected.dependencies).publish(modelPipelineRequestFixture())
+    ).rejects.toThrow('snapshot inventory model or alias facts are stale relative to CLIProxy');
+    expect(rejected.events).not.toContain('put');
+    expect(rejected.events).not.toContain('persist');
+  });
+
+  it('rejects activation receipt drift before read-back or persistence', async () => {
+    const drifted = activationReceipt({
+      active: { ...proposedActive, config_digest: `sha256:${'f'.repeat(64)}` },
+    });
+    const harness = dependencyHarness({ activationReceipt: drifted });
+
+    await expect(
+      new ModelPipelinePublisher(harness.dependencies).publish(modelPipelineRequestFixture())
+    ).rejects.toThrow('CLIProxy receipt active does not match expected identity');
+    expect(harness.events).not.toContain('inventory:3');
+    expect(harness.events).not.toContain('persist');
+  });
+
+  it('rejects activated inventory or YAML drift and never persists it', async () => {
+    const driftedInventory = activatedInventory();
+    driftedInventory.active = {
+      ...proposedActive,
+      snapshot_digest: `sha256:${'f'.repeat(64)}`,
+    };
+    const inventoryHarness = dependencyHarness({ activated: driftedInventory });
+    await expect(
+      new ModelPipelinePublisher(inventoryHarness.dependencies).publish(
+        modelPipelineRequestFixture()
+      )
+    ).rejects.toThrow('CLIProxy inventory active identity does not match expected identity');
+    expect(inventoryHarness.events).not.toContain('persist');
+
+    const yamlHarness = dependencyHarness();
+    const createClient = yamlHarness.dependencies.createClient;
+    yamlHarness.dependencies.createClient = (resolvedTarget, config) => {
+      const client = createClient(resolvedTarget, config);
+      return {
+        ...client,
+        async getConfigYaml(signal) {
+          const value = await client.getConfigYaml(signal);
+          return value === stagedConfigYaml ? `${value}drift: true\n` : value;
+        },
+      };
+    };
+    await expect(
+      new ModelPipelinePublisher(yamlHarness.dependencies).publish(modelPipelineRequestFixture())
+    ).rejects.toThrow('CLIProxy readback bytes do not match the staged config digest');
+    expect(yamlHarness.events).not.toContain('persist');
+  });
+
+  it('verifies active inventory provenance and exact config bytes before serving persisted state', async () => {
+    const harness = dependencyHarness({ persisted: persistedPipeline() });
+    let inventoryRead = false;
+    harness.dependencies.createClient = () => ({
+      async getModelInventory() {
+        inventoryRead = true;
+        const restarted = activatedInventory();
+        restarted.activation_loaded_at = '2026-08-28T12:11:08Z';
+        return restarted;
+      },
+      async getConfigYaml() {
+        return stagedConfigYaml;
+      },
+      async putConfigYaml() {
+        throw new Error('read must not activate');
+      },
+    });
+    await expect(new ModelPipelinePublisher(harness.dependencies).read()).resolves.toEqual(
+      persistedPipeline()
     );
-    expect(persistPipeline).not.toHaveBeenCalled();
+    expect(inventoryRead).toBe(true);
+
+    const absent = dependencyHarness();
+    await expect(new ModelPipelinePublisher(absent.dependencies).read()).rejects.toBeInstanceOf(
+      ModelPipelineSnapshotNotFoundError
+    );
+    expect(absent.events).not.toContain('inventory:1');
   });
 
-  it('verifies active inventory before serving the persisted snapshot', async () => {
-    const deps = dependencies();
-    const publisher = new ModelPipelinePublisher(deps);
-
-    await expect(publisher.read()).resolves.toEqual(pipeline);
-
-    const inventory = activeInventory();
-    inventory.active!.projection_digest = `sha256:${'f'.repeat(64)}`;
-    deps.createClient = () => ({
-      putConfigYaml: async () => receipt(),
-      getModelInventory: async () => inventory,
-    });
-    await expect(publisher.read()).rejects.toThrow('CLIProxy active projection_digest mismatch');
-  });
-
-  it('uses a typed absence only when bootstrap has no persisted snapshot', async () => {
-    const deps = dependencies();
-    const config = configuredPipeline();
-    delete config.model_pipeline;
-    deps.loadConfig = () => config;
-    const publisher = new ModelPipelinePublisher(deps);
-
-    await expect(publisher.read()).rejects.toBeInstanceOf(ModelPipelineSnapshotNotFoundError);
-    expect(deps.createClient).not.toHaveBeenCalled();
-  });
-
-  it.each([undefined, 0, -1, 1.5, '2000'])(
-    'rejects invalid management timeout %p before rendering or publishing',
-    async (managementTimeout) => {
-      const events: string[] = [];
-      const deps = dependencies(events);
-      const config = configuredPipeline();
-      if (!config.cliproxy_server) throw new ConfigError('test cliproxy_server missing');
-      config.cliproxy_server.management_timeout_ms = managementTimeout as number | undefined;
-      deps.loadConfig = () => config;
-      const publisher = new ModelPipelinePublisher(deps);
-
-      await expect(publisher.publish(pipeline)).rejects.toThrow(
-        'cliproxy_server.management_timeout_ms must be a positive whole number'
-      );
-      expect(events).toEqual([]);
-      expect(deps.persistPipeline).not.toHaveBeenCalled();
-    }
-  );
-
-  it('propagates cancellation without publishing or persisting', async () => {
-    const events: string[] = [];
-    const deps = dependencies(events);
+  it('propagates pre-cancellation without creating an intent or external request', async () => {
+    const harness = dependencyHarness();
     const controller = new AbortController();
     controller.abort(new UserAbortError('operator cancelled publication'));
-    const publisher = new ModelPipelinePublisher(deps);
 
-    await expect(publisher.publish(pipeline, controller.signal)).rejects.toThrow(
-      'operator cancelled publication'
+    await expect(
+      new ModelPipelinePublisher(harness.dependencies).publish(
+        modelPipelineRequestFixture(),
+        controller.signal
+      )
+    ).rejects.toThrow('operator cancelled publication');
+    expect(harness.events).toEqual([]);
+  });
+
+  it('enforces exact persisted CAS identity and idempotent bytes', () => {
+    const current = persistedPipeline();
+    const config = configWith(current);
+    expect(() => replaceModelPipeline(config, structuredClone(current), null)).not.toThrow();
+
+    const collision = structuredClone(current);
+    collision.receipt.loaded_at = '2026-08-28T11:21:58Z';
+    expect(() => replaceModelPipeline(config, collision, null)).toThrow(
+      'proposed identity with different snapshot or receipt bytes'
     );
-    expect(events).toEqual([]);
-    expect(deps.persistPipeline).not.toHaveBeenCalled();
-  });
 
-  it('aborts an in-flight publication and never confirms or persists it', async () => {
-    const events: string[] = [];
-    const deps = dependencies(events);
-    deps.createClient = () => ({
-      putConfigYaml: async (_content, signal) =>
-        new Promise<ConfigPublicationReceipt>((_resolve, reject) => {
-          signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
-        }),
-      getModelInventory: async () => {
-        events.push('unexpected-inventory');
-        return activeInventory();
-      },
-    });
-    const controller = new AbortController();
-    const publisher = new ModelPipelinePublisher(deps);
-    const publication = publisher.publish(pipeline, controller.signal);
-    await Promise.resolve();
-    await Promise.resolve();
-    controller.abort(new UserAbortError('connection closed'));
-
-    await expect(publication).rejects.toThrow('connection closed');
-    expect(events).not.toContain('unexpected-inventory');
-    expect(events).not.toContain('persist');
-  });
-
-  it('propagates local atomic persistence failure after remote verification', async () => {
-    const deps = dependencies();
-    deps.persistPipeline = () => {
-      throw new ConfigError('cannot atomically persist CCS config');
+    const different = structuredClone(current);
+    different.receipt.active = {
+      ...different.receipt.active,
+      config_digest: `sha256:${'e'.repeat(64)}`,
     };
-    const publisher = new ModelPipelinePublisher(deps);
-
-    await expect(publisher.publish(pipeline)).rejects.toThrow(
-      'cannot atomically persist CCS config'
+    expect(() => replaceModelPipeline(config, different, null)).toThrow(
+      ModelPipelineGenerationConflictError
     );
-  });
-
-  it('serializes concurrent publication attempts instead of interleaving state', async () => {
-    const events: string[] = [];
-    let releaseFirst: (() => void) | undefined;
-    const firstGate = new Promise<void>((resolve) => {
-      releaseFirst = resolve;
-    });
-    let call = 0;
-    const deps = dependencies(events);
-    deps.createClient = () => ({
-      putConfigYaml: async () => {
-        call += 1;
-        events.push(`put:${call}`);
-        if (call === 1) await firstGate;
-        return receipt();
-      },
-      getModelInventory: async () => activeInventory(),
-    });
-    const publisher = new ModelPipelinePublisher(deps);
-
-    const first = publisher.publish(pipeline);
-    const second = publisher.publish(pipeline);
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(events.filter((event) => event === 'persist')).toHaveLength(0);
-    releaseFirst!();
-    await Promise.all([first, second]);
-    expect(events.filter((event) => event === 'persist')).toHaveLength(2);
-  });
-
-  it('rejects stale generations and same-generation digest collisions', () => {
-    const config = configuredPipeline();
-    const stale = structuredClone(pipeline);
-    stale.snapshot.generation = 41;
-    expect(() => replaceModelPipeline(config, stale)).toThrow(ModelPipelineGenerationConflictError);
-
-    const collision = structuredClone(pipeline);
-    collision.snapshot.snapshot_digest = `sha256:${'f'.repeat(64)}`;
-    expect(() => replaceModelPipeline(config, collision)).toThrow(
-      'generation 42 already exists with a different snapshot_digest'
+    expect(() => replaceModelPipeline(config, different, null)).toThrow(
+      'bootstrap requires no persisted active identity'
     );
   });
 });

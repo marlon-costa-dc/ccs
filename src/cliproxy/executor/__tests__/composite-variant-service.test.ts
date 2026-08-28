@@ -555,7 +555,7 @@ cliproxy:
     expect(variants.test.tiers?.haiku.thinking).toBe('off');
   });
 
-  it('should have hasFallback=false when no fallbacks configured', () => {
+  it('does not expose the removed hasFallback compatibility field', () => {
     // Create unified config with composite variant WITHOUT fallback
     const configPath = path.join(tmpDir, 'config.yaml');
     const yamlContent = `version: 2
@@ -592,10 +592,10 @@ cliproxy:
 
     const variants = listVariantsFromConfig();
     expect(variants.test).toBeDefined();
-    expect(variants.test.hasFallback).toBe(false);
+    expect(variants.test).not.toHaveProperty('hasFallback');
   });
 
-  it('should skip malformed composite variant and keep valid variants', () => {
+  it('fails loudly on a malformed composite variant', () => {
     const configPath = path.join(tmpDir, 'config.yaml');
     const yamlContent = `version: 2
 accounts: {}
@@ -630,9 +630,8 @@ cliproxy:
 `;
     fs.writeFileSync(configPath, yamlContent, 'utf-8');
 
-    const variants = listVariantsFromConfig();
-    expect(variants.bad).toBeUndefined();
-    expect(variants.good).toBeDefined();
-    expect(variants.good.provider).toBe('gemini');
+    expect(() => listVariantsFromConfig()).toThrow(
+      "Malformed composite variant 'bad': missing required tier configuration"
+    );
   });
 });

@@ -124,9 +124,7 @@ export function getAiProvidersSourceSummary() {
   const managementAuth = target.isRemote
     ? target.managementKey
       ? 'configured'
-      : target.authToken
-        ? 'fallback'
-        : 'missing'
+      : 'missing'
     : 'configured';
 
   return {

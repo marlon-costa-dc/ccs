@@ -31,7 +31,7 @@ export function getModelPipelineSnapshotSchemaDigest(): string {
       error
     );
   }
-  const canonicalBytes = Buffer.from(canonicalJson(parsed), 'utf8');
+  const canonicalBytes = Buffer.from(`${canonicalJson(parsed)}\n`, 'utf8');
   if (!bytes.equals(canonicalBytes)) {
     throw new ConfigError(
       'canonical model pipeline snapshot schema artifact bytes are not canonical JSON',

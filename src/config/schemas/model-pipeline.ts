@@ -1,5 +1,44 @@
-import { ConfigError } from '../../errors/error-types';
 import { canonicalJson, canonicalJsonSha256Digest } from '../../utils/canonical-json';
+
+import {
+  assertSortedUnique,
+  candidateKey,
+  exactKeys,
+  fail,
+  identity,
+  modelKey,
+  parseCredentialReference,
+  parseHealth,
+  parseNestedModelKey,
+  parseNestedRouteKey,
+  parsePricing,
+  parseRestrictions,
+  parseSourceDigest,
+  readArray,
+  readBoolean,
+  readDecimal,
+  readDigest,
+  readInteger,
+  readIntegerSet,
+  readNullableBoolean,
+  readNullableInteger,
+  readNullableSignedInteger,
+  readNullableString,
+  readRecord,
+  readString,
+  readStringSet,
+  readStringValue,
+  readUtcTimestamp,
+} from './model-pipeline-codec';
+import {
+  parseCapabilities,
+  parseCatalogBenchmark,
+  parseCatalogVariant,
+  parseInventoryModel,
+  parseLimits,
+  parseModalities,
+  parseReasoningOptions,
+} from './model-pipeline-sections';
 
 import {
   MODEL_PIPELINE_SCHEMA_VERSION,
@@ -8,38 +47,30 @@ import {
   type ModelPipelineCandidate,
   type ModelPipelineCandidateEvaluation,
   type ModelPipelineCandidateRejection,
-  type ModelPipelineCapabilities,
-  type ModelPipelineCatalogBenchmark,
+  type ModelPipelineCatalogExperimentalMode,
+  type ModelPipelineCatalogHeader,
+  type ModelPipelineCatalogInterleaved,
+  type ModelPipelineCatalogJsonNode,
+  type ModelPipelineCatalogJsonPathSegment,
+  type ModelPipelineCatalogLink,
   type ModelPipelineCatalogModel,
+  type ModelPipelineCatalogProviderRequest,
   type ModelPipelineCatalogRoute,
-  type ModelPipelineCatalogVariant,
+  type ModelPipelineCatalogWeight,
   type ModelPipelineConfig,
   type ModelPipelineCredentialReference,
   type ModelPipelineEvaluationMetric,
   type ModelPipelineFailoverRule,
   type ModelPipelineFailureKind,
-  type ModelPipelineHealth,
   type ModelPipelineInventory,
   type ModelPipelineInventoryActive,
-  type ModelPipelineInventoryCredential,
-  type ModelPipelineInventoryModel,
-  type ModelPipelineInventoryRoute,
-  type ModelPipelineLimits,
   type ModelPipelineMember,
-  type ModelPipelineModalities,
-  type ModelPipelineModelKey,
   type ModelPipelineObservation,
-  type ModelPipelinePriceEntry,
-  type ModelPipelinePricing,
   type ModelPipelinePublication,
-  type ModelPipelineReasoningOption,
-  type ModelPipelineRestriction,
   type ModelPipelineFailurePolicy,
   type ModelPipelineRouteKey,
-  type ModelPipelineVariantKey,
   type ModelPipelineRuleEvaluation,
   type ModelPipelineSnapshot,
-  type ModelPipelineSourceDigest,
   type ActiveIdentityV2,
   type ModelPipelinePublicationRequest,
   type PublicationReceiptV2,
@@ -47,579 +78,185 @@ import {
 
 export * from './model-pipeline-types';
 
-function fail(path: string, expectation: string): never {
-  throw new ConfigError(`${path} ${expectation}`);
-}
-
-function readRecord(value: unknown, path: string): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return fail(path, 'must be an object');
-  }
-  return value as Record<string, unknown>;
-}
-
-function exactKeys(record: Record<string, unknown>, keys: readonly string[], path: string): void {
-  const allowed = new Set(keys);
-  for (const key of Object.keys(record)) {
-    if (!allowed.has(key)) {
-      fail(`${path}.${key}`, `is not part of schema version ${MODEL_PIPELINE_SCHEMA_VERSION}`);
-    }
-  }
-}
-
-function readArray(value: unknown, path: string): readonly unknown[] {
-  if (!Array.isArray(value)) return fail(path, 'must be an array');
-  return value;
-}
-
-function readString(value: unknown, path: string): string {
-  if (typeof value !== 'string' || value.length === 0) {
-    return fail(path, 'must be a non-empty string');
-  }
-  return value;
-}
-
-function readNullableString(value: unknown, path: string): string | null {
-  return value === null ? null : readString(value, path);
-}
-
-function readBoolean(value: unknown, path: string): boolean {
-  if (typeof value !== 'boolean') return fail(path, 'must be a boolean');
-  return value;
-}
-
-function readInteger(value: unknown, path: string, minimum: number, maximum?: number): number {
-  if (
-    typeof value !== 'number' ||
-    !Number.isSafeInteger(value) ||
-    value < minimum ||
-    (maximum !== undefined && value > maximum)
-  ) {
-    const upper = maximum === undefined ? '' : ` and no greater than ${maximum}`;
-    return fail(path, `must be a whole number ${minimum} or greater${upper}`);
-  }
-  return value;
-}
-
-function readNullableInteger(
-  value: unknown,
-  path: string,
-  minimum: number,
-  maximum?: number
-): number | null {
-  return value === null ? null : readInteger(value, path, minimum, maximum);
-}
-
-function readUtcTimestamp(value: unknown, path: string): string {
-  const timestamp = readString(value, path);
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(timestamp)) {
-    return fail(path, 'must be a UTC RFC3339 timestamp ending in Z');
-  }
-  if (!Number.isFinite(Date.parse(timestamp))) return fail(path, 'must be a valid timestamp');
-  return timestamp;
-}
-
-function readDigest(value: unknown, path: string): string {
-  const digest = readString(value, path);
-  if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
-    return fail(path, 'must be a lowercase sha256 digest');
-  }
-  return digest;
-}
-
-function readDecimal(value: unknown, path: string, signed = false): string {
-  const decimal = readString(value, path);
-  const pattern = signed ? /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/ : /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
-  if (!pattern.test(decimal)) return fail(path, 'must be an exact decimal string');
-  return decimal;
-}
-
-function assertSortedUnique(values: readonly string[], path: string): void {
-  const expected = [...new Set(values)].sort();
-  if (
-    values.length !== expected.length ||
-    values.some((value, index) => value !== expected[index])
-  ) {
-    fail(path, 'must be unique and sorted');
-  }
-}
-
-function readStringSet(value: unknown, path: string): readonly string[] {
-  const values = readArray(value, path).map((entry, index) =>
-    readString(entry, `${path}[${index}]`)
-  );
-  assertSortedUnique(values, path);
-  return values;
-}
-
-function readIntegerSet(
-  value: unknown,
-  path: string,
-  minimum: number,
-  maximum: number
-): readonly number[] {
-  const values = readArray(value, path).map((entry, index) =>
-    readInteger(entry, `${path}[${index}]`, minimum, maximum)
-  );
-  const expected = [...new Set(values)].sort((left, right) => left - right);
-  if (
-    values.length !== expected.length ||
-    values.some((entry, index) => entry !== expected[index])
-  ) {
-    fail(path, 'must be unique and sorted');
-  }
-  return values;
-}
-
-function identity(record: Record<string, unknown>, path: string): ModelPipelineModelKey {
+function parseCatalogLink(value: unknown, path: string): ModelPipelineCatalogLink {
+  const record = readRecord(value, path);
+  exactKeys(record, ['label', 'url', 'type'], path);
   return {
-    catalog_provider_id: readString(record.catalog_provider_id, `${path}.catalog_provider_id`),
-    canonical_model_id: readString(record.canonical_model_id, `${path}.canonical_model_id`),
+    label: readNullableString(record.label, `${path}.label`),
+    url: readString(record.url, `${path}.url`),
+    type: readNullableString(record.type, `${path}.type`),
   };
 }
 
-function routeIdentity(record: Record<string, unknown>, path: string): ModelPipelineRouteKey {
+function parseCatalogWeight(value: unknown, path: string): ModelPipelineCatalogWeight {
+  const record = readRecord(value, path);
+  exactKeys(record, ['label', 'url', 'format', 'quantization'], path);
   return {
-    model_key: parseNestedModelKey(record.model_key, `${path}.model_key`),
-    route_channel: readString(record.route_channel, `${path}.route_channel`),
+    label: readNullableString(record.label, `${path}.label`),
+    url: readString(record.url, `${path}.url`),
+    format: readNullableString(record.format, `${path}.format`),
+    quantization: readNullableString(record.quantization, `${path}.quantization`),
   };
 }
 
-function modelKey(value: ModelPipelineModelKey): string {
-  return `${value.catalog_provider_id}\u0000${value.canonical_model_id}`;
-}
-
-function candidateKey(value: {
-  readonly route_key: ModelPipelineRouteKey;
-  readonly variant_id: string | null;
-}): string {
-  return `${modelKey(value.route_key.model_key)}\u0000${value.route_key.route_channel}\u0000${value.variant_id ?? ''}`;
-}
-
-function parseSourceDigest(value: unknown, path: string): ModelPipelineSourceDigest {
-  const record = readRecord(value, path);
-  exactKeys(record, ['source_id', 'digest'], path);
-  return {
-    source_id: readString(record.source_id, `${path}.source_id`),
-    digest: readDigest(record.digest, `${path}.digest`),
-  };
-}
-
-function parseRestriction(value: unknown, path: string): ModelPipelineRestriction {
-  const record = readRecord(value, path);
-  exactKeys(record, ['rule_id', 'config_path', 'active', 'reason'], path);
-  return {
-    rule_id: readString(record.rule_id, `${path}.rule_id`),
-    config_path: readString(record.config_path, `${path}.config_path`),
-    active: readBoolean(record.active, `${path}.active`),
-    reason: readString(record.reason, `${path}.reason`),
-  };
-}
-
-function parseRestrictions(value: unknown, path: string): readonly ModelPipelineRestriction[] {
-  const restrictions = readArray(value, path).map((entry, index) =>
-    parseRestriction(entry, `${path}[${index}]`)
-  );
-  assertSortedUnique(
-    restrictions.map((item) => item.rule_id),
-    path
-  );
-  return restrictions;
-}
-
-function parseHealth(value: unknown, path: string): ModelPipelineHealth {
-  const record = readRecord(value, path);
-  exactKeys(record, ['status', 'selectable', 'observed_at', 'latency_ms'], path);
-  const status = readString(record.status, `${path}.status`);
-  if (
-    status !== 'healthy' &&
-    status !== 'degraded' &&
-    status !== 'blocked' &&
-    status !== 'unknown'
-  ) {
-    fail(`${path}.status`, 'must be healthy, degraded, blocked, or unknown');
-  }
-  return {
-    status,
-    selectable: readBoolean(record.selectable, `${path}.selectable`),
-    observed_at: readUtcTimestamp(record.observed_at, `${path}.observed_at`),
-    latency_ms: readNullableInteger(record.latency_ms, `${path}.latency_ms`, 0),
-  };
-}
-
-function parsePricing(value: unknown, path: string): ModelPipelinePricing {
-  const record = readRecord(value, path);
-  exactKeys(record, ['currency', 'unit', 'source_id', 'entries'], path);
-  const entries = readArray(record.entries, `${path}.entries`).map((entry, index) => {
-    const entryPath = `${path}.entries[${index}]`;
-    const item = readRecord(entry, entryPath);
-    exactKeys(item, ['name', 'amount', 'tier_type', 'tier_size', 'context_key'], entryPath);
-    const tierType = readNullableString(item.tier_type, `${entryPath}.tier_type`);
-    const tierSize = readNullableInteger(item.tier_size, `${entryPath}.tier_size`, 1);
-    const contextKey = readNullableString(item.context_key, `${entryPath}.context_key`);
-    if (tierSize !== null && tierType === null) {
-      fail(`${entryPath}.tier_size`, 'requires tier_type');
-    }
-    if (contextKey !== null && (tierType !== null || tierSize !== null)) {
-      fail(`${entryPath}.context_key`, 'cannot coexist with a structured tier');
-    }
-    return {
-      name: readString(item.name, `${entryPath}.name`),
-      amount: readDecimal(item.amount, `${entryPath}.amount`),
-      tier_type: tierType,
-      tier_size: tierSize,
-      context_key: contextKey,
-    };
-  });
-  const priceKey = (entry: ModelPipelinePriceEntry): string =>
-    `${entry.context_key ?? ''}\u0000${entry.tier_type ?? ''}\u0000${String(entry.tier_size ?? 0).padStart(20, '0')}\u0000${entry.name}`;
-  const keys = entries.map(priceKey);
-  const expected = [...new Set(keys)].sort();
-  if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
-    fail(`${path}.entries`, 'must have unique scopes sorted by scope and name');
-  }
-  return {
-    currency: readString(record.currency, `${path}.currency`),
-    unit: readString(record.unit, `${path}.unit`),
-    source_id: readString(record.source_id, `${path}.source_id`),
-    entries,
-  };
-}
-
-function parseNestedModelKey(value: unknown, path: string): ModelPipelineModelKey {
-  const record = readRecord(value, path);
-  exactKeys(record, ['catalog_provider_id', 'canonical_model_id'], path);
-  return identity(record, path);
-}
-
-function parseNestedRouteKey(value: unknown, path: string): ModelPipelineRouteKey {
-  const record = readRecord(value, path);
-  exactKeys(record, ['model_key', 'route_channel'], path);
-  return routeIdentity(record, path);
-}
-
-function parseNestedVariantKey(value: unknown, path: string): ModelPipelineVariantKey {
-  const record = readRecord(value, path);
-  exactKeys(record, ['model_key', 'variant_id'], path);
-  return {
-    model_key: parseNestedModelKey(record.model_key, `${path}.model_key`),
-    variant_id: readString(record.variant_id, `${path}.variant_id`),
-  };
-}
-
-function parseCredentialReference(value: unknown, path: string): ModelPipelineCredentialReference {
-  const record = readRecord(value, path);
-  exactKeys(record, ['id', 'kind'], path);
-  return {
-    id: readDigest(record.id, `${path}.id`),
-    kind: readString(record.kind, `${path}.kind`),
-  };
-}
-
-function parseInventoryCredential(value: unknown, path: string): ModelPipelineInventoryCredential {
-  const record = readRecord(value, path);
-  exactKeys(
-    record,
-    ['credential_ref', 'quota_domain', 'health', 'quota', 'suspension', 'restrictions'],
-    path
-  );
-  const credentialPath = `${path}.credential_ref`;
-  const quotaPath = `${path}.quota`;
-  const quota = readRecord(record.quota, quotaPath);
-  exactKeys(quota, ['status', 'remaining', 'resets_at', 'reason'], quotaPath);
-  if (quota.status !== 'available' && quota.status !== 'blocked' && quota.status !== 'unknown') {
-    fail(`${quotaPath}.status`, 'must be available, blocked, or unknown');
-  }
-  const suspensionPath = `${path}.suspension`;
-  const suspension = readRecord(record.suspension, suspensionPath);
-  exactKeys(suspension, ['active', 'reason', 'resumes_at'], suspensionPath);
-  const suspensionActive = readBoolean(suspension.active, `${suspensionPath}.active`);
-  const suspensionReason = readNullableString(suspension.reason, `${suspensionPath}.reason`);
-  if (suspensionActive && suspensionReason === null) {
-    fail(`${suspensionPath}.reason`, 'is required for an active suspension');
-  }
-  return {
-    credential_ref: {
-      ...parseCredentialReference(record.credential_ref, credentialPath),
-    },
-    quota_domain: readString(record.quota_domain, `${path}.quota_domain`),
-    health: parseHealth(record.health, `${path}.health`),
-    quota: {
-      status: quota.status,
-      remaining: readNullableString(quota.remaining, `${quotaPath}.remaining`),
-      resets_at:
-        quota.resets_at === null
-          ? null
-          : readUtcTimestamp(quota.resets_at, `${quotaPath}.resets_at`),
-      reason: readNullableString(quota.reason, `${quotaPath}.reason`),
-    },
-    suspension: {
-      active: suspensionActive,
-      reason: suspensionReason,
-      resumes_at:
-        suspension.resumes_at === null
-          ? null
-          : readUtcTimestamp(suspension.resumes_at, `${suspensionPath}.resumes_at`),
-    },
-    restrictions: parseRestrictions(record.restrictions, `${path}.restrictions`),
-  };
-}
-
-function parseInventoryRoute(value: unknown, path: string): ModelPipelineInventoryRoute {
-  const record = readRecord(value, path);
-  exactKeys(
-    record,
-    [
-      'route_key',
-      'catalog_route_provider_id',
-      'catalog_route_model_id',
-      'runtime_model_id',
-      'route_selector',
-      'quota_domains',
-      'protocols',
-      'restrictions',
-      'health',
-      'selectable',
-      'selection_reason',
-      'credentials',
-    ],
-    path
-  );
-  const quotaDomains = readStringSet(record.quota_domains, `${path}.quota_domains`);
-  const credentials = readArray(record.credentials, `${path}.credentials`).map((entry, index) =>
-    parseInventoryCredential(entry, `${path}.credentials[${index}]`)
-  );
-  assertSortedUnique(
-    credentials.map((item) => item.credential_ref.id),
-    `${path}.credentials`
-  );
-  for (const credential of credentials) {
-    if (!quotaDomains.includes(credential.quota_domain)) {
-      fail(`${path}.credentials`, 'contains a quota_domain not declared by the route');
-    }
-  }
-  const health = parseHealth(record.health, `${path}.health`);
-  const restrictions = parseRestrictions(record.restrictions, `${path}.restrictions`);
-  const selectable = readBoolean(record.selectable, `${path}.selectable`);
-  const credentialSelectable = (credential: ModelPipelineInventoryCredential): boolean =>
-    credential.health.selectable &&
-    credential.quota.status === 'available' &&
-    !credential.suspension.active &&
-    credential.restrictions.every((restriction) => !restriction.active);
-  if (
-    selectable &&
-    (!health.selectable ||
-      restrictions.some((restriction) => restriction.active) ||
-      !credentials.some(credentialSelectable))
-  ) {
-    fail(
-      path,
-      'selectable route requires selectable health, no active restriction, and a usable credential'
-    );
-  }
-  return {
-    route_key: parseNestedRouteKey(record.route_key, `${path}.route_key`),
-    catalog_route_provider_id: readString(
-      record.catalog_route_provider_id,
-      `${path}.catalog_route_provider_id`
-    ),
-    catalog_route_model_id: readString(
-      record.catalog_route_model_id,
-      `${path}.catalog_route_model_id`
-    ),
-    runtime_model_id: readString(record.runtime_model_id, `${path}.runtime_model_id`),
-    route_selector: readDigest(record.route_selector, `${path}.route_selector`),
-    quota_domains: quotaDomains,
-    protocols: readStringSet(record.protocols, `${path}.protocols`),
-    restrictions,
-    health,
-    selectable,
-    selection_reason: readString(record.selection_reason, `${path}.selection_reason`),
-    credentials,
-  };
-}
-
-function parseInventoryModel(value: unknown, path: string): ModelPipelineInventoryModel {
-  const record = readRecord(value, path);
-  exactKeys(record, ['model_key', 'display_name', 'active', 'variants', 'routes'], path);
-  const modelIdentity = parseNestedModelKey(record.model_key, `${path}.model_key`);
-  const variants = readArray(record.variants, `${path}.variants`).map((entry, index) => {
-    const variantPath = `${path}.variants[${index}]`;
-    const variant = readRecord(entry, variantPath);
-    exactKeys(variant, ['variant_key', 'display_name', 'protocols'], variantPath);
-    const variantKeyPath = `${variantPath}.variant_key`;
-    return {
-      variant_key: parseNestedVariantKey(variant.variant_key, variantKeyPath),
-      display_name: readNullableString(variant.display_name, `${variantPath}.display_name`),
-      protocols: readStringSet(variant.protocols, `${variantPath}.protocols`),
-    };
-  });
-  assertSortedUnique(
-    variants.map((variant) => variant.variant_key.variant_id),
-    `${path}.variants`
-  );
-  const routes = readArray(record.routes, `${path}.routes`).map((entry, index) =>
-    parseInventoryRoute(entry, `${path}.routes[${index}]`)
-  );
-  assertSortedUnique(
-    routes.map((route) => route.route_key.route_channel),
-    `${path}.routes`
-  );
-  for (const variant of variants) {
-    if (modelKey(variant.variant_key.model_key) !== modelKey(modelIdentity)) {
-      fail(`${path}.variants`, 'must contain only variants owned by the parent ModelKey');
-    }
-  }
-  for (const route of routes) {
-    if (modelKey(route.route_key.model_key) !== modelKey(modelIdentity)) {
-      fail(`${path}.routes`, 'must contain only routes owned by the parent ModelKey');
-    }
-  }
-  const active = readBoolean(record.active, `${path}.active`);
-  if (!active && routes.some((route) => route.selectable)) {
-    fail(`${path}.active`, 'inactive model cannot expose a selectable route');
-  }
-  return {
-    model_key: modelIdentity,
-    display_name: readString(record.display_name, `${path}.display_name`),
-    active,
-    variants,
-    routes,
-  };
-}
-
-function parseCatalogBenchmark(value: unknown, path: string): ModelPipelineCatalogBenchmark {
-  const record = readRecord(value, path);
-  exactKeys(
-    record,
-    ['name', 'score', 'metric', 'source', 'dataset', 'date', 'harness', 'variant', 'version'],
-    path
-  );
-  return {
-    name: readString(record.name, `${path}.name`),
-    score: readDecimal(record.score, `${path}.score`, true),
-    metric: readNullableString(record.metric, `${path}.metric`),
-    source: readNullableString(record.source, `${path}.source`),
-    dataset: readNullableString(record.dataset, `${path}.dataset`),
-    date: readNullableString(record.date, `${path}.date`),
-    harness: readNullableString(record.harness, `${path}.harness`),
-    variant: readNullableString(record.variant, `${path}.variant`),
-    version: readNullableString(record.version, `${path}.version`),
-  };
-}
-
-function parseCatalogVariant(value: unknown, path: string): ModelPipelineCatalogVariant {
-  const record = readRecord(value, path);
-  exactKeys(
-    record,
-    [
-      'variant_key',
-      'display_name',
-      'reasoning_option',
-      'own_capabilities',
-      'inherited_capabilities',
-      'source_id',
-    ],
-    path
-  );
-  const ownCapabilities = readStringSet(record.own_capabilities, `${path}.own_capabilities`);
-  const inheritedCapabilities = readStringSet(
-    record.inherited_capabilities,
-    `${path}.inherited_capabilities`
-  );
-  if (ownCapabilities.some((capability) => inheritedCapabilities.includes(capability))) {
-    fail(path, 'cannot declare one capability as both own and inherited');
-  }
-  return {
-    variant_key: parseNestedVariantKey(record.variant_key, `${path}.variant_key`),
-    display_name: readNullableString(record.display_name, `${path}.display_name`),
-    reasoning_option: readNullableString(record.reasoning_option, `${path}.reasoning_option`),
-    own_capabilities: ownCapabilities,
-    inherited_capabilities: inheritedCapabilities,
-    source_id: readString(record.source_id, `${path}.source_id`),
-  };
-}
-
-function readNullableBoolean(value: unknown, path: string): boolean | null {
-  return value === null ? null : readBoolean(value, path);
-}
-
-function readNullableSignedInteger(value: unknown, path: string): number | null {
-  if (value === null) return null;
-  if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
-    return fail(path, 'must be null or a safe whole number');
-  }
-  return value;
-}
-
-function parseLimits(value: unknown, path: string): ModelPipelineLimits {
-  const record = readRecord(value, path);
-  exactKeys(record, ['context', 'input', 'output'], path);
-  const context = readInteger(record.context, `${path}.context`, 1);
-  const input = readNullableInteger(record.input, `${path}.input`, 1);
-  const output = readInteger(record.output, `${path}.output`, 1);
-  if (input !== null && input > context) fail(`${path}.input`, 'must not exceed context');
-  if (output > context) fail(`${path}.output`, 'must not exceed context');
-  return { context, input, output };
-}
-
-function parseModalities(value: unknown, path: string): ModelPipelineModalities {
-  const record = readRecord(value, path);
-  exactKeys(record, ['input', 'output'], path);
-  return {
-    input: readStringSet(record.input, `${path}.input`),
-    output: readStringSet(record.output, `${path}.output`),
-  };
-}
-
-function parseCapabilities(value: unknown, path: string): ModelPipelineCapabilities {
-  const record = readRecord(value, path);
-  exactKeys(
-    record,
-    ['attachment', 'reasoning', 'structured_output', 'temperature', 'tool_call', 'open_weights'],
-    path
-  );
-  return {
-    attachment: readNullableBoolean(record.attachment, `${path}.attachment`),
-    reasoning: readNullableBoolean(record.reasoning, `${path}.reasoning`),
-    structured_output: readNullableBoolean(record.structured_output, `${path}.structured_output`),
-    temperature: readNullableBoolean(record.temperature, `${path}.temperature`),
-    tool_call: readNullableBoolean(record.tool_call, `${path}.tool_call`),
-    open_weights: readNullableBoolean(record.open_weights, `${path}.open_weights`),
-  };
-}
-
-function parseReasoningOptions(
+function parseCatalogJsonPathSegment(
   value: unknown,
   path: string
-): readonly ModelPipelineReasoningOption[] {
-  const options = readArray(value, path).map((entry, index) => {
-    const optionPath = `${path}[${index}]`;
-    const record = readRecord(entry, optionPath);
-    exactKeys(record, ['type', 'values', 'min', 'max'], optionPath);
-    const values = readArray(record.values, `${optionPath}.values`).map((item, valueIndex) =>
-      readNullableString(item, `${optionPath}.values[${valueIndex}]`)
-    );
-    if (new Set(values).size !== values.length) {
-      fail(`${optionPath}.values`, 'must contain unique values');
-    }
-    const minimum = readNullableSignedInteger(record.min, `${optionPath}.min`);
-    const maximum = readNullableSignedInteger(record.max, `${optionPath}.max`);
-    if (minimum !== null && maximum !== null && minimum > maximum) {
-      fail(optionPath, 'min must not exceed max');
-    }
-    return {
-      type: readString(record.type, `${optionPath}.type`),
-      values,
-      min: minimum,
-      max: maximum,
-    };
-  });
-  assertSortedUnique(
-    options.map((option) => option.type),
+): ModelPipelineCatalogJsonPathSegment {
+  const record = readRecord(value, path);
+  exactKeys(record, ['property_name', 'array_index'], path);
+  const propertyName = readNullableString(record.property_name, `${path}.property_name`);
+  const arrayIndex = readNullableInteger(record.array_index, `${path}.array_index`, 0);
+  if ((propertyName === null) === (arrayIndex === null)) {
+    fail(path, 'requires exactly one property_name or array_index');
+  }
+  return { property_name: propertyName, array_index: arrayIndex };
+}
+
+function catalogJsonPathKey(path: readonly ModelPipelineCatalogJsonPathSegment[]): string {
+  return path
+    .map((segment) =>
+      segment.property_name !== null
+        ? `p:${segment.property_name}`
+        : `i:${String(segment.array_index).padStart(20, '0')}`
+    )
+    .join('\u0000');
+}
+
+function parseCatalogJsonNode(value: unknown, path: string): ModelPipelineCatalogJsonNode {
+  const record = readRecord(value, path);
+  exactKeys(
+    record,
+    ['path', 'kind', 'string_value', 'integer_value', 'decimal_value', 'boolean_value'],
     path
   );
-  return options;
+  const kind = readString(record.kind, `${path}.kind`);
+  if (
+    kind !== 'object' &&
+    kind !== 'array' &&
+    kind !== 'string' &&
+    kind !== 'integer' &&
+    kind !== 'decimal' &&
+    kind !== 'boolean' &&
+    kind !== 'null'
+  ) {
+    fail(`${path}.kind`, 'must identify a supported JSON node kind');
+  }
+  const stringValue =
+    record.string_value === null
+      ? null
+      : readStringValue(record.string_value, `${path}.string_value`);
+  const integerValue = readNullableSignedInteger(record.integer_value, `${path}.integer_value`);
+  const decimalValue =
+    record.decimal_value === null
+      ? null
+      : readDecimal(record.decimal_value, `${path}.decimal_value`, true);
+  const booleanValue = readNullableBoolean(record.boolean_value, `${path}.boolean_value`);
+  const present = {
+    string: stringValue !== null,
+    integer: integerValue !== null,
+    decimal: decimalValue !== null,
+    boolean: booleanValue !== null,
+  } as const;
+  for (const [valueKind, isPresent] of Object.entries(present)) {
+    if (isPresent !== (kind === valueKind)) {
+      fail(path, `has incoherent ${valueKind}_value for JSON node kind ${kind}`);
+    }
+  }
+  return {
+    path: readArray(record.path, `${path}.path`).map((segment, index) =>
+      parseCatalogJsonPathSegment(segment, `${path}.path[${index}]`)
+    ),
+    kind,
+    string_value: stringValue,
+    integer_value: integerValue,
+    decimal_value: decimalValue,
+    boolean_value: booleanValue,
+  };
+}
+
+function parseCatalogHeader(value: unknown, path: string): ModelPipelineCatalogHeader {
+  const record = readRecord(value, path);
+  exactKeys(record, ['name', 'value'], path);
+  return {
+    name: readString(record.name, `${path}.name`),
+    value: readStringValue(record.value, `${path}.value`),
+  };
+}
+
+function parseCatalogProviderRequest(
+  value: unknown,
+  path: string
+): ModelPipelineCatalogProviderRequest {
+  const record = readRecord(value, path);
+  exactKeys(record, ['npm', 'api', 'shape', 'body', 'headers'], path);
+  const shape = readNullableString(record.shape, `${path}.shape`);
+  if (shape !== null && shape !== 'responses' && shape !== 'completions') {
+    fail(`${path}.shape`, 'must be responses, completions, or null');
+  }
+  const body =
+    record.body === null
+      ? null
+      : readArray(record.body, `${path}.body`).map((entry, index) =>
+          parseCatalogJsonNode(entry, `${path}.body[${index}]`)
+        );
+  if (body !== null) {
+    const paths = body.map((node) => catalogJsonPathKey(node.path));
+    const expected = [...new Set(paths)].sort();
+    if (
+      paths.length === 0 ||
+      paths.length !== expected.length ||
+      paths.some((entry, index) => entry !== expected[index])
+    ) {
+      fail(`${path}.body`, 'must be non-empty, unique, and sorted by JSON path');
+    }
+  }
+  const headers =
+    record.headers === null
+      ? null
+      : readArray(record.headers, `${path}.headers`).map((entry, index) =>
+          parseCatalogHeader(entry, `${path}.headers[${index}]`)
+        );
+  if (headers !== null) {
+    assertSortedUnique(
+      headers.map((header) => header.name),
+      `${path}.headers`
+    );
+  }
+  return {
+    npm: readNullableString(record.npm, `${path}.npm`),
+    api: readNullableString(record.api, `${path}.api`),
+    shape,
+    body,
+    headers,
+  };
+}
+
+function parseCatalogInterleaved(value: unknown, path: string): ModelPipelineCatalogInterleaved {
+  const record = readRecord(value, path);
+  exactKeys(record, ['enabled', 'field'], path);
+  if (record.enabled !== true) fail(`${path}.enabled`, 'must be true');
+  const field = readNullableString(record.field, `${path}.field`);
+  if (field !== null && field !== 'reasoning_content' && field !== 'reasoning_details') {
+    fail(`${path}.field`, 'must be reasoning_content, reasoning_details, or null');
+  }
+  return { enabled: true, field };
+}
+
+function parseCatalogExperimentalMode(
+  value: unknown,
+  path: string
+): ModelPipelineCatalogExperimentalMode {
+  const record = readRecord(value, path);
+  exactKeys(record, ['name', 'pricing', 'request'], path);
+  return {
+    name: readString(record.name, `${path}.name`),
+    pricing: record.pricing === null ? null : parsePricing(record.pricing, `${path}.pricing`),
+    request:
+      record.request === null
+        ? null
+        : parseCatalogProviderRequest(record.request, `${path}.request`),
+  };
 }
 
 function parseCatalogRoute(value: unknown, path: string): ModelPipelineCatalogRoute {
@@ -631,7 +268,14 @@ function parseCatalogRoute(value: unknown, path: string): ModelPipelineCatalogRo
       'catalog_route_provider_id',
       'catalog_route_model_id',
       'source_id',
+      'provider_name',
+      'provider_env',
+      'provider_npm',
+      'provider_api',
+      'provider_doc',
       'display_name',
+      'description',
+      'family',
       'status',
       'release_date',
       'last_updated',
@@ -640,9 +284,19 @@ function parseCatalogRoute(value: unknown, path: string): ModelPipelineCatalogRo
       'modalities',
       'capabilities',
       'reasoning_options',
+      'interleaved',
+      'provider_request',
+      'experimental_modes',
       'pricing',
     ],
     path
+  );
+  const experimentalModes = readArray(record.experimental_modes, `${path}.experimental_modes`).map(
+    (entry, index) => parseCatalogExperimentalMode(entry, `${path}.experimental_modes[${index}]`)
+  );
+  assertSortedUnique(
+    experimentalModes.map((mode) => mode.name),
+    `${path}.experimental_modes`
   );
   return {
     route_key: parseNestedRouteKey(record.route_key, `${path}.route_key`),
@@ -655,7 +309,14 @@ function parseCatalogRoute(value: unknown, path: string): ModelPipelineCatalogRo
       `${path}.catalog_route_model_id`
     ),
     source_id: readString(record.source_id, `${path}.source_id`),
+    provider_name: readString(record.provider_name, `${path}.provider_name`),
+    provider_env: readStringSet(record.provider_env, `${path}.provider_env`),
+    provider_npm: readString(record.provider_npm, `${path}.provider_npm`),
+    provider_api: readNullableString(record.provider_api, `${path}.provider_api`),
+    provider_doc: readString(record.provider_doc, `${path}.provider_doc`),
     display_name: readString(record.display_name, `${path}.display_name`),
+    description: readString(record.description, `${path}.description`),
+    family: readNullableString(record.family, `${path}.family`),
     status: readNullableString(record.status, `${path}.status`),
     release_date: readNullableString(record.release_date, `${path}.release_date`),
     last_updated: readNullableString(record.last_updated, `${path}.last_updated`),
@@ -664,6 +325,15 @@ function parseCatalogRoute(value: unknown, path: string): ModelPipelineCatalogRo
     modalities: parseModalities(record.modalities, `${path}.modalities`),
     capabilities: parseCapabilities(record.capabilities, `${path}.capabilities`),
     reasoning_options: parseReasoningOptions(record.reasoning_options, `${path}.reasoning_options`),
+    interleaved:
+      record.interleaved === null
+        ? null
+        : parseCatalogInterleaved(record.interleaved, `${path}.interleaved`),
+    provider_request:
+      record.provider_request === null
+        ? null
+        : parseCatalogProviderRequest(record.provider_request, `${path}.provider_request`),
+    experimental_modes: experimentalModes,
     pricing: record.pricing === null ? null : parsePricing(record.pricing, `${path}.pricing`),
   };
 }
@@ -673,9 +343,14 @@ function parseCatalogModel(value: unknown, path: string): ModelPipelineCatalogMo
   exactKeys(
     record,
     [
-      'model_key',
+      'catalog_provider_id',
+      'canonical_model_id',
       'display_name',
+      'description',
       'family',
+      'license',
+      'links',
+      'weights',
       'source_id',
       'status',
       'release_date',
@@ -691,7 +366,33 @@ function parseCatalogModel(value: unknown, path: string): ModelPipelineCatalogMo
     ],
     path
   );
-  const modelIdentity = parseNestedModelKey(record.model_key, `${path}.model_key`);
+  const modelIdentity = identity(record, path);
+  const links = readArray(record.links, `${path}.links`).map((entry, index) =>
+    parseCatalogLink(entry, `${path}.links[${index}]`)
+  );
+  const linkKeys = links.map((item) =>
+    JSON.stringify([item.type ?? '', item.label ?? '', item.url])
+  );
+  const expectedLinkKeys = [...new Set(linkKeys)].sort();
+  if (
+    linkKeys.length !== expectedLinkKeys.length ||
+    linkKeys.some((key, index) => key !== expectedLinkKeys[index])
+  ) {
+    fail(`${path}.links`, 'must be unique and canonically sorted');
+  }
+  const weights = readArray(record.weights, `${path}.weights`).map((entry, index) =>
+    parseCatalogWeight(entry, `${path}.weights[${index}]`)
+  );
+  const weightKeys = weights.map((item) =>
+    JSON.stringify([item.format ?? '', item.quantization ?? '', item.label ?? '', item.url])
+  );
+  const expectedWeightKeys = [...new Set(weightKeys)].sort();
+  if (
+    weightKeys.length !== expectedWeightKeys.length ||
+    weightKeys.some((key, index) => key !== expectedWeightKeys[index])
+  ) {
+    fail(`${path}.weights`, 'must be unique and canonically sorted');
+  }
   const benchmarks = readArray(record.benchmarks, `${path}.benchmarks`).map((entry, index) =>
     parseCatalogBenchmark(entry, `${path}.benchmarks[${index}]`)
   );
@@ -719,11 +420,11 @@ function parseCatalogModel(value: unknown, path: string): ModelPipelineCatalogMo
     parseCatalogVariant(entry, `${path}.variants[${index}]`)
   );
   assertSortedUnique(
-    variants.map((item) => item.variant_key.variant_id),
+    variants.map((item) => item.variant_id),
     `${path}.variants`
   );
   for (const variant of variants) {
-    if (modelKey(variant.variant_key.model_key) !== modelKey(modelIdentity)) {
+    if (modelKey(variant.model_key) !== modelKey(modelIdentity)) {
       fail(`${path}.variants`, 'must contain only variants owned by the parent ModelKey');
     }
   }
@@ -747,9 +448,13 @@ function parseCatalogModel(value: unknown, path: string): ModelPipelineCatalogMo
     }
   }
   return {
-    model_key: modelIdentity,
+    ...modelIdentity,
     display_name: readString(record.display_name, `${path}.display_name`),
+    description: readString(record.description, `${path}.description`),
     family: readNullableString(record.family, `${path}.family`),
+    license: readNullableString(record.license, `${path}.license`),
+    links,
+    weights,
     source_id: readString(record.source_id, `${path}.source_id`),
     status: readNullableString(record.status, `${path}.status`),
     release_date: readNullableString(record.release_date, `${path}.release_date`),
@@ -1358,7 +1063,7 @@ function parseSnapshot(value: unknown, path: string): ModelPipelineSnapshot {
   );
   assertSortedUniqueByKey(
     catalog,
-    catalog.map((model) => modelKey(model.model_key)),
+    catalog.map((model) => modelKey(model)),
     `${path}.catalog`
   );
   const observations = readArray(record.observations, `${path}.observations`).map((entry, index) =>

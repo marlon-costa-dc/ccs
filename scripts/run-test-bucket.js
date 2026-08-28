@@ -27,6 +27,7 @@ const browserMcpSplitTests = [
 // (catches deletion drift) but CANNOT detect new undeclared slow tests.
 // Automated perf-budget enforcement tracked in issue #1071.
 const slowTests = [
+  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
   'tests/integration/logging-request-context.test.ts',
   'tests/integration/proxy/daemon-lifecycle.test.ts',
   'tests/integration/update-command-install-origin.test.ts',

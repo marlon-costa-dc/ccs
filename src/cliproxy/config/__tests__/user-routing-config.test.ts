@@ -71,7 +71,7 @@ describe('CLIProxy user routing config', () => {
     ]);
   });
 
-  it('keeps a sequential failover pool: one alias, several upstream names, config order', () => {
+  it('rejects obsolete sequential failover pools for one alias', () => {
     const body = `  codex:
     - name: gpt-5
       alias: g5
@@ -81,26 +81,9 @@ describe('CLIProxy user routing config', () => {
       alias: g5
 `;
 
-    const parsed = parseOAuthModelAliasSection(body);
-    expect(parsed.codex).toEqual([
-      { name: 'gpt-5', alias: 'g5' },
-      { name: 'gpt-5-mini', alias: 'g5' },
-      { name: 'gpt-5-nano', alias: 'g5' },
-    ]);
-
-    // The pool must survive a full parse -> serialize -> parse round-trip:
-    // regenerateConfig() runs exactly this cycle on every `ccs doctor`.
-    expect(parseOAuthModelAliasSection(serializeOAuthModelAliasBody(parsed))).toEqual(parsed);
-
-    // ...and a merge, which is what folds the existing file into the config.
-    const merged = mergeOAuthModelAliases(parsed, {
-      codex: [{ name: 'gpt-5-mini', alias: 'g5', fork: true }],
-    });
-    expect(merged.codex).toEqual([
-      { name: 'gpt-5', alias: 'g5' },
-      { name: 'gpt-5-mini', alias: 'g5', fork: true },
-      { name: 'gpt-5-nano', alias: 'g5' },
-    ]);
+    expect(() => parseOAuthModelAliasSection(body)).toThrow(
+      'oauth-model-alias.codex maps alias g5 more than once'
+    );
   });
 
   it('round-trips unknown payload subsections and replaces matching scoped rules', () => {

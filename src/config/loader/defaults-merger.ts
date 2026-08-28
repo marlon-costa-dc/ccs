@@ -224,7 +224,9 @@ export function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfi
         management_key: partial.cliproxy_server?.remote?.management_key,
         allow_self_signed: partial.cliproxy_server?.remote?.allow_self_signed,
       },
-      management_timeout_ms: partial.cliproxy_server?.management_timeout_ms,
+      management_timeout_ms:
+        partial.cliproxy_server?.management_timeout_ms ??
+        DEFAULT_CLIPROXY_SERVER_CONFIG.management_timeout_ms,
       local: {
         port: partial.cliproxy_server?.local?.port ?? DEFAULT_CLIPROXY_SERVER_CONFIG.local.port,
         auto_start:

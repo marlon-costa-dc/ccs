@@ -318,7 +318,9 @@ async function runSetupWizard(force: boolean = false): Promise<void> {
       const remoteConfig = await configureRemoteProxy(rl);
 
       config.cliproxy_server = {
+        ...DEFAULT_CLIPROXY_SERVER_CONFIG,
         remote: {
+          ...DEFAULT_CLIPROXY_SERVER_CONFIG.remote,
           enabled: true,
           host: remoteConfig.host,
           port: remoteConfig.port,
@@ -326,7 +328,7 @@ async function runSetupWizard(force: boolean = false): Promise<void> {
           auth_token: remoteConfig.authToken,
         },
         local: {
-          port: CLIPROXY_DEFAULT_PORT,
+          ...DEFAULT_CLIPROXY_SERVER_CONFIG.local,
           auto_start: false, // Disable local auto-start when using remote
         },
       };

@@ -1,12 +1,5 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { describe, expect, it } from 'bun:test';
 import type { CliproxyUsageApiResponse } from '../../../src/cliproxy/services/stats-fetcher';
-import {
-  clearModelsDevRegistryCache,
-  setCachedModelsDevRegistry,
-} from '../../../src/web-server/models-dev/registry-cache';
 import {
   buildCliproxyUsageHistoryAggregates,
   extractCliproxyUsageHistoryDetails,
@@ -261,42 +254,7 @@ describe('cliproxy usage transformer', () => {
   });
 
   describe('provider-aware pricing', () => {
-    let tempRoot = '';
-    let originalCcsHome: string | undefined;
-    let originalCcsDir: string | undefined;
-
-    beforeEach(() => {
-      tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-cliproxy-models-dev-'));
-      originalCcsHome = process.env.CCS_HOME;
-      originalCcsDir = process.env.CCS_DIR;
-      process.env.CCS_HOME = tempRoot;
-      delete process.env.CCS_DIR;
-      setCachedModelsDevRegistry({
-        openai: {
-          id: 'openai',
-          models: {
-            'gpt-5.5': { id: 'gpt-5.5', cost: { input: 5, output: 30, cache_read: 0.5 } },
-          },
-        },
-        'github-copilot': {
-          id: 'github-copilot',
-          models: {
-            'gpt-5.5': { id: 'gpt-5.5', cost: { input: 0, output: 0 } },
-          },
-        },
-      });
-    });
-
-    afterEach(() => {
-      clearModelsDevRegistryCache();
-      if (originalCcsHome !== undefined) process.env.CCS_HOME = originalCcsHome;
-      else delete process.env.CCS_HOME;
-      if (originalCcsDir !== undefined) process.env.CCS_DIR = originalCcsDir;
-      else delete process.env.CCS_DIR;
-      fs.rmSync(tempRoot, { recursive: true, force: true });
-    });
-
-    it('keeps same model IDs separated by provider in CLIProxy usage', () => {
+    it('keeps canonical CLIProxy costs separated for the same model ID by provider', () => {
       const response: CliproxyUsageApiResponse = {
         usage: {
           apis: {
@@ -314,6 +272,13 @@ describe('cliproxy usage transformer', () => {
                         reasoning_tokens: 0,
                         cached_tokens: 1_000_000,
                         total_tokens: 3_000_000,
+                      },
+                      cost: {
+                        currency: 'USD',
+                        quality: 'complete',
+                        estimated_total: 35.5,
+                        pricing_source: 'ai-hub-snapshot',
+                        pricing_source_digest: `sha256:${'a'.repeat(64)}`,
                       },
                       failed: false,
                     },
@@ -335,6 +300,13 @@ describe('cliproxy usage transformer', () => {
                         reasoning_tokens: 0,
                         cached_tokens: 1_000_000,
                         total_tokens: 3_000_000,
+                      },
+                      cost: {
+                        currency: 'USD',
+                        quality: 'complete',
+                        estimated_total: 0,
+                        pricing_source: 'ai-hub-snapshot',
+                        pricing_source_digest: `sha256:${'a'.repeat(64)}`,
                       },
                       failed: false,
                     },

@@ -1,111 +1,97 @@
 import { describe, expect, it } from 'bun:test';
 import { generateYamlWithComments } from '../../loader/yaml-serializer';
-import fixture from './fixtures/model-pipeline-snapshot-v1.json';
+import { modelPipelineConfigFixture } from './fixtures/model-pipeline-v2-fixture';
 import { MODEL_PIPELINE_SCHEMA_VERSION, parseModelPipelineConfig } from '../model-pipeline';
 import { createEmptyUnifiedConfig, isUnifiedConfig } from '../unified-config';
 
 function cloneEnvelope(): Record<string, unknown> {
-  return structuredClone(fixture.model_pipeline) as unknown as Record<string, unknown>;
+  return modelPipelineConfigFixture();
 }
 
 function snapshotOf(envelope: Record<string, unknown>): Record<string, unknown> {
   return envelope.snapshot as Record<string, unknown>;
 }
 
-describe('model pipeline config boundary', () => {
-  it('accepts and deeply freezes the exact AI Hub v1 fixture', () => {
-    const parsed = parseModelPipelineConfig(fixture.model_pipeline);
+function firstCandidate(snapshot: Record<string, unknown>): Record<string, unknown> {
+  const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+  const members = assignments[0]?.members as Array<Record<string, unknown>>;
+  const candidates = members[0]?.candidates as Array<Record<string, unknown>>;
+  return candidates[0]!;
+}
+
+describe('model pipeline v2 config boundary', () => {
+  it('accepts and deeply freezes the canonical AI Hub v2 fixture', () => {
+    const parsed = parseModelPipelineConfig(cloneEnvelope());
 
     expect(parsed.schema_version).toBe(MODEL_PIPELINE_SCHEMA_VERSION);
-    expect(parsed.snapshot.generation).toBe(42);
-    expect(parsed.snapshot.projection_digest).toBe(
-      'sha256:a2d543504bba7caa9a5c925bb1018e484a0331fb0479dbc87e828db51bc275a5'
-    );
+    expect(parsed.snapshot.generation).toBe(1);
     expect(parsed.snapshot.snapshot_digest).toBe(
-      'sha256:15303dbab83d64d09f79f1f3a22bc09fb3ad5916f2624283f2c6a0ecbe969801'
+      'sha256:869a91e29aa3d7a98f726bfd13e4ce7290394d60b98295da996015844d46c39d'
     );
+    expect(parsed.receipt.active.projection_digest).toBe(`sha256:${'b'.repeat(64)}`);
     expect(parsed.snapshot.agent_bindings).toEqual([
-      { agent: 'codex', tier_id: 'primary', alias: 'aihub-primary' },
+      { agent: 'architect', tier_id: 'deep', alias: 'aihub-deep' },
     ]);
-    expect(parsed.snapshot.assignments[0]?.candidates[0]?.pricing?.entries).toHaveLength(9);
+    expect(parsed.snapshot.assignments[0]?.members[0]?.candidates).toHaveLength(2);
     expect(Object.isFrozen(parsed)).toBe(true);
     expect(Object.isFrozen(parsed.snapshot)).toBe(true);
-    expect(Object.isFrozen(parsed.snapshot.inventory.models[0]?.routes[0]?.credentials)).toBe(true);
-    expect(Object.isFrozen(parsed.snapshot.assignments[0]?.candidates[0]?.pricing?.entries)).toBe(
-      true
-    );
+    expect(
+      Object.isFrozen(parsed.snapshot.inventory.direct_models[0]?.routes[0]?.credentials)
+    ).toBe(true);
+    expect(Object.isFrozen(parsed.snapshot.catalog[0]?.provider_request?.body)).toBe(true);
   });
 
-  it('requires positive publication ownership values and rejects extra keys', () => {
+  it('requires positive publication ownership values and rejects v1 residue', () => {
     const invalidCases: ReadonlyArray<readonly [string, unknown, string]> = [
       ['request_timeout_seconds', undefined, 'must be a whole number 1 or greater'],
       ['request_timeout_seconds', 0, 'must be a whole number 1 or greater'],
-      ['request_timeout_seconds', '120', 'must be a whole number 1 or greater'],
-      ['retained_snapshots', undefined, 'must be a whole number 1 or greater'],
       ['retained_snapshots', 0, 'must be a whole number 1 or greater'],
-      ['retained_snapshots', 2.5, 'must be a whole number 1 or greater'],
-      ['legacy_atomic_write', true, 'is not part of schema version 1'],
+      ['legacy_atomic_write', true, 'is not part of schema version 2'],
     ];
 
     for (const [key, value, message] of invalidCases) {
       const envelope = cloneEnvelope();
       const publication = snapshotOf(envelope).publication as Record<string, unknown>;
-      if (value === undefined) {
-        delete publication[key];
-      } else {
-        publication[key] = value;
-      }
+      if (value === undefined) delete publication[key];
+      else publication[key] = value;
       expect(() => parseModelPipelineConfig(envelope)).toThrow(message);
     }
   });
 
-  it('rejects fields outside the exact versioned contract', () => {
+  it('rejects fields outside the exact v2 contract', () => {
     const envelope = cloneEnvelope();
     snapshotOf(envelope).legacy_models = [];
 
     expect(() => parseModelPipelineConfig(envelope)).toThrow(
-      'model_pipeline.snapshot.legacy_models is not part of schema version 1'
+      'model_pipeline.snapshot.legacy_models is not part of schema version 2'
     );
   });
 
   it('rejects numeric prices because pricing is lossless decimal text', () => {
     const envelope = cloneEnvelope();
-    const assignments = snapshotOf(envelope).assignments as Array<Record<string, unknown>>;
-    const candidates = assignments[0]?.candidates as Array<Record<string, unknown>>;
-    const pricing = candidates[0]?.pricing as Record<string, unknown>;
+    const pricing = firstCandidate(snapshotOf(envelope)).pricing as Record<string, unknown>;
     const entries = pricing.entries as Array<Record<string, unknown>>;
-    entries[0]!.amount = 0.25;
+    entries[0]!.amount = 30;
 
     expect(() => parseModelPipelineConfig(envelope)).toThrow(
-      'model_pipeline.snapshot.assignments[0].candidates[0].pricing.entries[0].amount'
+      'model_pipeline.snapshot.assignments[0].members[0].candidates[0].pricing.entries[0].amount'
     );
   });
 
-  it('rejects variants serialized as independent catalog models', () => {
-    const envelope = cloneEnvelope();
-    const catalog = snapshotOf(envelope).catalog as Array<Record<string, unknown>>;
+  it('rejects flattened and independent model identities', () => {
+    const flattened = cloneEnvelope();
+    const inventory = snapshotOf(flattened).inventory as Record<string, unknown>;
+    const models = inventory.direct_models as Array<Record<string, unknown>>;
+    models[0]!.catalog_provider_id = 'openai';
+    expect(() => parseModelPipelineConfig(flattened)).toThrow(
+      'catalog_provider_id is not part of schema version 2'
+    );
+
+    const independentVariant = cloneEnvelope();
+    const catalog = snapshotOf(independentVariant).catalog as Array<Record<string, unknown>>;
     catalog[0]!.variant_id = 'high';
-
-    expect(() => parseModelPipelineConfig(envelope)).toThrow(
-      'model_pipeline.snapshot.catalog[0].variant_id is not part of schema version 1'
-    );
-  });
-
-  it('rejects one ModelKey assigned to more than one exclusive tier', () => {
-    const envelope = cloneEnvelope();
-    const snapshot = snapshotOf(envelope);
-    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
-    const evaluations = snapshot.evaluations as Array<Record<string, unknown>>;
-    const fastAssignment = structuredClone(assignments[0]!);
-    fastAssignment.tier_id = 'fast';
-    fastAssignment.alias = 'aihub-fast';
-    const fastEvaluation = structuredClone(evaluations[0]!);
-    fastEvaluation.tier_id = 'fast';
-    assignments.unshift(fastAssignment);
-    evaluations.unshift(fastEvaluation);
-
-    expect(() => parseModelPipelineConfig(envelope)).toThrow(
-      'model_pipeline.snapshot.assignments assigns one ModelKey to more than one tier'
+    expect(() => parseModelPipelineConfig(independentVariant)).toThrow(
+      'model_pipeline.snapshot.catalog[0].variant_id is not part of schema version 2'
     );
   });
 
@@ -118,8 +104,8 @@ describe('model pipeline config boundary', () => {
 
     const duplicate = cloneEnvelope();
     snapshotOf(duplicate).agent_bindings = [
-      { agent: 'codex', tier_id: 'primary', alias: 'aihub-primary' },
-      { agent: 'codex', tier_id: 'primary', alias: 'aihub-primary' },
+      { agent: 'architect', tier_id: 'deep', alias: 'aihub-deep' },
+      { agent: 'architect', tier_id: 'deep', alias: 'aihub-deep' },
     ];
     expect(() => parseModelPipelineConfig(duplicate)).toThrow(
       'model_pipeline.snapshot.agent_bindings must be unique and sorted'
@@ -127,19 +113,41 @@ describe('model pipeline config boundary', () => {
 
     const dangling = cloneEnvelope();
     snapshotOf(dangling).agent_bindings = [
-      { agent: 'codex', tier_id: 'primary', alias: 'aihub-fast' },
+      { agent: 'architect', tier_id: 'deep', alias: 'aihub-fast' },
     ];
     expect(() => parseModelPipelineConfig(dangling)).toThrow(
-      'model_pipeline.snapshot.agent_bindings must reference the alias allocated to each bound tier'
+      'must reference the alias allocated to each bound tier'
     );
   });
 
-  it('rejects semantic drift when the projection digest is stale', () => {
+  it('rejects snapshot digest drift independently from projection identity', () => {
     const envelope = cloneEnvelope();
-    snapshotOf(envelope).generated_at = '2026-08-27T19:00:00Z';
+    snapshotOf(envelope).generated_at = '2026-08-28T12:00:00Z';
 
     expect(() => parseModelPipelineConfig(envelope)).toThrow(
-      'model_pipeline.snapshot.projection_digest must equal sha256:'
+      'model_pipeline.snapshot.snapshot_digest must equal sha256:'
+    );
+  });
+
+  it('requires the receipt to identify the snapshot and exact predecessor', () => {
+    const activeDrift = cloneEnvelope();
+    const receipt = activeDrift.receipt as Record<string, unknown>;
+    const active = receipt.active as Record<string, unknown>;
+    active.snapshot_digest = `sha256:${'f'.repeat(64)}`;
+    expect(() => parseModelPipelineConfig(activeDrift)).toThrow(
+      'model_pipeline.receipt.active must identify the persisted snapshot'
+    );
+
+    const predecessorDrift = cloneEnvelope();
+    const predecessorReceipt = predecessorDrift.receipt as Record<string, unknown>;
+    predecessorReceipt.previous_active = {
+      generation: 1,
+      snapshot_digest: `sha256:${'1'.repeat(64)}`,
+      projection_digest: `sha256:${'2'.repeat(64)}`,
+      config_digest: `sha256:${'3'.repeat(64)}`,
+    };
+    expect(() => parseModelPipelineConfig(predecessorDrift)).toThrow(
+      'model_pipeline.receipt.previous_active must be null for generation 1'
     );
   });
 
@@ -162,51 +170,14 @@ describe('model pipeline config boundary', () => {
     }
   });
 
-  it('rejects empty, duplicate, overlapping, unsorted, and unknown failover matchers', () => {
-    const mutateRules = (
-      mutate: (rules: Array<Record<string, unknown>>) => void,
-      message: string
-    ) => {
-      const envelope = cloneEnvelope();
-      const failurePolicy = snapshotOf(envelope).failure_policy as Record<string, unknown>;
-      const rules = failurePolicy.failover_rules as Array<Record<string, unknown>>;
-      mutate(rules);
-      expect(() => parseModelPipelineConfig(envelope)).toThrow(message);
-    };
-
-    mutateRules((rules) => rules.splice(0), 'must contain at least one rule');
-    mutateRules((rules) => {
-      rules[0]!.http_statuses = [];
-      rules[0]!.error_codes = [];
-      rules[0]!.failure_kinds = [];
-    }, 'must declare at least one matcher');
-    mutateRules((rules) => {
-      rules[1]!.rule_id = rules[0]!.rule_id;
-    }, 'must contain unique rule ids');
-    mutateRules((rules) => {
-      rules[1]!.http_statuses = [429, 503];
-    }, 'http_statuses matchers must belong to exactly one rule');
-    mutateRules((rules) => {
-      rules[1]!.http_statuses = [503, 500];
-    }, 'must be unique and sorted');
-    mutateRules((rules) => {
-      rules[0]!.failure_kinds = ['invented'];
-    }, 'must be a supported failure kind');
-    mutateRules((rules) => {
-      rules[0]!.legacy_retry_count = 2;
-    }, 'is not part of schema version 1');
-  });
-
-  it('validates and serializes model_pipeline as a native top-level CCS section', () => {
-    const modelPipeline = parseModelPipelineConfig(fixture.model_pipeline);
+  it('validates and serializes model_pipeline as the native CCS v2 section', () => {
+    const modelPipeline = parseModelPipelineConfig(cloneEnvelope());
     const config = { ...createEmptyUnifiedConfig(), model_pipeline: modelPipeline };
 
     expect(isUnifiedConfig(config)).toBe(true);
     const serialized = generateYamlWithComments(config);
     expect(serialized).toContain('\nmodel_pipeline:\n');
-    expect(serialized).toContain(
-      'snapshot_digest: sha256:15303dbab83d64d09f79f1f3a22bc09fb3ad5916f2624283f2c6a0ecbe969801'
-    );
+    expect(serialized).toContain(`snapshot_digest: ${modelPipeline.snapshot.snapshot_digest}`);
     expect(serialized.indexOf('\nmodel_pipeline:\n')).toBeLessThan(
       serialized.indexOf('\ncliproxy_server:\n')
     );

@@ -43,11 +43,7 @@ export interface ModelPipelinePublisherDependencies {
   ): UnifiedConfig;
   renderConfig(activeConfigYaml: string, snapshot: ModelPipelineSnapshot): string;
   resolveTarget(config: UnifiedConfig): ProxyTarget;
-  createClient(
-    target: ProxyTarget,
-    config: UnifiedConfig,
-    managementTimeoutMs: number
-  ): ModelPipelinePublicationClient;
+  createClient(target: ProxyTarget, config: UnifiedConfig): ModelPipelinePublicationClient;
   snapshotSchemaDigest(): string;
   ccsBinary(): ModelPipelineInventory['binary_provenance'];
   withTransaction<T>(operation: (store: ModelPipelineTransactionStore) => Promise<T>): Promise<T>;
@@ -132,6 +128,16 @@ function assertIdentity(
   }
 }
 
+function inventoryRoutingFacts(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(inventoryRoutingFacts);
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== 'observed_at')
+      .map(([key, entry]) => [key, inventoryRoutingFacts(entry)])
+  );
+}
+
 function assertInventoryEvidence(
   snapshotInventory: ModelPipelineInventory,
   liveInventory: ModelPipelineInventory
@@ -157,8 +163,10 @@ function assertInventoryEvidence(
     throw new ModelPipelineGenerationConflictError('snapshot inventory routing schema is stale');
   }
   if (
-    canonicalJson(snapshotInventory.direct_models) !== canonicalJson(liveInventory.direct_models) ||
-    canonicalJson(snapshotInventory.aliases) !== canonicalJson(liveInventory.aliases)
+    canonicalJson(inventoryRoutingFacts(snapshotInventory.direct_models)) !==
+      canonicalJson(inventoryRoutingFacts(liveInventory.direct_models)) ||
+    canonicalJson(inventoryRoutingFacts(snapshotInventory.aliases)) !==
+      canonicalJson(inventoryRoutingFacts(liveInventory.aliases))
   ) {
     throw new ModelPipelineGenerationConflictError(
       'snapshot inventory model or alias facts are stale relative to CLIProxy'
@@ -201,8 +209,7 @@ function assertTransition(
 
 function createDefaultClient(
   target: ProxyTarget,
-  config: UnifiedConfig,
-  managementTimeoutMs: number
+  config: UnifiedConfig
 ): ModelPipelinePublicationClient {
   const managementKey = target.isRemote
     ? target.managementKey
@@ -219,17 +226,9 @@ function createDefaultClient(
     port: target.port,
     protocol: target.protocol,
     managementKey,
-    timeout: managementTimeoutMs,
+    timeout: target.managementTimeoutMs,
     allowSelfSigned: target.allowSelfSigned,
   });
-}
-
-function readManagementTimeout(config: UnifiedConfig): number {
-  const value = config.cliproxy_server?.management_timeout_ms;
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
-    throw new ConfigError('cliproxy_server.management_timeout_ms must be a positive whole number');
-  }
-  return value;
 }
 
 const defaultDependencies: ModelPipelinePublisherDependencies = {
@@ -395,11 +394,10 @@ export class ModelPipelinePublisher {
     readonly client: ModelPipelinePublicationClient;
   } {
     const config = this.dependencies.loadConfig();
-    const managementTimeoutMs = readManagementTimeout(config);
     const target = this.dependencies.resolveTarget(config);
     return {
       config,
-      client: this.dependencies.createClient(target, config, managementTimeoutMs),
+      client: this.dependencies.createClient(target, config),
     };
   }
 
@@ -481,9 +479,9 @@ export class ModelPipelinePublisher {
     if (!pipeline) throw new ModelPipelineSnapshotNotFoundError();
     const inventory = await client.getModelInventory(signal);
     assertIdentity(inventory.active, pipeline.receipt.active, 'CLIProxy inventory active identity');
-    if (inventory.activation_loaded_at !== pipeline.receipt.loaded_at) {
-      throw new ConfigError('CLIProxy activation timestamp differs from the persisted CCS receipt');
-    }
+    // activation_loaded_at is process-load evidence, not part of the durable CAS
+    // identity. A clean CLIProxy restart reloads the exact active config with a
+    // new timestamp while the historical publication receipt remains immutable.
     if (!provenanceEqual(inventory.binary_provenance, pipeline.receipt.cliproxy_binary)) {
       throw new ConfigError('CLIProxy binary provenance differs from the persisted CCS receipt');
     }

@@ -640,6 +640,7 @@ export class ManagementApiClient {
         if (req.socket) destroyOwnedSocket(req.socket, terminationReason);
         req.destroy(terminationReason);
         agent.destroy();
+        reject(terminationReason);
       };
       const cancel = (): void => {
         terminate(

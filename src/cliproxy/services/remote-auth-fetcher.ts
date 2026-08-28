@@ -12,9 +12,13 @@ import {
 } from '../proxy/proxy-target-resolver';
 import { getProviderDisplayName, mapExternalProviderName } from '../provider-capabilities';
 import type { CLIProxyProvider } from '../types';
-
-/** Timeout for remote fetch requests (ms) */
-const REMOTE_FETCH_TIMEOUT_MS = 5000;
+import {
+  AuthError,
+  CCSError,
+  ConfigError,
+  NetworkError,
+  ProviderError,
+} from '../../errors/error-types';
 
 async function fetchRemoteAuthResponse(
   url: string,
@@ -23,7 +27,7 @@ async function fetchRemoteAuthResponse(
 ): Promise<Response> {
   if (target.protocol !== 'https' || !target.allowSelfSigned) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REMOTE_FETCH_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), target.managementTimeoutMs);
 
     try {
       return await fetch(url, {
@@ -50,7 +54,7 @@ async function fetchRemoteAuthResponse(
       const timeoutError = new Error('Request timeout');
       req.destroy(timeoutError);
       settle(() => reject(timeoutError));
-    }, REMOTE_FETCH_TIMEOUT_MS);
+    }, target.managementTimeoutMs);
 
     const req = https.request(
       url,
@@ -58,7 +62,7 @@ async function fetchRemoteAuthResponse(
         method: 'GET',
         headers,
         agent,
-        timeout: REMOTE_FETCH_TIMEOUT_MS,
+        timeout: target.managementTimeoutMs,
       },
       (res) => {
         let body = '';
@@ -101,11 +105,64 @@ async function fetchRemoteAuthResponse(
 interface RemoteAuthFile {
   id: string;
   name: string;
-  type: string;
-  provider: string;
+  provider: CLIProxyProvider;
   email?: string;
-  status: 'active' | 'disabled' | 'unavailable';
-  source: 'file' | 'memory';
+  status: 'unknown' | 'active' | 'pending' | 'refreshing' | 'error' | 'disabled';
+}
+
+const REMOTE_AUTH_STATUSES = new Set<RemoteAuthFile['status']>([
+  'unknown',
+  'active',
+  'pending',
+  'refreshing',
+  'error',
+  'disabled',
+]);
+
+function readRequiredString(record: Record<string, unknown>, key: string, path: string): string {
+  const value = record[key];
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new ProviderError(`${path}.${key} must be a non-empty string`, 'cliproxy');
+  }
+  return value;
+}
+
+function parseRemoteAuthFile(value: unknown, index: number): RemoteAuthFile {
+  const path = `CLIProxy auth-files response.files[${index}]`;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new ProviderError(`${path} must be an object`, 'cliproxy');
+  }
+  const record = value as Record<string, unknown>;
+  const providerName = readRequiredString(record, 'provider', path);
+  const provider = mapExternalProviderName(providerName);
+  if (!provider) {
+    throw new ProviderError(`${path}.provider is unsupported: ${providerName}`, 'cliproxy');
+  }
+  const status = readRequiredString(record, 'status', path);
+  if (!REMOTE_AUTH_STATUSES.has(status as RemoteAuthFile['status'])) {
+    throw new ProviderError(`${path}.status is unsupported: ${status}`, 'cliproxy');
+  }
+  if (record.email !== undefined && typeof record.email !== 'string') {
+    throw new ProviderError(`${path}.email must be a string when present`, 'cliproxy');
+  }
+  return {
+    id: readRequiredString(record, 'id', path),
+    name: readRequiredString(record, 'name', path),
+    provider,
+    ...(record.email !== undefined && { email: record.email as string }),
+    status: status as RemoteAuthFile['status'],
+  };
+}
+
+function parseRemoteAuthFilesResponse(value: unknown): RemoteAuthFile[] {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new ProviderError('CLIProxy auth-files response must be an object', 'cliproxy');
+  }
+  const files = (value as Record<string, unknown>).files;
+  if (!Array.isArray(files)) {
+    throw new ProviderError('CLIProxy auth-files response.files must be an array', 'cliproxy');
+  }
+  return files.map(parseRemoteAuthFile);
 }
 
 /** Account info for UI display */
@@ -114,7 +171,7 @@ export interface RemoteAccountInfo {
   email: string;
   provider: CLIProxyProvider;
   isDefault: boolean;
-  status: 'active' | 'disabled' | 'unavailable';
+  status: RemoteAuthFile['status'];
 }
 
 /** Auth status for a provider (UI format) */
@@ -130,13 +187,13 @@ export interface RemoteAuthStatus {
 
 /**
  * Fetch auth status from remote CLIProxyAPI
- * @throws Error if remote is unreachable or returns error
+ * @throws A typed CCS error if the target, authentication, transport, or response is invalid.
  */
 export async function fetchRemoteAuthStatus(target?: ProxyTarget): Promise<RemoteAuthStatus[]> {
   const proxyTarget = target ?? getProxyTarget();
 
   if (!proxyTarget.isRemote) {
-    throw new Error('fetchRemoteAuthStatus called but remote mode not enabled');
+    throw new ConfigError('fetchRemoteAuthStatus requires remote CLIProxy mode');
   }
 
   const url = buildProxyUrl(proxyTarget, '/v0/management/auth-files');
@@ -147,27 +204,31 @@ export async function fetchRemoteAuthStatus(target?: ProxyTarget): Promise<Remot
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        throw new Error('Authentication failed - check auth token in settings');
+        throw new AuthError('CLIProxy management authentication failed', 'cliproxy');
       }
-      throw new Error(`Remote returned ${response.status}: ${response.statusText}`);
+      throw new NetworkError(
+        `CLIProxy management request returned ${response.status}: ${response.statusText}`,
+        url,
+        response.status
+      );
     }
 
-    const data: unknown = await response.json();
-
-    // Validate response structure
-    if (!data || typeof data !== 'object' || !('files' in data) || !Array.isArray(data.files)) {
-      throw new Error('Invalid response format from remote auth endpoint');
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch (error) {
+      throw new ProviderError('CLIProxy auth-files response is not valid JSON', 'cliproxy', error);
     }
-
-    return transformRemoteAuthFiles(data.files as RemoteAuthFile[]);
+    return transformRemoteAuthFiles(parseRemoteAuthFilesResponse(data));
   } catch (error) {
+    if (error instanceof CCSError) throw error;
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Remote proxy connection timed out');
+      throw new NetworkError('CLIProxy management request timed out', url);
     }
     if (error instanceof Error && error.message === 'Request timeout') {
-      throw new Error('Remote proxy connection timed out');
+      throw new NetworkError('CLIProxy management request timed out', url);
     }
-    throw error;
+    throw new NetworkError('CLIProxy management request failed', url);
   }
 }
 
@@ -179,17 +240,11 @@ function transformRemoteAuthFiles(files: RemoteAuthFile[]): RemoteAuthStatus[] {
   const byProvider = new Map<CLIProxyProvider, RemoteAuthFile[]>();
 
   for (const file of files) {
-    const provider = mapExternalProviderName(file.provider);
-    if (!provider) {
-      // Unknown provider, skip (could add logging in debug mode)
-      continue;
-    }
-
-    const existing = byProvider.get(provider);
+    const existing = byProvider.get(file.provider);
     if (existing) {
       existing.push(file);
     } else {
-      byProvider.set(provider, [file]);
+      byProvider.set(file.provider, [file]);
     }
   }
 

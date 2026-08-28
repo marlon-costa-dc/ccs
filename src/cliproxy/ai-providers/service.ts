@@ -104,34 +104,55 @@ function readModelProtocols(model: unknown): string[] {
 
 function normalizeOpenAICompatModels(models: unknown): AiProviderModelAlias[] {
   return (Array.isArray(models) ? models : [])
-    .map((model) => ({
-      name: readModelRulePart(model, 'name'),
-      alias: readModelRulePart(model, 'alias'),
-      catalogProviderId:
-        readFirstModelRulePart(model, 'catalog-provider-id', 'catalogProviderId') || undefined,
-      catalogModelId:
-        readFirstModelRulePart(model, 'catalog-model-id', 'catalogModelId') || undefined,
-      catalogRouteProviderId:
-        readFirstModelRulePart(model, 'catalog-route-provider-id', 'catalogRouteProviderId') ||
-        undefined,
-      catalogRouteModelId:
-        readFirstModelRulePart(model, 'catalog-route-model-id', 'catalogRouteModelId') || undefined,
-      variantId: readFirstModelRulePart(model, 'variant-id', 'variantId') || undefined,
-      protocols: readModelProtocols(model),
-    }))
+    .map((model) => {
+      const catalogProviderId = readFirstModelRulePart(
+        model,
+        'catalog-provider-id',
+        'catalogProviderId'
+      );
+      const catalogModelId = readFirstModelRulePart(model, 'catalog-model-id', 'catalogModelId');
+      const catalogRouteProviderId = readFirstModelRulePart(
+        model,
+        'catalog-route-provider-id',
+        'catalogRouteProviderId'
+      );
+      const catalogRouteModelId = readFirstModelRulePart(
+        model,
+        'catalog-route-model-id',
+        'catalogRouteModelId'
+      );
+      const variantId = readFirstModelRulePart(model, 'variant-id', 'variantId');
+      const protocols = readModelProtocols(model);
+      return {
+        name: readModelRulePart(model, 'name'),
+        alias: readModelRulePart(model, 'alias'),
+        ...(catalogProviderId && { catalogProviderId }),
+        ...(catalogModelId && { catalogModelId }),
+        ...(catalogRouteProviderId && { catalogRouteProviderId }),
+        ...(catalogRouteModelId && { catalogRouteModelId }),
+        ...(variantId && { variantId }),
+        ...(protocols.length > 0 && { protocols }),
+      };
+    })
     .filter((model) => model.name.length > 0 || model.alias.length > 0);
 }
 
 function toOpenAICompatModelEntry(model: AiProviderModelAlias): OpenAICompatModelEntry {
+  const catalogProviderId = model.catalogProviderId?.trim();
+  const catalogModelId = model.catalogModelId?.trim();
+  const catalogRouteProviderId = model.catalogRouteProviderId?.trim();
+  const catalogRouteModelId = model.catalogRouteModelId?.trim();
+  const variantId = model.variantId?.trim();
+  const protocols = model.protocols?.map((value) => value.trim()).filter(Boolean);
   return {
     name: model.name.trim(),
     alias: model.alias.trim(),
-    'catalog-provider-id': model.catalogProviderId?.trim() || undefined,
-    'catalog-model-id': model.catalogModelId?.trim() || undefined,
-    'catalog-route-provider-id': model.catalogRouteProviderId?.trim() || undefined,
-    'catalog-route-model-id': model.catalogRouteModelId?.trim() || undefined,
-    'variant-id': model.variantId?.trim() || undefined,
-    protocols: model.protocols?.map((value) => value.trim()).filter((value) => value.length > 0),
+    ...(catalogProviderId && { 'catalog-provider-id': catalogProviderId }),
+    ...(catalogModelId && { 'catalog-model-id': catalogModelId }),
+    ...(catalogRouteProviderId && { 'catalog-route-provider-id': catalogRouteProviderId }),
+    ...(catalogRouteModelId && { 'catalog-route-model-id': catalogRouteModelId }),
+    ...(variantId && { 'variant-id': variantId }),
+    ...(protocols?.length && { protocols }),
   };
 }
 
@@ -222,12 +243,7 @@ function toApiKeyEntry(
   input: UpsertAiProviderEntryInput,
   existing?: AiProviderApiKeyEntry
 ): AiProviderApiKeyEntry {
-  const nextSecret =
-    input.apiKey !== undefined
-      ? input.apiKey.trim()
-      : input.preserveSecrets
-        ? existing?.['api-key'] || ''
-        : existing?.['api-key'] || '';
+  const nextSecret = input.apiKey !== undefined ? input.apiKey.trim() : existing?.['api-key'] || '';
 
   return {
     id: existing?.id,
@@ -254,9 +270,7 @@ function toOpenAiCompatEntry(
   const nextApiKeys =
     input.apiKeys !== undefined
       ? input.apiKeys.map((value) => value.trim()).filter((value) => value.length > 0)
-      : input.preserveSecrets
-        ? (existing?.['api-key-entries'] || []).map((entry) => entry['api-key'])
-        : (existing?.['api-key-entries'] || []).map((entry) => entry['api-key']);
+      : (existing?.['api-key-entries'] || []).map((entry) => entry['api-key']);
 
   return {
     id: existing?.id,
@@ -361,29 +375,6 @@ function resolveEntryIndex(entries: Array<{ id?: string }>, entryId: string): nu
   const matchedIndex = entries.findIndex((entry) => entry.id === normalizedEntryId);
   if (matchedIndex !== -1) {
     return matchedIndex;
-  }
-
-  const legacyIndex = Number.parseInt(normalizedEntryId, 10);
-  if (
-    Number.isInteger(legacyIndex) &&
-    legacyIndex >= 0 &&
-    legacyIndex < entries.length &&
-    String(legacyIndex) === normalizedEntryId
-  ) {
-    return legacyIndex;
-  }
-
-  if (normalizedEntryId.startsWith('openai-compatibility:') || normalizedEntryId.includes(':')) {
-    const legacySuffix = normalizedEntryId.split(':').at(-1) || '';
-    const legacySuffixIndex = Number.parseInt(legacySuffix, 10);
-    if (
-      Number.isInteger(legacySuffixIndex) &&
-      legacySuffixIndex >= 0 &&
-      legacySuffixIndex < entries.length &&
-      String(legacySuffixIndex) === legacySuffix
-    ) {
-      return legacySuffixIndex;
-    }
   }
 
   throw new ValidationError('Entry not found', 'entryId');

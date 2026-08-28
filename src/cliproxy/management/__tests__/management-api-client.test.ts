@@ -3,14 +3,39 @@
  */
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import * as net from 'node:net';
-import fixture from '../../../config/schemas/__tests__/fixtures/model-pipeline-snapshot-v1.json';
-import { ManagementApiClient, parseConfigPublicationReceipt } from '../management-api-client';
+import { modelPipelineSnapshotFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
+import {
+  formatActiveIdentityEtag,
+  ManagementApiClient,
+  parseCLIProxyActivationReceipt,
+} from '../management-api-client';
 import type {
   ManagementClientConfig,
   ManagementHealthStatus,
   ClaudeKey,
 } from '../management-api-types';
 import { UserAbortError } from '../../../errors/error-types';
+
+const digestA = `sha256:${'a'.repeat(64)}`;
+const digestB = `sha256:${'b'.repeat(64)}`;
+const digestC = `sha256:${'c'.repeat(64)}`;
+const activeIdentity = {
+  generation: 7,
+  snapshot_digest: digestA,
+  projection_digest: digestB,
+  config_digest: digestC,
+};
+const validActivationReceipt = {
+  previous_active: null,
+  active: activeIdentity,
+  routing_schema: { version: 2 as const, digest: digestA },
+  binary_provenance: {
+    version: 'cliproxy-fixture-v2',
+    commit: 'cliproxy-fixture-commit',
+    built_at: '2026-08-28T11:13:01Z',
+  },
+  loaded_at: '2026-08-28T11:20:57Z',
+};
 
 describe('management-api-client', () => {
   describe('ManagementApiClient', () => {
@@ -93,33 +118,25 @@ describe('management-api-client', () => {
     describe('atomic config publication', () => {
       it('sends raw YAML and validates the publication receipt', async () => {
         const client = new ManagementApiClient(config);
-        const configYaml = 'port: 8317\nmodel-routing:\n  schema-version: 1\n';
-        const digest = `sha256:${'a'.repeat(64)}`;
+        const configYaml = 'port: 8317\nmodel-routing:\n  schema-version: 2\n';
         const originalFetch = global.fetch;
         const fetchMock = mock(() =>
           Promise.resolve(
-            new Response(
-              JSON.stringify({
-                ok: true,
-                generation: 7,
-                snapshot_digest: digest,
-                projection_digest: digest,
-              }),
-              { status: 200, headers: { 'Content-Type': 'application/json' } }
-            )
+            new Response(JSON.stringify(validActivationReceipt), {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                ETag: formatActiveIdentityEtag(activeIdentity),
+              },
+            })
           )
         );
         global.fetch = fetchMock as typeof global.fetch;
 
         try {
-          const receipt = await client.putConfigYaml(configYaml);
+          const receipt = await client.putConfigYaml(configYaml, null);
 
-          expect(receipt).toEqual({
-            ok: true,
-            generation: 7,
-            snapshot_digest: digest,
-            projection_digest: digest,
-          });
+          expect(receipt).toEqual(validActivationReceipt);
           expect(fetchMock).toHaveBeenCalledWith(
             'http://localhost:8317/v0/management/config.yaml',
             expect.objectContaining({
@@ -127,6 +144,7 @@ describe('management-api-client', () => {
               body: configYaml,
               headers: expect.objectContaining({
                 'Content-Type': 'application/yaml',
+                'If-None-Match': '*',
               }),
             })
           );
@@ -153,8 +171,8 @@ describe('management-api-client', () => {
         );
 
         try {
-          await expect(client.putConfigYaml('port: 8317\n')).rejects.toThrow(
-            'snapshot_digest must be a lowercase sha256 digest'
+          await expect(client.putConfigYaml('port: 8317\n', null)).rejects.toThrow(
+            'config publication receipt.ok is not part of the contract'
           );
         } finally {
           global.fetch = originalFetch;
@@ -162,24 +180,19 @@ describe('management-api-client', () => {
       });
 
       it('rejects extra, missing, and mistyped receipt fields at the boundary', () => {
-        const digest = `sha256:${'a'.repeat(64)}`;
-        const valid = {
-          ok: true,
-          generation: 7,
-          snapshot_digest: digest,
-          projection_digest: digest,
-        };
-
-        expect(() => parseConfigPublicationReceipt({ ...valid, ignored: true })).toThrow(
-          'config publication receipt.ignored is not part of the contract'
+        expect(() =>
+          parseCLIProxyActivationReceipt({ ...validActivationReceipt, ignored: true })
+        ).toThrow('config publication receipt.ignored is not part of the contract');
+        const { active: _active, ...missingActive } = validActivationReceipt;
+        expect(() => parseCLIProxyActivationReceipt(missingActive)).toThrow(
+          'receipt.active must be an object'
         );
-        const { generation: _generation, ...missingGeneration } = valid;
-        expect(() => parseConfigPublicationReceipt(missingGeneration)).toThrow(
-          'generation must be a positive whole number'
-        );
-        expect(() => parseConfigPublicationReceipt({ ...valid, ok: 'true' })).toThrow(
-          'config publication receipt.ok must be true'
-        );
+        expect(() =>
+          parseCLIProxyActivationReceipt({
+            ...validActivationReceipt,
+            active: { ...activeIdentity, config_digest: 'not-a-digest' },
+          })
+        ).toThrow('receipt.active.config_digest must be a lowercase sha256 digest');
       });
 
       it('reads and validates the active route-aware model inventory', async () => {
@@ -187,10 +200,13 @@ describe('management-api-client', () => {
         const originalFetch = global.fetch;
         const fetchMock = mock(() =>
           Promise.resolve(
-            new Response(JSON.stringify(fixture.model_pipeline.snapshot.inventory), {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' },
-            })
+            new Response(
+              JSON.stringify(modelPipelineSnapshotFixture().inventory as Record<string, unknown>),
+              {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+              }
+            )
           )
         );
         global.fetch = fetchMock as typeof global.fetch;
@@ -198,8 +214,8 @@ describe('management-api-client', () => {
         try {
           const inventory = await client.getModelInventory();
 
-          expect(inventory.active?.generation).toBe(41);
-          expect(inventory.models[0]?.routes[0]?.catalog_route_model_id).toBe('openai/gpt-5.4');
+          expect(inventory.active).toBeNull();
+          expect(inventory.direct_models[0]?.routes[0]?.catalog_route_model_id).toBe('gpt-5.4-pro');
           expect(fetchMock).toHaveBeenCalledWith(
             'http://localhost:8317/v0/management/model-inventory',
             expect.objectContaining({ method: 'GET' })
@@ -223,7 +239,7 @@ describe('management-api-client', () => {
 
         try {
           await expect(client.getModelInventory()).rejects.toThrow(
-            'model_inventory.routes is not part of schema version 1'
+            'model_inventory.routes is not part of schema version 2'
           );
         } finally {
           global.fetch = originalFetch;
@@ -262,7 +278,7 @@ describe('management-api-client', () => {
           global.fetch = fetchMock as typeof global.fetch;
 
           try {
-            await expect(client.putConfigYaml('model-routing: {}\n')).rejects.toThrow(
+            await expect(client.putConfigYaml('model-routing: {}\n', null)).rejects.toThrow(
               `HTTP ${status}: status-${status}`
             );
             expect(fetchMock).toHaveBeenCalledTimes(1);
