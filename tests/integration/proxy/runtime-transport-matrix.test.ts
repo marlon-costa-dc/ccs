@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as os from 'node:os';
@@ -27,37 +27,17 @@ type ProbeResult = {
   elapsedMs?: number;
 };
 
-function resolveNodeBinary(version: 18 | 22 | 26): Promise<string> {
-  const npmExecPath = process.env.npm_execpath;
-  const npmNodeExecPath = process.env.npm_node_execpath;
-  if (!npmExecPath || !npmNodeExecPath) {
-    throw new Error('Unable to resolve npm runtime from npm_execpath and npm_node_execpath');
-  }
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      npmNodeExecPath,
-      [npmExecPath, 'exec', '--yes', `node@${version}`, '--', '-p', 'process.execPath'],
-      {
-        env: Object.fromEntries(
-          Object.entries(process.env).filter(([key]) => !proxyKeys.includes(key))
-        ),
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }
-    );
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => (stdout += chunk));
-    child.stderr.on('data', (chunk) => (stderr += chunk));
-    child.once('error', reject);
-    child.once('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`Unable to resolve Node ${version}: ${stderr.trim() || stdout.trim()}`));
-        return;
-      }
-      resolve(stdout.trim());
-    });
+function resolveNodeBinary(version: 18 | 22 | 26): string {
+  const result = spawnSync('npx', ['-y', `node@${version}`, '-p', 'process.execPath'], {
+    encoding: 'utf8',
+    env: Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !proxyKeys.includes(key))
+    ),
   });
+  if (result.status !== 0) {
+    throw new Error(`Unable to resolve Node ${version}: ${result.stderr.trim()}`);
+  }
+  return result.stdout.trim();
 }
 
 function runProbe(
@@ -119,11 +99,9 @@ describe.skipIf(!matrixEnabled)('real runtime upstream transport matrix', () => 
   let sawProxyAuthorization = false;
 
   beforeAll(async () => {
-    [node18, node22, node26] = await Promise.all([
-      resolveNodeBinary(18),
-      resolveNodeBinary(22),
-      resolveNodeBinary(26),
-    ]);
+    node18 = resolveNodeBinary(18);
+    node22 = resolveNodeBinary(22);
+    node26 = resolveNodeBinary(26);
     const payload = JSON.stringify({
       id: 'chatcmpl_matrix',
       model: 'sentinel-model',
