@@ -14,6 +14,8 @@ const proxyTarget: ProxyTarget = {
   host: '127.0.0.1',
   port: 8317,
   protocol: 'http',
+  allowSelfSigned: false,
+  managementTimeoutMs: 2_000,
   isRemote: false,
 };
 
@@ -56,7 +58,6 @@ async function registerScenarioMocks(): Promise<void> {
     realProxyTargetResolver,
     realAccountSafety,
     realAccountSafetyCrossLane,
-    realPoolOptInPrompt,
     realOAuthPortDiagnostics,
   ] = await Promise.all([
     import('../../config/config-generator'),
@@ -66,7 +67,6 @@ async function registerScenarioMocks(): Promise<void> {
     import('../../proxy/proxy-target-resolver'),
     import('../../accounts/account-safety'),
     import('../../accounts/account-safety-cross-lane'),
-    import('../../routing/pool-opt-in-prompt'),
     import('../../../management/oauth-port-diagnostics'),
   ]);
 
@@ -136,10 +136,6 @@ async function registerScenarioMocks(): Promise<void> {
     checkCrossLaneEmailOverlap: () => null,
   }));
 
-  mock.module('../../routing/pool-opt-in-prompt', () => ({
-    ...realPoolOptInPrompt,
-    maybeOfferPoolRouting: async () => undefined,
-  }));
 }
 
 afterEach(() => {

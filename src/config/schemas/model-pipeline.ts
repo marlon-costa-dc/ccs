@@ -3,6 +3,7 @@ import { ConfigError } from '../../errors/error-types';
 
 import {
   MODEL_PIPELINE_SCHEMA_VERSION,
+  type ModelPipelineAgentBinding,
   type ModelPipelineAssignment,
   type ModelPipelineCandidate,
   type ModelPipelineCandidateEvaluation,
@@ -15,6 +16,8 @@ import {
   type ModelPipelineConfig,
   type ModelPipelineCredentialReference,
   type ModelPipelineEvaluationMetric,
+  type ModelPipelineFailoverRule,
+  type ModelPipelineFailureKind,
   type ModelPipelineHealth,
   type ModelPipelineInventory,
   type ModelPipelineInventoryActive,
@@ -30,8 +33,7 @@ import {
   type ModelPipelinePublication,
   type ModelPipelineReasoningOption,
   type ModelPipelineRestriction,
-  type ModelPipelineRetryPolicy,
-  type ModelPipelineRetryRule,
+  type ModelPipelineFailurePolicy,
   type ModelPipelineRouteKey,
   type ModelPipelineRuleEvaluation,
   type ModelPipelineSnapshot,
@@ -140,6 +142,25 @@ function readStringSet(value: unknown, path: string): readonly string[] {
     readString(entry, `${path}[${index}]`)
   );
   assertSortedUnique(values, path);
+  return values;
+}
+
+function readIntegerSet(
+  value: unknown,
+  path: string,
+  minimum: number,
+  maximum: number
+): readonly number[] {
+  const values = readArray(value, path).map((entry, index) =>
+    readInteger(entry, `${path}[${index}]`, minimum, maximum)
+  );
+  const expected = [...new Set(values)].sort((left, right) => left - right);
+  if (
+    values.length !== expected.length ||
+    values.some((entry, index) => entry !== expected[index])
+  ) {
+    fail(path, 'must be unique and sorted');
+  }
   return values;
 }
 
@@ -446,8 +467,8 @@ function parseCatalogBenchmark(value: unknown, path: string): ModelPipelineCatal
   return {
     name: readString(record.name, `${path}.name`),
     score: readDecimal(record.score, `${path}.score`, true),
-    metric: readString(record.metric, `${path}.metric`),
-    source: readString(record.source, `${path}.source`),
+    metric: readNullableString(record.metric, `${path}.metric`),
+    source: readNullableString(record.source, `${path}.source`),
     dataset: readNullableString(record.dataset, `${path}.dataset`),
     date: readNullableString(record.date, `${path}.date`),
     harness: readNullableString(record.harness, `${path}.harness`),
@@ -650,13 +671,13 @@ function parseCatalogModel(value: unknown, path: string): ModelPipelineCatalogMo
   const benchmarkKeys = benchmarks.map((item) =>
     JSON.stringify([
       item.name,
-      item.metric,
+      item.metric ?? '',
       item.variant ?? '',
       item.version ?? '',
       item.dataset ?? '',
       item.date ?? '',
       item.harness ?? '',
-      item.source,
+      item.source ?? '',
       item.score,
     ])
   );
@@ -732,6 +753,7 @@ function parseObservation(value: unknown, path: string): ModelPipelineObservatio
       'http_status',
       'latency_ms',
       'effective_model_id',
+      'effective_variant_id',
       'credential_ref',
       'quota_domain',
       'rejection_reason',
@@ -744,7 +766,7 @@ function parseObservation(value: unknown, path: string): ModelPipelineObservatio
       ? null
       : parseCredentialReference(record.credential_ref, `${path}.credential_ref`);
   const quotaDomain = readNullableString(record.quota_domain, `${path}.quota_domain`);
-  if ((credentialReference === null) !== (quotaDomain === null)) {
+  if (outcome === 'success' && (credentialReference === null) !== (quotaDomain === null)) {
     fail(path, 'credential_ref and quota_domain must be both absent or both present');
   }
   if (outcome === 'success' && credentialReference === null) {
@@ -757,15 +779,24 @@ function parseObservation(value: unknown, path: string): ModelPipelineObservatio
   if (outcome === 'success' && effectiveModelId === null) {
     fail(path, 'successful probe requires effective_model_id evidence');
   }
+  const variantId = readNullableString(record.variant_id, `${path}.variant_id`);
+  const hasEffectiveVariantId = record.effective_variant_id !== undefined;
+  const effectiveVariantId = !hasEffectiveVariantId
+    ? null
+    : readNullableString(record.effective_variant_id, `${path}.effective_variant_id`);
+  if (outcome === 'success' && effectiveVariantId !== variantId) {
+    fail(path, 'successful probe effective variant must match ObservationKey');
+  }
   return {
     ...routeIdentity(record, path),
-    variant_id: readNullableString(record.variant_id, `${path}.variant_id`),
+    variant_id: variantId,
     protocol: readString(record.protocol, `${path}.protocol`),
     observed_at: readUtcTimestamp(record.observed_at, `${path}.observed_at`),
     outcome,
     http_status: readNullableInteger(record.http_status, `${path}.http_status`, 100, 599),
     latency_ms: readNullableInteger(record.latency_ms, `${path}.latency_ms`, 0),
     effective_model_id: effectiveModelId,
+    ...(hasEffectiveVariantId ? { effective_variant_id: effectiveVariantId } : {}),
     credential_ref: credentialReference,
     quota_domain: quotaDomain,
     rejection_reason: readNullableString(record.rejection_reason, `${path}.rejection_reason`),
@@ -957,94 +988,130 @@ function parseAssignment(value: unknown, path: string): ModelPipelineAssignment 
   };
 }
 
-function parseRetryRule(value: unknown, path: string): ModelPipelineRetryRule {
+function parseAgentBinding(value: unknown, path: string): ModelPipelineAgentBinding {
   const record = readRecord(value, path);
-  exactKeys(
-    record,
-    [
-      'rule_id',
-      'config_path',
-      'http_statuses',
-      'classifier_codes',
-      'retry_before_first_byte',
-      'retry_after_first_byte',
-    ],
-    path
-  );
-  const httpStatuses = readArray(record.http_statuses, `${path}.http_statuses`).map(
-    (entry, index) => readInteger(entry, `${path}.http_statuses[${index}]`, 100, 599)
-  );
-  const expectedStatuses = [...new Set(httpStatuses)].sort((left, right) => left - right);
-  if (
-    httpStatuses.length !== expectedStatuses.length ||
-    httpStatuses.some((status, index) => status !== expectedStatuses[index])
-  ) {
-    fail(`${path}.http_statuses`, 'must be unique and sorted');
-  }
-  const retryAfterFirstByte = readBoolean(
-    record.retry_after_first_byte,
-    `${path}.retry_after_first_byte`
-  );
-  if (retryAfterFirstByte) {
-    fail(`${path}.retry_after_first_byte`, 'must be false');
-  }
+  exactKeys(record, ['agent', 'tier_id', 'alias'], path);
   return {
-    rule_id: readString(record.rule_id, `${path}.rule_id`),
-    config_path: readString(record.config_path, `${path}.config_path`),
-    http_statuses: httpStatuses,
-    classifier_codes: readStringSet(record.classifier_codes, `${path}.classifier_codes`),
-    retry_before_first_byte: readBoolean(
-      record.retry_before_first_byte,
-      `${path}.retry_before_first_byte`
-    ),
-    retry_after_first_byte: retryAfterFirstByte,
+    agent: readString(record.agent, `${path}.agent`),
+    tier_id: readString(record.tier_id, `${path}.tier_id`),
+    alias: readString(record.alias, `${path}.alias`),
   };
 }
 
-function parseRetryPolicy(value: unknown, path: string): ModelPipelineRetryPolicy {
+const FAILURE_KINDS = new Set<ModelPipelineFailureKind>([
+  'credential',
+  'transport',
+  'upstream_timeout',
+  'empty_pre_response',
+]);
+
+function parseFailoverRule(value: unknown, path: string): ModelPipelineFailoverRule {
+  const record = readRecord(value, path);
+  exactKeys(record, ['rule_id', 'http_statuses', 'error_codes', 'failure_kinds'], path);
+  const httpStatuses = readIntegerSet(record.http_statuses, `${path}.http_statuses`, 100, 599);
+  const errorCodes = readStringSet(record.error_codes, `${path}.error_codes`);
+  const failureKinds = readStringSet(record.failure_kinds, `${path}.failure_kinds`).map(
+    (failureKind, index) => {
+      if (!FAILURE_KINDS.has(failureKind as ModelPipelineFailureKind)) {
+        fail(`${path}.failure_kinds[${index}]`, 'must be a supported failure kind');
+      }
+      return failureKind as ModelPipelineFailureKind;
+    }
+  );
+  if (httpStatuses.length === 0 && errorCodes.length === 0 && failureKinds.length === 0) {
+    fail(path, 'must declare at least one matcher');
+  }
+  return {
+    rule_id: readString(record.rule_id, `${path}.rule_id`),
+    http_statuses: httpStatuses,
+    error_codes: errorCodes,
+    failure_kinds: failureKinds,
+  };
+}
+
+function parseFailurePolicy(value: unknown, path: string): ModelPipelineFailurePolicy {
   const record = readRecord(value, path);
   exactKeys(
     record,
     [
-      'max_attempts',
-      'cooldown_seconds',
-      'request_timeout_seconds',
-      'rules',
-      'restore_primary_after_cooldown',
-      'fail_when_all_candidates_blocked',
+      'mode',
+      'credential_acquisition_timeout_seconds',
+      'automatic_retry',
+      'automatic_failover',
+      'max_candidate_attempts',
+      'failover_rules',
+      'serve_stale_on_error',
+      'preserve_first_error',
+      'terminate_owned_request_on_cancel',
     ],
     path
   );
-  const rules = readArray(record.rules, `${path}.rules`).map((entry, index) =>
-    parseRetryRule(entry, `${path}.rules[${index}]`)
+  const mode = readString(record.mode, `${path}.mode`);
+  const automaticRetry = readBoolean(record.automatic_retry, `${path}.automatic_retry`);
+  const automaticFailover = readBoolean(record.automatic_failover, `${path}.automatic_failover`);
+  const serveStaleOnError = readBoolean(
+    record.serve_stale_on_error,
+    `${path}.serve_stale_on_error`
   );
-  assertSortedUnique(
-    rules.map((rule) => rule.rule_id),
-    `${path}.rules`
+  const preserveFirstError = readBoolean(
+    record.preserve_first_error,
+    `${path}.preserve_first_error`
   );
+  const terminateOwnedRequestOnCancel = readBoolean(
+    record.terminate_owned_request_on_cancel,
+    `${path}.terminate_owned_request_on_cancel`
+  );
+  const failoverRules = readArray(record.failover_rules, `${path}.failover_rules`).map(
+    (rule, index) => parseFailoverRule(rule, `${path}.failover_rules[${index}]`)
+  );
+  if (mode !== 'classified_candidate_failover') {
+    fail(`${path}.mode`, 'must equal classified_candidate_failover');
+  }
+  if (automaticRetry) fail(`${path}.automatic_retry`, 'must be false');
+  if (!automaticFailover) fail(`${path}.automatic_failover`, 'must be true');
+  if (failoverRules.length === 0) fail(`${path}.failover_rules`, 'must contain at least one rule');
+  if (serveStaleOnError) fail(`${path}.serve_stale_on_error`, 'must be false');
+  if (!preserveFirstError) fail(`${path}.preserve_first_error`, 'must be true');
+  if (!terminateOwnedRequestOnCancel) {
+    fail(`${path}.terminate_owned_request_on_cancel`, 'must be true');
+  }
+  const ruleIds = failoverRules.map((rule) => rule.rule_id);
+  if (ruleIds.length !== new Set(ruleIds).size) {
+    fail(`${path}.failover_rules`, 'must contain unique rule ids');
+  }
+  for (const matcher of ['http_statuses', 'error_codes', 'failure_kinds'] as const) {
+    const values: string[] = [];
+    for (const rule of failoverRules) {
+      for (const value of rule[matcher]) values.push(String(value));
+    }
+    if (values.length !== new Set(values).size) {
+      fail(`${path}.failover_rules`, `${matcher} matchers must belong to exactly one rule`);
+    }
+  }
   return {
-    max_attempts: readInteger(record.max_attempts, `${path}.max_attempts`, 1),
-    cooldown_seconds: readInteger(record.cooldown_seconds, `${path}.cooldown_seconds`, 1),
-    request_timeout_seconds: readInteger(
-      record.request_timeout_seconds,
-      `${path}.request_timeout_seconds`,
+    mode,
+    credential_acquisition_timeout_seconds: readInteger(
+      record.credential_acquisition_timeout_seconds,
+      `${path}.credential_acquisition_timeout_seconds`,
       1
     ),
-    rules,
-    restore_primary_after_cooldown: readBoolean(
-      record.restore_primary_after_cooldown,
-      `${path}.restore_primary_after_cooldown`
+    automatic_retry: automaticRetry,
+    automatic_failover: automaticFailover,
+    max_candidate_attempts: readInteger(
+      record.max_candidate_attempts,
+      `${path}.max_candidate_attempts`,
+      2
     ),
-    fail_when_all_candidates_blocked: readBoolean(
-      record.fail_when_all_candidates_blocked,
-      `${path}.fail_when_all_candidates_blocked`
-    ),
+    failover_rules: failoverRules,
+    serve_stale_on_error: serveStaleOnError,
+    preserve_first_error: preserveFirstError,
+    terminate_owned_request_on_cancel: terminateOwnedRequestOnCancel,
   };
 }
 
 function parsePublication(value: unknown, path: string): ModelPipelinePublication {
   const record = readRecord(value, path);
-  exactKeys(record, ['mode', 'targets'], path);
+  exactKeys(record, ['mode', 'request_timeout_seconds', 'retained_snapshots', 'targets'], path);
   const targets = readArray(record.targets, `${path}.targets`).map((entry, index) => {
     const targetPath = `${path}.targets[${index}]`;
     const target = readRecord(entry, targetPath);
@@ -1062,6 +1129,12 @@ function parsePublication(value: unknown, path: string): ModelPipelinePublicatio
   );
   return {
     mode: readString(record.mode, `${path}.mode`),
+    request_timeout_seconds: readInteger(
+      record.request_timeout_seconds,
+      `${path}.request_timeout_seconds`,
+      1
+    ),
+    retained_snapshots: readInteger(record.retained_snapshots, `${path}.retained_snapshots`, 1),
     targets,
   };
 }
@@ -1168,7 +1241,8 @@ function parseSnapshot(value: unknown, path: string): ModelPipelineSnapshot {
       'evaluations',
       'rejections',
       'assignments',
-      'retry_policy',
+      'agent_bindings',
+      'failure_policy',
       'publication',
       'projection_digest',
       'snapshot_digest',
@@ -1288,6 +1362,24 @@ function parseSnapshot(value: unknown, path: string): ModelPipelineSnapshot {
   if (new Set(assignments.map((item) => item.alias)).size !== assignments.length) {
     fail(`${path}.assignments`, 'must contain unique aliases');
   }
+  const agentBindings = readArray(record.agent_bindings, `${path}.agent_bindings`).map(
+    (entry, index) => parseAgentBinding(entry, `${path}.agent_bindings[${index}]`)
+  );
+  if (agentBindings.length === 0) {
+    fail(`${path}.agent_bindings`, 'must contain at least one agent tier binding');
+  }
+  assertSortedUnique(
+    agentBindings.map((binding) => binding.agent),
+    `${path}.agent_bindings`
+  );
+  const aliasesByTier = new Map(
+    assignments.map((assignment) => [assignment.tier_id, assignment.alias] as const)
+  );
+  for (const binding of agentBindings) {
+    if (aliasesByTier.get(binding.tier_id) !== binding.alias) {
+      fail(`${path}.agent_bindings`, 'must reference the alias allocated to each bound tier');
+    }
+  }
 
   const eligible = new Set(
     evaluations
@@ -1375,7 +1467,8 @@ function parseSnapshot(value: unknown, path: string): ModelPipelineSnapshot {
     evaluations,
     rejections,
     assignments,
-    retry_policy: parseRetryPolicy(record.retry_policy, `${path}.retry_policy`),
+    agent_bindings: agentBindings,
+    failure_policy: parseFailurePolicy(record.failure_policy, `${path}.failure_policy`),
     publication: parsePublication(record.publication, `${path}.publication`),
   };
   const projectionDigest = readDigest(record.projection_digest, `${path}.projection_digest`);
@@ -1420,6 +1513,10 @@ export function parseModelPipelineConfig(value: unknown): ModelPipelineConfig {
     schema_version: MODEL_PIPELINE_SCHEMA_VERSION,
     snapshot,
   });
+}
+
+export function parseModelPipelineInventory(value: unknown): ModelPipelineInventory {
+  return deepFreeze(parseInventory(value, 'model_inventory'));
 }
 
 export function isModelPipelineConfig(value: unknown): value is ModelPipelineConfig {

@@ -112,9 +112,7 @@ function resultUsesCodexProvider(result: ProfileDetectionResult): boolean {
     return false;
   }
 
-  return Object.values(result.compositeTiers).some(
-    (tier) => tier.provider === 'codex' || tier.fallback?.provider === 'codex'
-  );
+  return Object.values(result.compositeTiers).some((tier) => tier.provider === 'codex');
 }
 
 function createCodexClaudeExtensionError(profileName: string): Error {

@@ -52,6 +52,8 @@ function parseInput(body: unknown): UpsertAiProviderEntryInput {
   return {
     name: typeof payload.name === 'string' ? payload.name : undefined,
     baseUrl: typeof payload.baseUrl === 'string' ? payload.baseUrl : undefined,
+    routeChannel: typeof payload.routeChannel === 'string' ? payload.routeChannel : undefined,
+    quotaDomain: typeof payload.quotaDomain === 'string' ? payload.quotaDomain : undefined,
     proxyUrl: typeof payload.proxyUrl === 'string' ? payload.proxyUrl : undefined,
     prefix: typeof payload.prefix === 'string' ? payload.prefix : undefined,
     headers: Array.isArray(payload.headers)
@@ -71,12 +73,26 @@ function parseInput(body: unknown): UpsertAiProviderEntryInput {
     models: Array.isArray(payload.models)
       ? payload.models
           .filter(
-            (item): item is { name?: unknown; alias?: unknown } =>
+            (item): item is Record<string, unknown> =>
               typeof item === 'object' && item !== null
           )
           .map((item) => ({
             name: typeof item.name === 'string' ? item.name : '',
             alias: typeof item.alias === 'string' ? item.alias : '',
+            catalogProviderId:
+              typeof item.catalogProviderId === 'string' ? item.catalogProviderId : undefined,
+            catalogModelId:
+              typeof item.catalogModelId === 'string' ? item.catalogModelId : undefined,
+            catalogRouteProviderId:
+              typeof item.catalogRouteProviderId === 'string'
+                ? item.catalogRouteProviderId
+                : undefined,
+            catalogRouteModelId:
+              typeof item.catalogRouteModelId === 'string' ? item.catalogRouteModelId : undefined,
+            variantId: typeof item.variantId === 'string' ? item.variantId : undefined,
+            protocols: Array.isArray(item.protocols)
+              ? item.protocols.filter((value): value is string => typeof value === 'string')
+              : undefined,
           }))
       : undefined,
     apiKey: typeof payload.apiKey === 'string' ? payload.apiKey : undefined,

@@ -515,58 +515,64 @@
           ]
         }
       ],
-      "retry_policy": {
-        "max_attempts": 3,
-        "cooldown_seconds": 15,
-        "request_timeout_seconds": 120,
-        "rules": [
+      "agent_bindings": [
+        {
+          "agent": "codex",
+          "tier_id": "primary",
+          "alias": "aihub-primary"
+        }
+      ],
+      "failure_policy": {
+        "mode": "classified_candidate_failover",
+        "credential_acquisition_timeout_seconds": 120,
+        "automatic_retry": false,
+        "automatic_failover": true,
+        "max_candidate_attempts": 3,
+        "failover_rules": [
           {
-            "rule_id": "credential-state",
-            "config_path": "models.retry_policy.rules[credential-state]",
+            "rule_id": "capacity",
             "http_statuses": [
-              401,
-              402,
-              403
+              429
             ],
-            "classifier_codes": [
-              "account_suspended",
-              "credential_unavailable",
-              "quota_exhausted"
+            "error_codes": [
+              "credential_concurrency_exceeded",
+              "model_cooldown",
+              "rate_limit"
             ],
-            "retry_before_first_byte": true,
-            "retry_after_first_byte": false
+            "failure_kinds": [
+              "credential"
+            ]
           },
           {
-            "rule_id": "permanent-http",
-            "config_path": "models.retry_policy.rules[permanent-http]",
-            "http_statuses": [
-              400
-            ],
-            "classifier_codes": [],
-            "retry_before_first_byte": false,
-            "retry_after_first_byte": false
-          },
-          {
-            "rule_id": "transient-http",
-            "config_path": "models.retry_policy.rules[transient-http]",
+            "rule_id": "pre-response-transient",
             "http_statuses": [
               408,
-              429,
               500,
               502,
               503,
               504
             ],
-            "classifier_codes": [],
-            "retry_before_first_byte": true,
-            "retry_after_first_byte": false
+            "error_codes": [
+              "empty_completion",
+              "empty_stream",
+              "home_unavailable",
+              "upstream_failed"
+            ],
+            "failure_kinds": [
+              "empty_pre_response",
+              "transport",
+              "upstream_timeout"
+            ]
           }
         ],
-        "restore_primary_after_cooldown": true,
-        "fail_when_all_candidates_blocked": true
+        "serve_stale_on_error": false,
+        "preserve_first_error": true,
+        "terminate_owned_request_on_cancel": true
       },
       "publication": {
         "mode": "atomic_replace",
+        "request_timeout_seconds": 120,
+        "retained_snapshots": 2,
         "targets": [
           {
             "target_id": "ccs",
@@ -588,8 +594,8 @@
           }
         ]
       },
-      "projection_digest": "sha256:6d505e335548fe916e49b679e5a5c5265262f1b552217c7afcc54dbd890d451f",
-      "snapshot_digest": "sha256:2d8c52223e9249975146a7383d7e91b4c10a2aadce66d0c31a1cc29be430d34e"
+      "projection_digest": "sha256:a2d543504bba7caa9a5c925bb1018e484a0331fb0479dbc87e828db51bc275a5",
+      "snapshot_digest": "sha256:15303dbab83d64d09f79f1f3a22bc09fb3ad5916f2624283f2c6a0ecbe969801"
     }
   }
 }

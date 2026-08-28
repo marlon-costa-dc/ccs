@@ -123,8 +123,8 @@ export interface ModelPipelineInventory {
 export interface ModelPipelineCatalogBenchmark {
   readonly name: string;
   readonly score: string;
-  readonly metric: string;
-  readonly source: string;
+  readonly metric: string | null;
+  readonly source: string | null;
   readonly dataset: string | null;
   readonly date: string | null;
   readonly harness: string | null;
@@ -210,6 +210,7 @@ export interface ModelPipelineObservation extends ModelPipelineRouteKey {
   readonly http_status: number | null;
   readonly latency_ms: number | null;
   readonly effective_model_id: string | null;
+  readonly effective_variant_id?: string | null;
   readonly credential_ref: ModelPipelineCredentialReference | null;
   readonly quota_domain: string | null;
   readonly rejection_reason: string | null;
@@ -269,22 +270,35 @@ export interface ModelPipelineAssignment {
   readonly candidates: readonly ModelPipelineCandidate[];
 }
 
-export interface ModelPipelineRetryRule {
-  readonly rule_id: string;
-  readonly config_path: string;
-  readonly http_statuses: readonly number[];
-  readonly classifier_codes: readonly string[];
-  readonly retry_before_first_byte: boolean;
-  readonly retry_after_first_byte: false;
+export interface ModelPipelineAgentBinding {
+  readonly agent: string;
+  readonly tier_id: string;
+  readonly alias: string;
 }
 
-export interface ModelPipelineRetryPolicy {
-  readonly max_attempts: number;
-  readonly cooldown_seconds: number;
-  readonly request_timeout_seconds: number;
-  readonly rules: readonly ModelPipelineRetryRule[];
-  readonly restore_primary_after_cooldown: boolean;
-  readonly fail_when_all_candidates_blocked: boolean;
+export type ModelPipelineFailureKind =
+  | 'credential'
+  | 'transport'
+  | 'upstream_timeout'
+  | 'empty_pre_response';
+
+export interface ModelPipelineFailoverRule {
+  readonly rule_id: string;
+  readonly http_statuses: readonly number[];
+  readonly error_codes: readonly string[];
+  readonly failure_kinds: readonly ModelPipelineFailureKind[];
+}
+
+export interface ModelPipelineFailurePolicy {
+  readonly mode: 'classified_candidate_failover';
+  readonly credential_acquisition_timeout_seconds: number;
+  readonly automatic_retry: false;
+  readonly automatic_failover: true;
+  readonly max_candidate_attempts: number;
+  readonly failover_rules: readonly ModelPipelineFailoverRule[];
+  readonly serve_stale_on_error: false;
+  readonly preserve_first_error: true;
+  readonly terminate_owned_request_on_cancel: true;
 }
 
 export interface ModelPipelinePublicationTarget {
@@ -296,6 +310,8 @@ export interface ModelPipelinePublicationTarget {
 
 export interface ModelPipelinePublication {
   readonly mode: string;
+  readonly request_timeout_seconds: number;
+  readonly retained_snapshots: number;
   readonly targets: readonly ModelPipelinePublicationTarget[];
 }
 
@@ -310,7 +326,8 @@ export interface ModelPipelineSnapshot {
   readonly evaluations: readonly ModelPipelineCandidateEvaluation[];
   readonly rejections: readonly ModelPipelineCandidateRejection[];
   readonly assignments: readonly ModelPipelineAssignment[];
-  readonly retry_policy: ModelPipelineRetryPolicy;
+  readonly agent_bindings: readonly ModelPipelineAgentBinding[];
+  readonly failure_policy: ModelPipelineFailurePolicy;
   readonly publication: ModelPipelinePublication;
   readonly projection_digest: string;
   readonly snapshot_digest: string;

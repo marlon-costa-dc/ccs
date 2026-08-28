@@ -5,29 +5,19 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  api,
-  type CreateVariant,
-  type UpdateVariant,
-  type CreatePreset,
-  type RoutingStrategy,
-  type CliproxySessionAffinityApplyResult,
-  type CliproxyRetryApplyResult,
-  type CliproxyRetryValues,
-} from '@/lib/api-client';
+import { api, type CreateVariant, type UpdateVariant, type CreatePreset } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
-function invalidateCliproxyRoutingQueries(queryClient: ReturnType<typeof useQueryClient>): void {
+function invalidateCliproxyModelQueries(queryClient: ReturnType<typeof useQueryClient>): void {
   queryClient.invalidateQueries({ queryKey: ['cliproxy-catalog'] });
   queryClient.invalidateQueries({ queryKey: ['cliproxy-models'] });
-  queryClient.invalidateQueries({ queryKey: ['cliproxy-session-affinity'] });
 }
 
 function invalidateCliproxyAccountQueries(queryClient: ReturnType<typeof useQueryClient>): void {
   queryClient.invalidateQueries({ queryKey: ['cliproxy-accounts'] });
   queryClient.invalidateQueries({ queryKey: ['cliproxy-auth'] });
-  invalidateCliproxyRoutingQueries(queryClient);
+  invalidateCliproxyModelQueries(queryClient);
 }
 
 export function useCliproxy() {
@@ -49,86 +39,18 @@ export function useCliproxyCatalog() {
     queryKey: ['cliproxy-catalog'],
     queryFn: () => api.cliproxy.catalog(),
     staleTime: 30000,
-    retry: 1,
+    retry: false,
   });
 }
 
-export function useCliproxyRoutingStrategy() {
+export function useModelPipeline() {
   return useQuery({
-    queryKey: ['cliproxy-routing'],
-    queryFn: () => api.cliproxy.getRoutingStrategy(),
-  });
-}
-
-export function useUpdateCliproxyRoutingStrategy() {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
-
-  return useMutation({
-    mutationFn: (strategy: RoutingStrategy) => api.cliproxy.updateRoutingStrategy(strategy),
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['cliproxy-routing'] });
-      toast.success(
-        result.message || t('toasts.routingStrategySet', { strategy: result.strategy })
-      );
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-}
-
-export function useCliproxySessionAffinity() {
-  return useQuery({
-    queryKey: ['cliproxy-session-affinity'],
-    queryFn: () => api.cliproxy.getSessionAffinity(),
-  });
-}
-
-export function useUpdateCliproxySessionAffinity() {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
-
-  return useMutation({
-    mutationFn: (data: { enabled: boolean; ttl?: string }) =>
-      api.cliproxy.updateSessionAffinity(data),
-    onSuccess: (result: CliproxySessionAffinityApplyResult) => {
-      queryClient.setQueryData(['cliproxy-session-affinity'], result);
-      queryClient.invalidateQueries({ queryKey: ['cliproxy-session-affinity'] });
-      const stateLabel = result.enabled
-        ? t('routingGuidance.sessionAffinityEnabled')
-        : t('routingGuidance.sessionAffinityDisabled');
-      toast.success(
-        result.message || t('toasts.sessionAffinityUpdated', { state: stateLabel.toLowerCase() })
-      );
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
-}
-
-export function useCliproxyRetryConfig() {
-  return useQuery({
-    queryKey: ['cliproxy-retry-config'],
-    queryFn: () => api.cliproxy.getRetrySettings(),
-  });
-}
-
-export function useUpdateCliproxyRetryConfig() {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
-
-  return useMutation({
-    mutationFn: (retry: CliproxyRetryValues) => api.cliproxy.updateRetrySettings(retry),
-    onSuccess: (result: CliproxyRetryApplyResult) => {
-      queryClient.setQueryData(['cliproxy-retry-config'], result);
-      queryClient.invalidateQueries({ queryKey: ['cliproxy-retry-config'] });
-      toast.success(result.message || t('toasts.cliproxyRetryUpdated'));
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
+    queryKey: ['model-pipeline'],
+    queryFn: () => api.modelPipeline.get(),
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
   });
 }
 

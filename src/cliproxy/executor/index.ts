@@ -59,7 +59,6 @@ import {
   resolveSkipLocalAuth,
   runAntigravityGate,
   ensureProviderAuthentication,
-  runPreflightQuotaCheck,
   runAccountSafetyGuards,
   ensureModelConfiguration,
   ensureProviderSettingsFile,
@@ -295,12 +294,8 @@ export async function execClaudeWithCLIProxy(
     await ensureProviderAuthentication(authCtx);
   }
 
-  // 3b. Preflight quota check (providers with quota-based rotation)
-  if (!skipLocalAuth) {
-    await runPreflightQuotaCheck(provider, compositeProviders);
-  }
-
-  // 3c. Account safety: enforce cross-provider isolation
+  // 3b. Account safety: enforce cross-provider isolation. Selection and quota
+  // failover belong exclusively to the active CLIProxy model-routing snapshot.
   if (!skipLocalAuth) {
     runAccountSafetyGuards(provider, compositeProviders);
   }
@@ -378,7 +373,7 @@ export async function execClaudeWithCLIProxy(
         remotePort: proxyConfig.port,
         authToken: proxyConfig.authToken,
         verbose,
-        allowSelfSigned: proxyConfig.allowSelfSigned ?? false,
+        allowSelfSigned: proxyConfig.allowSelfSigned,
       });
       tunnelPort = await httpsTunnel.start();
       log(
@@ -393,23 +388,25 @@ export async function execClaudeWithCLIProxy(
     log('HTTPS tunnel skipped for Codex; local proxy chain will connect to remote HTTPS directly');
   }
 
-  const imageAnalysisProxyTarget =
-    useRemoteProxy && proxyConfig.host
-      ? {
-          host: proxyConfig.host,
-          port: proxyConfig.port,
-          protocol: proxyConfig.protocol,
-          authToken: proxyConfig.authToken,
-          managementKey: proxyConfig.managementKey,
-          allowSelfSigned: proxyConfig.allowSelfSigned,
-          isRemote: true as const,
-        }
-      : {
-          host: '127.0.0.1',
-          port: cfg.port,
-          protocol: 'http' as const,
-          isRemote: false as const,
-        };
+  const imageAnalysisProxyTarget = useRemoteProxy
+    ? {
+        host: proxyConfig.host,
+        port: proxyConfig.port,
+        protocol: proxyConfig.protocol,
+        authToken: proxyConfig.authToken,
+        managementKey: proxyConfig.managementKey,
+        allowSelfSigned: proxyConfig.allowSelfSigned,
+        managementTimeoutMs: proxyConfig.timeout,
+        isRemote: true as const,
+      }
+    : {
+        host: '127.0.0.1',
+        port: cfg.port,
+        protocol: 'http' as const,
+        allowSelfSigned: false,
+        managementTimeoutMs: proxyConfig.timeout,
+        isRemote: false as const,
+      };
   const imageAnalysisResolution = await resolveCliproxyImageAnalysisEnv({
     profileName: cfg.profileName || provider,
     provider,

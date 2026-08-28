@@ -325,10 +325,6 @@ async function runSetupWizard(force: boolean = false): Promise<void> {
           protocol: remoteConfig.protocol,
           auth_token: remoteConfig.authToken,
         },
-        fallback: {
-          enabled: true,
-          auto_start: false,
-        },
         local: {
           port: CLIPROXY_DEFAULT_PORT,
           auto_start: false, // Disable local auto-start when using remote

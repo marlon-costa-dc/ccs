@@ -56,25 +56,8 @@ export async function showHelp(): Promise<void> {
         ['default <account> [--provider <name>]', 'Set default account for rotation'],
         ['pause <account> [--provider <name>]', 'Pause account (skip in rotation)'],
         ['resume <account> [--provider <name>]', 'Resume paused account'],
-        [
-          'quota',
-          'Show quota status + pool context (drain order, per-account available/cooling/paused)',
-        ],
+        ['quota', 'Show account quota status'],
         ['quota --provider <name>', `Filter by provider (${QUOTA_PROVIDER_HELP_TEXT})`],
-        ['routing', 'Show current routing strategy and manual guidance (local target only)'],
-        ['routing explain', 'Explain strategy vs session-affinity and how sessions are recognized'],
-        ['routing set <mode>', 'Set round-robin or fill-first on the local CLIProxy'],
-        ['routing affinity', 'Show local session-affinity status and TTL'],
-        [
-          'routing affinity <on|off> [--ttl <duration>]',
-          'Toggle local session-affinity settings (not applied to remote)',
-        ],
-        ['pool', 'Show pool routing status (local target only; cooling/affinity managed locally)'],
-        ['pool --enable', 'Enable pool routing on the local CLIProxy (writes local config)'],
-        [
-          'pool --disable',
-          'Disable pool routing on the local CLIProxy and restore non-pool config',
-        ],
         [
           'accounts order <provider>',
           'Show effective drain order (priority bucket desc, then ID asc)',
@@ -134,7 +117,6 @@ export async function showHelp(): Promise<void> {
   }
 
   console.log(dim('  Note: CLIProxy now persists by default. Use "stop" to terminate.'));
-  console.log(dim('  Routing: use gcli/<model> or agy/<model> to keep overlapping models pinned.'));
   console.log(dim('  Backend: original is the default; plus is opt-in for plus-only providers.'));
   console.log('');
   console.log(subheader('Notes:'));

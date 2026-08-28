@@ -1383,12 +1383,10 @@ function EntryInspector({
 function EmptyEntryWorkspace({
   family,
   onAddEntry,
-  onOpenControlPanel,
   onOpenProfiles,
 }: {
   family: AiProviderFamilyState;
   onAddEntry: () => void;
-  onOpenControlPanel: () => void;
   onOpenProfiles: () => void;
 }) {
   const guide = getFamilyGuide(family);
@@ -1446,13 +1444,10 @@ function EmptyEntryWorkspace({
                 Need the other pages?
               </div>
               <div className="mt-2 text-sm leading-6 text-muted-foreground">
-                Use Overview or Control Panel for OAuth sign-ins. Use API Profiles only for
-                CCS-native Anthropic-compatible profiles and presets.
+                Use Overview for OAuth sign-ins. Use API Profiles only for CCS-native
+                Anthropic-compatible profiles and presets.
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={onOpenControlPanel}>
-                  Control Panel
-                </Button>
                 <Button type="button" size="sm" variant="outline" onClick={onOpenProfiles}>
                   API Profiles
                   <ExternalLink className="ml-1 h-3.5 w-3.5" />
@@ -1585,13 +1580,6 @@ export function CliproxyAiProvidersPage() {
                 <Button type="button" onClick={() => void refetch()}>
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Retry
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/cliproxy/control-panel')}
-                >
-                  Control Panel
                 </Button>
                 <Button type="button" variant="outline" onClick={() => navigate('/providers')}>
                   API Profiles
@@ -1745,13 +1733,6 @@ export function CliproxyAiProvidersPage() {
               >
                 <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/cliproxy/control-panel')}
-              >
-                Control Panel
-              </Button>
               <Button type="button" variant="outline" onClick={() => navigate('/providers')}>
                 API Profiles
                 <ExternalLink className="ml-1 h-3.5 w-3.5" />
@@ -1871,7 +1852,6 @@ export function CliproxyAiProvidersPage() {
               <EmptyEntryWorkspace
                 family={selectedFamilyState}
                 onAddEntry={openCreateDialog}
-                onOpenControlPanel={() => navigate('/cliproxy/control-panel')}
                 onOpenProfiles={() => navigate('/providers')}
               />
             </div>

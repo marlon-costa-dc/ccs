@@ -14,6 +14,23 @@ export type AiProviderFamilyId = (typeof AI_PROVIDER_FAMILY_IDS)[number];
 export interface AiProviderModelAlias {
   name: string;
   alias: string;
+  catalogProviderId?: string;
+  catalogModelId?: string;
+  catalogRouteProviderId?: string;
+  catalogRouteModelId?: string;
+  variantId?: string;
+  protocols?: string[];
+}
+
+export interface OpenAICompatModelEntry {
+  name: string;
+  alias: string;
+  'catalog-provider-id'?: string;
+  'catalog-model-id'?: string;
+  'catalog-route-provider-id'?: string;
+  'catalog-route-model-id'?: string;
+  'variant-id'?: string;
+  protocols?: string[];
 }
 
 export interface AiProviderApiKeyEntry {
@@ -29,6 +46,7 @@ export interface AiProviderApiKeyEntry {
 
 export interface OpenAICompatApiKeyEntry {
   'api-key': string;
+  'quota-domain'?: string;
   'proxy-url'?: string;
 }
 
@@ -36,9 +54,10 @@ export interface OpenAICompatEntry {
   id?: string;
   name: string;
   'base-url': string;
+  'route-channel'?: string;
   headers?: Record<string, string>;
   'api-key-entries': OpenAICompatApiKeyEntry[];
-  models?: AiProviderModelAlias[];
+  models?: OpenAICompatModelEntry[];
 }
 
 export interface AiProviderFamilyDefinition {
@@ -56,6 +75,8 @@ export interface AiProviderEntryView {
   name?: string;
   label: string;
   baseUrl?: string;
+  routeChannel?: string;
+  quotaDomain?: string;
   proxyUrl?: string;
   prefix?: string;
   headers: Array<{ key: string; value: string }>;
@@ -92,6 +113,8 @@ export interface ListAiProvidersResult {
 export interface UpsertAiProviderEntryInput {
   name?: string;
   baseUrl?: string;
+  routeChannel?: string;
+  quotaDomain?: string;
   proxyUrl?: string;
   prefix?: string;
   headers?: Array<{ key: string; value: string }>;

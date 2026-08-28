@@ -20,7 +20,6 @@
  */
 
 import * as path from 'path';
-import { warn } from '../../utils/ui';
 import { getCcsDir } from '../../config/config-loader-facade';
 import {
   ToolSanitizationProxy,
@@ -114,17 +113,16 @@ export async function buildProxyChain(context: ProxyChainContext): Promise<Proxy
         upstreamBaseUrl: initialEnvVars.ANTHROPIC_BASE_URL,
         verbose,
         warnOnSanitize: true,
-        allowSelfSigned: useRemoteProxy ? (proxyConfig.allowSelfSigned ?? false) : false,
+        allowSelfSigned: useRemoteProxy ? proxyConfig.allowSelfSigned : false,
       });
       toolSanitizationPort = await toolSanitizationProxy.start();
       log(`Tool sanitization proxy active on port ${toolSanitizationPort}`);
     } catch (error) {
-      const err = error as Error;
       toolSanitizationProxy = null;
       toolSanitizationPort = null;
-      if (verbose) {
-        console.error(warn(`Tool sanitization proxy disabled: ${err.message}`));
-      }
+      throw new Error(`Tool sanitization proxy startup failed: ${(error as Error).message}`, {
+        cause: error,
+      });
     }
   }
 
@@ -153,7 +151,7 @@ export async function buildProxyChain(context: ProxyChainContext): Promise<Proxy
           defaultEffort: 'medium',
           disableEffort: codexThinkingOff,
           traceFilePath: traceEnabled ? path.join(getCcsDir(), 'codex-reasoning-proxy.log') : '',
-          allowSelfSigned: useRemoteProxy ? (proxyConfig.allowSelfSigned ?? false) : false,
+          allowSelfSigned: useRemoteProxy ? proxyConfig.allowSelfSigned : false,
           modelMap: {
             defaultModel: initialEnvVars.ANTHROPIC_MODEL,
             opusModel: initialEnvVars.ANTHROPIC_DEFAULT_OPUS_MODEL,
@@ -168,12 +166,11 @@ export async function buildProxyChain(context: ProxyChainContext): Promise<Proxy
           : buildCliproxyProviderPath('codex');
         log(`Codex reasoning proxy active: http://127.0.0.1:${codexReasoningPort}${providerPath}`);
       } catch (error) {
-        const err = error as Error;
         codexReasoningProxy = null;
         codexReasoningPort = null;
-        if (verbose) {
-          console.error(warn(`Codex reasoning proxy disabled: ${err.message}`));
-        }
+        throw new Error(`Codex reasoning proxy startup failed: ${(error as Error).message}`, {
+          cause: error,
+        });
       }
     }
   }

@@ -24,13 +24,8 @@ let isSyncing = false;
  * Check if auto-sync is enabled in config.
  */
 export function isAutoSyncEnabled(): boolean {
-  try {
-    const config = loadOrCreateUnifiedConfig();
-    // For local sync, check cliproxy.auto_sync (simpler config location)
-    return config.cliproxy?.auto_sync === true;
-  } catch {
-    return false;
-  }
+  const config = loadOrCreateUnifiedConfig();
+  return config.cliproxy?.auto_sync === true;
 }
 
 /**
@@ -40,13 +35,20 @@ function log(message: string): void {
   console.log(`[auto-sync] ${message}`);
 }
 
+function resolveConfiguredLocalPort(): number {
+  const port = loadOrCreateUnifiedConfig().cliproxy_server?.local?.port;
+  if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error('cliproxy_server.local.port must be a whole number between 1 and 65535');
+  }
+  return port;
+}
+
 /**
  * Execute sync to local CLIProxy config.
  */
 async function triggerSync(): Promise<void> {
   if (isSyncing) {
-    log('Sync already in progress, skipping');
-    return;
+    throw new Error('Auto-sync received overlapping work while a sync is active');
   }
 
   if (!isAutoSyncEnabled()) {
@@ -60,8 +62,7 @@ async function triggerSync(): Promise<void> {
     const result = syncToLocalConfig();
 
     if (!result.success) {
-      log(`Sync failed: ${result.error}`);
-      return;
+      throw new Error(`Auto-sync failed: ${result.error}`);
     }
 
     if (result.syncedCount === 0) {
@@ -70,8 +71,6 @@ async function triggerSync(): Promise<void> {
     }
 
     log(`Success: ${result.syncedCount} profile(s) synced to ${result.configPath}`);
-  } catch (error) {
-    log(`Sync error: ${(error as Error).message}`);
   } finally {
     isSyncing = false;
   }
@@ -79,8 +78,7 @@ async function triggerSync(): Promise<void> {
 
 async function triggerRegeneration(): Promise<void> {
   if (isSyncing) {
-    log('Sync already in progress, skipping');
-    return;
+    throw new Error('Auto-sync received overlapping regeneration work');
   }
   if (!isAutoSyncEnabled()) {
     log('Auto-sync disabled, skipping');
@@ -88,13 +86,18 @@ async function triggerRegeneration(): Promise<void> {
   }
   isSyncing = true;
   try {
-    const configPath = regenerateConfig();
+    const configPath = regenerateConfig(resolveConfiguredLocalPort());
     log(`Success: regenerated ${configPath}`);
-  } catch (error) {
-    log(`Regeneration error: ${(error as Error).message}`);
   } finally {
     isSyncing = false;
   }
+}
+
+function terminateOnBackgroundFailure(error: unknown): void {
+  const cause = error instanceof Error ? error : new Error(String(error));
+  setImmediate(() => {
+    throw cause;
+  });
 }
 
 /**
@@ -115,9 +118,7 @@ function onFileChange(filePath: string): void {
   syncTimeout = setTimeout(() => {
     syncTimeout = null;
     const operation = fileName === 'config.yaml' ? triggerRegeneration() : triggerSync();
-    operation.catch((err) => {
-      log(`Sync error: ${err.message}`);
-    });
+    operation.catch(terminateOnBackgroundFailure);
   }, DEBOUNCE_MS);
 }
 
@@ -155,7 +156,7 @@ export function startAutoSyncWatcher(): void {
   watcherInstance.on('unlink', onFileChange);
 
   watcherInstance.on('error', (error) => {
-    log(`Watcher error: ${error.message}`);
+    terminateOnBackgroundFailure(error);
   });
 
   log('Watcher started');
@@ -175,11 +176,7 @@ export async function stopAutoSyncWatcher(): Promise<void> {
     const timeoutPromise = new Promise<void>((_, reject) =>
       setTimeout(() => reject(new Error('Close timeout')), 5000)
     );
-    try {
-      await Promise.race([closePromise, timeoutPromise]);
-    } catch (err) {
-      log(`Warning: ${(err as Error).message}, forcing cleanup`);
-    }
+    await Promise.race([closePromise, timeoutPromise]);
     watcherInstance = null;
     log('Watcher stopped');
   }
@@ -200,7 +197,7 @@ export async function restartAutoSyncWatcher(): Promise<void> {
   }
 
   if (isSyncing) {
-    log('Warning: Sync still in progress after 10s timeout, proceeding with restart');
+    throw new Error('Auto-sync remained active after the 10 second restart deadline');
   }
 
   await stopAutoSyncWatcher();

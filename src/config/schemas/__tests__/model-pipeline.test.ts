@@ -19,11 +19,14 @@ describe('model pipeline config boundary', () => {
     expect(parsed.schema_version).toBe(MODEL_PIPELINE_SCHEMA_VERSION);
     expect(parsed.snapshot.generation).toBe(42);
     expect(parsed.snapshot.projection_digest).toBe(
-      'sha256:6d505e335548fe916e49b679e5a5c5265262f1b552217c7afcc54dbd890d451f'
+      'sha256:a2d543504bba7caa9a5c925bb1018e484a0331fb0479dbc87e828db51bc275a5'
     );
     expect(parsed.snapshot.snapshot_digest).toBe(
-      'sha256:2d8c52223e9249975146a7383d7e91b4c10a2aadce66d0c31a1cc29be430d34e'
+      'sha256:15303dbab83d64d09f79f1f3a22bc09fb3ad5916f2624283f2c6a0ecbe969801'
     );
+    expect(parsed.snapshot.agent_bindings).toEqual([
+      { agent: 'codex', tier_id: 'primary', alias: 'aihub-primary' },
+    ]);
     expect(parsed.snapshot.assignments[0]?.candidates[0]?.pricing?.entries).toHaveLength(9);
     expect(Object.isFrozen(parsed)).toBe(true);
     expect(Object.isFrozen(parsed.snapshot)).toBe(true);
@@ -31,6 +34,29 @@ describe('model pipeline config boundary', () => {
     expect(Object.isFrozen(parsed.snapshot.assignments[0]?.candidates[0]?.pricing?.entries)).toBe(
       true
     );
+  });
+
+  it('requires positive publication ownership values and rejects extra keys', () => {
+    const invalidCases: ReadonlyArray<readonly [string, unknown, string]> = [
+      ['request_timeout_seconds', undefined, 'must be a whole number 1 or greater'],
+      ['request_timeout_seconds', 0, 'must be a whole number 1 or greater'],
+      ['request_timeout_seconds', '120', 'must be a whole number 1 or greater'],
+      ['retained_snapshots', undefined, 'must be a whole number 1 or greater'],
+      ['retained_snapshots', 0, 'must be a whole number 1 or greater'],
+      ['retained_snapshots', 2.5, 'must be a whole number 1 or greater'],
+      ['legacy_atomic_write', true, 'is not part of schema version 1'],
+    ];
+
+    for (const [key, value, message] of invalidCases) {
+      const envelope = cloneEnvelope();
+      const publication = snapshotOf(envelope).publication as Record<string, unknown>;
+      if (value === undefined) {
+        delete publication[key];
+      } else {
+        publication[key] = value;
+      }
+      expect(() => parseModelPipelineConfig(envelope)).toThrow(message);
+    }
   });
 
   it('rejects fields outside the exact versioned contract', () => {
@@ -83,6 +109,31 @@ describe('model pipeline config boundary', () => {
     );
   });
 
+  it('rejects missing, duplicate, or dangling agent tier bindings', () => {
+    const missing = cloneEnvelope();
+    snapshotOf(missing).agent_bindings = [];
+    expect(() => parseModelPipelineConfig(missing)).toThrow(
+      'model_pipeline.snapshot.agent_bindings must contain at least one agent tier binding'
+    );
+
+    const duplicate = cloneEnvelope();
+    snapshotOf(duplicate).agent_bindings = [
+      { agent: 'codex', tier_id: 'primary', alias: 'aihub-primary' },
+      { agent: 'codex', tier_id: 'primary', alias: 'aihub-primary' },
+    ];
+    expect(() => parseModelPipelineConfig(duplicate)).toThrow(
+      'model_pipeline.snapshot.agent_bindings must be unique and sorted'
+    );
+
+    const dangling = cloneEnvelope();
+    snapshotOf(dangling).agent_bindings = [
+      { agent: 'codex', tier_id: 'primary', alias: 'aihub-fast' },
+    ];
+    expect(() => parseModelPipelineConfig(dangling)).toThrow(
+      'model_pipeline.snapshot.agent_bindings must reference the alias allocated to each bound tier'
+    );
+  });
+
   it('rejects semantic drift when the projection digest is stale', () => {
     const envelope = cloneEnvelope();
     snapshotOf(envelope).generated_at = '2026-08-27T19:00:00Z';
@@ -90,6 +141,60 @@ describe('model pipeline config boundary', () => {
     expect(() => parseModelPipelineConfig(envelope)).toThrow(
       'model_pipeline.snapshot.projection_digest must equal sha256:'
     );
+  });
+
+  it('accepts only explicit classified candidate failover invariants', () => {
+    const invalidCases: ReadonlyArray<readonly [string, unknown, string]> = [
+      ['mode', 'retry', 'must equal classified_candidate_failover'],
+      ['automatic_retry', true, 'must be false'],
+      ['automatic_failover', false, 'must be true'],
+      ['max_candidate_attempts', 1, 'must be a whole number 2 or greater'],
+      ['serve_stale_on_error', true, 'must be false'],
+      ['preserve_first_error', false, 'must be true'],
+      ['terminate_owned_request_on_cancel', false, 'must be true'],
+    ];
+
+    for (const [key, value, message] of invalidCases) {
+      const envelope = cloneEnvelope();
+      const failurePolicy = snapshotOf(envelope).failure_policy as Record<string, unknown>;
+      failurePolicy[key] = value;
+      expect(() => parseModelPipelineConfig(envelope)).toThrow(message);
+    }
+  });
+
+  it('rejects empty, duplicate, overlapping, unsorted, and unknown failover matchers', () => {
+    const mutateRules = (
+      mutate: (rules: Array<Record<string, unknown>>) => void,
+      message: string
+    ) => {
+      const envelope = cloneEnvelope();
+      const failurePolicy = snapshotOf(envelope).failure_policy as Record<string, unknown>;
+      const rules = failurePolicy.failover_rules as Array<Record<string, unknown>>;
+      mutate(rules);
+      expect(() => parseModelPipelineConfig(envelope)).toThrow(message);
+    };
+
+    mutateRules((rules) => rules.splice(0), 'must contain at least one rule');
+    mutateRules((rules) => {
+      rules[0]!.http_statuses = [];
+      rules[0]!.error_codes = [];
+      rules[0]!.failure_kinds = [];
+    }, 'must declare at least one matcher');
+    mutateRules((rules) => {
+      rules[1]!.rule_id = rules[0]!.rule_id;
+    }, 'must contain unique rule ids');
+    mutateRules((rules) => {
+      rules[1]!.http_statuses = [429, 503];
+    }, 'http_statuses matchers must belong to exactly one rule');
+    mutateRules((rules) => {
+      rules[1]!.http_statuses = [503, 500];
+    }, 'must be unique and sorted');
+    mutateRules((rules) => {
+      rules[0]!.failure_kinds = ['invented'];
+    }, 'must be a supported failure kind');
+    mutateRules((rules) => {
+      rules[0]!.legacy_retry_count = 2;
+    }, 'is not part of schema version 1');
   });
 
   it('validates and serializes model_pipeline as a native top-level CCS section', () => {
@@ -100,7 +205,7 @@ describe('model pipeline config boundary', () => {
     const serialized = generateYamlWithComments(config);
     expect(serialized).toContain('\nmodel_pipeline:\n');
     expect(serialized).toContain(
-      'snapshot_digest: sha256:2d8c52223e9249975146a7383d7e91b4c10a2aadce66d0c31a1cc29be430d34e'
+      'snapshot_digest: sha256:15303dbab83d64d09f79f1f3a22bc09fb3ad5916f2624283f2c6a0ecbe969801'
     );
     expect(serialized.indexOf('\nmodel_pipeline:\n')).toBeLessThan(
       serialized.indexOf('\ncliproxy_server:\n')

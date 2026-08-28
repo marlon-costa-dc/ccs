@@ -10,7 +10,6 @@
  * - isAuthenticated checks + automatic OAuth trigger
  * - Proactive token refresh (multi-provider for composite)
  * - lastUsedAt touch via touchDefaultAccount
- * - Preflight quota check
  * - Account safety guards (cross-provider isolation)
  * - First-run model configuration
  *
@@ -21,9 +20,8 @@
  *   4. OAuth check / trigger (single or composite)
  *   5. Token refresh
  *   6. lastUsedAt touch
- *   7. Preflight quota check
- *   8. Account safety guards
- *   9. First-run model configuration
+ *   7. Account safety guards
+ *   8. First-run model configuration
  */
 
 import { ok, fail, info } from '../../utils/ui';
@@ -37,9 +35,8 @@ import {
   ensureCliAntigravityResponsibility,
   ANTIGRAVITY_ACCEPT_RISK_FLAGS,
 } from '../auth/antigravity-responsibility';
-import { handleTokenExpiration, handleQuotaCheck } from './retry-handler';
+import { handleTokenExpiration } from './failure-handler';
 import { applyAccountSafetyGuards, touchDefaultAccount } from './account-resolution';
-import { MANAGED_QUOTA_PROVIDERS } from '../quota/quota-manager';
 import type { ParsedExecutorFlags } from './arg-parser';
 import type { UnifiedConfig } from '../../config/schemas/unified-config';
 
@@ -337,28 +334,7 @@ export async function ensureProviderAuthentication(
   touchDefaultAccount(provider);
 }
 
-// ── 7. Preflight quota check ──────────────────────────────────────────────────
-
-/**
- * Preflight quota check for providers with quota-based rotation.
- * Only runs when !skipLocalAuth.
- */
-export async function runPreflightQuotaCheck(
-  provider: CLIProxyProvider,
-  compositeProviders: CLIProxyProvider[]
-): Promise<void> {
-  if (compositeProviders.length > 0) {
-    for (const managedProvider of MANAGED_QUOTA_PROVIDERS) {
-      if (compositeProviders.includes(managedProvider)) {
-        await handleQuotaCheck(managedProvider);
-      }
-    }
-  } else {
-    await handleQuotaCheck(provider);
-  }
-}
-
-// ── 8. Account safety guards ──────────────────────────────────────────────────
+// ── 7. Account safety guards ──────────────────────────────────────────────────
 
 /**
  * Enforce cross-provider account isolation. Only runs when !skipLocalAuth.
@@ -370,7 +346,7 @@ export function runAccountSafetyGuards(
   applyAccountSafetyGuards(provider, compositeProviders);
 }
 
-// ── 9. First-run model configuration ─────────────────────────────────────────
+// ── 8. First-run model configuration ─────────────────────────────────────────
 
 /**
  * Ensure provider model is configured on first run.

@@ -6,7 +6,7 @@
  */
 
 import type { TargetType } from '../../targets/target-adapter';
-import type { CLIProxyProvider, CliproxyRoutingStrategy } from '../../cliproxy/types';
+import type { CLIProxyProvider } from '../../cliproxy/types';
 import { CLIPROXY_PROVIDER_IDS } from '../../cliproxy/provider-capabilities';
 import type { OAuthAccounts, CLIProxyAuthConfig, TokenRefreshSettings } from './auth';
 
@@ -50,22 +50,8 @@ export interface CompositeTierConfig {
   model: string;
   /** Account nickname (optional, references oauth_accounts) */
   account?: string;
-  /** Fallback provider+model if primary fails */
-  fallback?: {
-    provider: CLIProxyProvider;
-    model: string;
-    account?: string;
-  };
-  /** Ordered cross-provider fallback hops after the primary provider+model. */
-  fallback_chain?: readonly CompositeFallbackEntry[];
   /** Per-tier thinking budget override (e.g. 'xhigh', 'medium', 'off') */
   thinking?: string;
-}
-
-export interface CompositeFallbackEntry {
-  readonly provider: CLIProxyProvider;
-  readonly model: string;
-  readonly account?: string;
 }
 
 /**
@@ -123,28 +109,6 @@ export const DEFAULT_CLIPROXY_SAFETY_CONFIG: CLIProxySafetyConfig = {
   antigravity_ack_bypass: false,
 };
 
-export interface CLIProxyRoutingConfig {
-  /** Credential selection strategy when multiple accounts match */
-  strategy?: CliproxyRoutingStrategy;
-  /** Keep one conversation pinned to the same account when possible */
-  session_affinity?: boolean;
-  /** Go-style duration for session-affinity binding retention */
-  session_affinity_ttl?: string;
-}
-
-/**
- * CLIProxy request-retry configuration.
- * Controls CLIProxy's own retry-on-transient-error behavior
- * (403, 408, 500, 502, 503, 504). Defaults to disabled (0/0): retrying can
- * burn quota on multi-account pools, so this is opt-in.
- */
-export interface CLIProxyRetryConfig {
-  /** Number of times to retry a request on a transient error (integer >= 0, default: 0 = disabled) */
-  request_retry?: number;
-  /** Maximum wait time in seconds for a cooled-down credential before retrying (integer >= 0, default: 0) */
-  max_retry_interval?: number;
-}
-
 /** One OAuth model alias exposed by CLIProxy to compatible clients. */
 export interface CLIProxyOAuthModelAliasEntry {
   /** Upstream model ID used after alias resolution. */
@@ -153,8 +117,6 @@ export interface CLIProxyOAuthModelAliasEntry {
   alias: string;
   /** Keep both the upstream name and alias visible when supported upstream. */
   fork?: boolean;
-  /** Zero-based position in an explicitly ordered cross-provider pool. */
-  order?: number;
 }
 
 /** Provider/protocol keyed OAuth model aliases (for example `codex`). */
@@ -191,56 +153,6 @@ export interface CLIProxyPayloadConfig {
   [section: string]: unknown;
 }
 
-/** Lower bound (inclusive) accepted for CLIProxy retry config fields. */
-export const CLIPROXY_RETRY_MIN_VALUE = 0;
-
-/** Human-readable accepted-range description for CLIProxy retry config fields. */
-export const CLIPROXY_RETRY_RANGE_MESSAGE = `must be a whole number ${CLIPROXY_RETRY_MIN_VALUE} or greater`;
-
-/**
- * Validate a single CLIProxy retry config field value (request_retry or
- * max_retry_interval). Both fields share the same bounds: non-negative integer.
- */
-export function isValidCliproxyRetryValue(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= CLIPROXY_RETRY_MIN_VALUE;
-}
-
-/**
- * Pool routing configuration for multi-account CLIProxy rotation.
- *
- * Pool routing is opt-in at the 1->2 account-add transition.
- * When enabled: fill-first strategy, session affinity (1h TTL), cooling ON,
- * and max-retry-credentials: 3 are written to the generated CLIProxy config.
- *
- * Cooling note: disable-cooling flips to false when pool routing is enabled.
- * This is intentional — cooling is required for retry-cap to function correctly.
- * See archaeology comment in generator.ts (CCS v5 commit fb77d72a).
- */
-export interface CLIProxyPoolRoutingConfig {
-  /**
-   * Whether pool routing is active for this provider.
-   * Written by enablePoolRouting(); cleared by disablePoolRouting().
-   */
-  enabled?: boolean;
-  /**
-   * Max credentials to try per request before returning 429 to the caller.
-   * Effective only when pool routing (and therefore cooling) is enabled.
-   * Defaults to 3 when pool routing is enabled.
-   */
-  max_retry_credentials?: number;
-  /**
-   * Whether the user has dismissed the pool routing opt-in prompt.
-   * Prevents re-prompting after an explicit decline.
-   */
-  prompt_dismissed?: boolean;
-  /**
-   * Whether the user has dismissed the pool onboarding hint.
-   * Fires once when >= 2 native Claude profiles exist and no pool is enabled.
-   * Shares the pool_routing key family - one schema home, no duplicate plumbing.
-   */
-  onboarding_hint_dismissed?: boolean;
-}
-
 /**
  * CLIProxy configuration section.
  */
@@ -267,12 +179,6 @@ export interface CLIProxyConfig {
   token_refresh?: TokenRefreshSettings;
   /** Auto-sync API profiles to local CLIProxy config on settings change (default: true) */
   auto_sync?: boolean;
-  /** Routing strategy for multi-account CLIProxy selection */
-  routing?: CLIProxyRoutingConfig;
-  /** Pool routing opt-in state and configuration */
-  pool_routing?: CLIProxyPoolRoutingConfig;
-  /** Request-retry behavior for transient upstream errors (opt-in, default: disabled) */
-  retry?: CLIProxyRetryConfig;
   /** User-defined OAuth model aliases emitted into managed CLIProxy config. */
   oauth_model_alias?: CLIProxyOAuthModelAliasConfig;
   /** Scoped payload rules emitted into managed CLIProxy config. */

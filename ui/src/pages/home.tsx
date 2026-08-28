@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { HeroSection } from '@/components/layout/hero-section';
 import { AuthMonitor } from '@/components/monitoring/auth-monitor';
+import { ModelPipelineSnapshotCard } from '@/components/monitoring/model-pipeline-snapshot-card';
 import { ErrorLogsMonitor } from '@/components/error-logs-monitor';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -187,7 +188,8 @@ function HomeContent() {
         )}
       </TabsContent>
 
-      <TabsContent value="monitor">
+      <TabsContent value="monitor" className="space-y-6">
+        <ModelPipelineSnapshotCard />
         <AuthMonitor />
       </TabsContent>
 

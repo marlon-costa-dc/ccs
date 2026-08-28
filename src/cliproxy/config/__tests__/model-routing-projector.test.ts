@@ -6,6 +6,8 @@ import {
   type ModelPipelineSnapshot,
 } from '../../../config/schemas/model-pipeline';
 import { ConfigError } from '../../../errors/error-types';
+import { createEmptyUnifiedConfig } from '../../../config/schemas/unified-config';
+import { renderUnifiedConfigForPublication } from '../generator';
 import { projectModelRouting, serializeModelRoutingSection } from '../model-routing-projector';
 
 function snapshot(): ModelPipelineSnapshot {
@@ -27,14 +29,14 @@ describe('model-routing projector', () => {
       'projection-digest',
       'aliases',
       'direct-models',
-      'retry-policy',
+      'failure-policy',
     ]);
     expect(projected.generation).toBe(42);
     expect(projected['snapshot-digest']).toBe(
-      'sha256:2d8c52223e9249975146a7383d7e91b4c10a2aadce66d0c31a1cc29be430d34e'
+      'sha256:15303dbab83d64d09f79f1f3a22bc09fb3ad5916f2624283f2c6a0ecbe969801'
     );
     expect(projected['projection-digest']).toBe(
-      'sha256:6d505e335548fe916e49b679e5a5c5265262f1b552217c7afcc54dbd890d451f'
+      'sha256:a2d543504bba7caa9a5c925bb1018e484a0331fb0479dbc87e828db51bc275a5'
     );
     expect(alias).toMatchObject({
       name: 'aihub-primary',
@@ -117,6 +119,7 @@ describe('model-routing projector', () => {
           'variant-id': 'high',
         },
         'display-name': 'High reasoning',
+        'reasoning-option': 'high',
         protocols: ['openai_chat'],
       },
     ]);
@@ -136,38 +139,34 @@ describe('model-routing projector', () => {
       'selection-reason',
     ]);
     expect(directRoute.pricing).toEqual(candidate.pricing);
-    expect(projected['retry-policy']).toEqual({
-      'max-attempts': 3,
-      'cooldown-seconds': 15,
-      'request-timeout-seconds': 120,
-      'restore-primary-after-cooldown': true,
-      'fail-when-all-candidates-blocked': true,
-      rules: [
+    expect(projected['failure-policy']).toEqual({
+      mode: 'classified_candidate_failover',
+      'credential-acquisition-timeout-seconds': 120,
+      'automatic-retry': false,
+      'automatic-failover': true,
+      'max-candidate-attempts': 3,
+      'failover-rules': [
         {
-          'rule-id': 'credential-state',
-          'config-path': 'models.retry_policy.rules[credential-state]',
-          'http-statuses': [401, 402, 403],
-          'classifier-codes': ['account_suspended', 'credential_unavailable', 'quota_exhausted'],
-          'retry-before-first-byte': true,
-          'retry-after-first-byte': false,
+          'rule-id': 'capacity',
+          'http-statuses': [429],
+          'error-codes': ['credential_concurrency_exceeded', 'model_cooldown', 'rate_limit'],
+          'failure-kinds': ['credential'],
         },
         {
-          'rule-id': 'permanent-http',
-          'config-path': 'models.retry_policy.rules[permanent-http]',
-          'http-statuses': [400],
-          'classifier-codes': [],
-          'retry-before-first-byte': false,
-          'retry-after-first-byte': false,
-        },
-        {
-          'rule-id': 'transient-http',
-          'config-path': 'models.retry_policy.rules[transient-http]',
-          'http-statuses': [408, 429, 500, 502, 503, 504],
-          'classifier-codes': [],
-          'retry-before-first-byte': true,
-          'retry-after-first-byte': false,
+          'rule-id': 'pre-response-transient',
+          'http-statuses': [408, 500, 502, 503, 504],
+          'error-codes': [
+            'empty_completion',
+            'empty_stream',
+            'home_unavailable',
+            'upstream_failed',
+          ],
+          'failure-kinds': ['empty_pre_response', 'transport', 'upstream_timeout'],
         },
       ],
+      'serve-stale-on-error': false,
+      'preserve-first-error': true,
+      'terminate-owned-request-on-cancel': true,
     });
     expect('pricing' in projected).toBe(false);
   });
@@ -209,6 +208,16 @@ describe('model-routing projector', () => {
     );
   });
 
+  it('fails closed when an inventory variant has no catalog-owned reasoning option', () => {
+    const changed = structuredClone(snapshot()) as unknown as Record<string, unknown>;
+    const catalog = changed.catalog as Array<Record<string, unknown>>;
+    catalog[0]!.variants = [];
+
+    expect(() => projectModelRouting(changed as unknown as ModelPipelineSnapshot)).toThrow(
+      'has no matching catalog variant'
+    );
+  });
+
   it('serializes only raw canonical model-routing YAML with null pointers intact', () => {
     const serialized = serializeModelRoutingSection(snapshot());
     const parsed = yaml.load(serialized) as Record<string, unknown>;
@@ -220,5 +229,20 @@ describe('model-routing projector', () => {
     expect(serialized).not.toContain('&ref_');
     expect(serialized).not.toContain('*ref_');
     expect(serialized).not.toContain('model-pricing:');
+  });
+
+  it('renders a complete config without legacy routing, retry or alias coexistence', () => {
+    const modelPipeline = parseModelPipelineConfig(fixture.model_pipeline);
+    const config = { ...createEmptyUnifiedConfig(), model_pipeline: modelPipeline };
+
+    const serialized = renderUnifiedConfigForPublication(config, 8317);
+
+    expect(serialized).toContain('\nmodel-routing:\n');
+    expect(serialized).not.toContain('\noauth-model-alias:\n');
+    expect(serialized).not.toContain('\nrequest-retry:');
+    expect(serialized).not.toContain('\nmax-retry-interval:');
+    expect(serialized).not.toContain('\nquota-exceeded:\n');
+    expect(serialized).not.toContain('\ndisable-cooling:');
+    expect(serialized).not.toMatch(/\nrouting:\n/);
   });
 });

@@ -28,7 +28,7 @@ import {
   DEFAULT_LOGGING_CONFIG,
 } from '../unified-config-types';
 import type { UnifiedConfig } from '../unified-config-types';
-import { canonicalizeBrowserConfig, normalizeSessionAffinityTtl } from './normalizers';
+import { canonicalizeBrowserConfig } from './normalizers';
 import { normalizeContinuityConfig, normalizeOfficialChannelsConfig } from './normalizers';
 import type { LegacyDiscordChannelsConfig } from './normalizers';
 import { canonicalizeImageAnalysisConfig } from '../../utils/hooks/image-analysis-backend-resolver';
@@ -92,21 +92,6 @@ export function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfi
       ),
       // Auto-sync - default to true
       auto_sync: partial.cliproxy?.auto_sync ?? defaults.cliproxy.auto_sync ?? true,
-      routing: {
-        strategy:
-          partial.cliproxy?.routing?.strategy === 'fill-first' ||
-          partial.cliproxy?.routing?.strategy === 'round-robin'
-            ? partial.cliproxy.routing.strategy
-            : defaults.cliproxy.routing?.strategy,
-        session_affinity:
-          typeof partial.cliproxy?.routing?.session_affinity === 'boolean'
-            ? partial.cliproxy.routing.session_affinity
-            : defaults.cliproxy.routing?.session_affinity,
-        session_affinity_ttl: normalizeSessionAffinityTtl(
-          partial.cliproxy?.routing?.session_affinity_ttl,
-          defaults.cliproxy.routing?.session_affinity_ttl ?? '1h'
-        ),
-      },
     },
     model_pipeline:
       partial.model_pipeline === undefined
@@ -237,15 +222,9 @@ export function mergeWithDefaults(partial: Partial<UnifiedConfig>): UnifiedConfi
           DEFAULT_CLIPROXY_SERVER_CONFIG.remote.auth_token,
         // management_key is optional - falls back to auth_token when not set
         management_key: partial.cliproxy_server?.remote?.management_key,
+        allow_self_signed: partial.cliproxy_server?.remote?.allow_self_signed,
       },
-      fallback: {
-        enabled:
-          partial.cliproxy_server?.fallback?.enabled ??
-          DEFAULT_CLIPROXY_SERVER_CONFIG.fallback.enabled,
-        auto_start:
-          partial.cliproxy_server?.fallback?.auto_start ??
-          DEFAULT_CLIPROXY_SERVER_CONFIG.fallback.auto_start,
-      },
+      management_timeout_ms: partial.cliproxy_server?.management_timeout_ms,
       local: {
         port: partial.cliproxy_server?.local?.port ?? DEFAULT_CLIPROXY_SERVER_CONFIG.local.port,
         auto_start:

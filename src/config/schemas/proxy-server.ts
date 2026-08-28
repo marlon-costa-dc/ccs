@@ -39,18 +39,10 @@ export interface ProxyRemoteConfig {
   management_key?: string;
   /** Connection timeout in milliseconds (default: 2000) */
   timeout?: number;
+  /** Explicit TLS policy for self-signed remote certificates. */
+  allow_self_signed?: boolean;
   /** Enable auto-sync profiles to remote on settings change (default: false) */
   auto_sync?: boolean;
-}
-
-/**
- * Fallback configuration when remote proxy is unreachable.
- */
-export interface ProxyFallbackConfig {
-  /** Enable fallback to local proxy (default: true) */
-  enabled: boolean;
-  /** Auto-start local proxy without prompting (default: false = prompt user) */
-  auto_start: boolean;
 }
 
 /**
@@ -85,10 +77,10 @@ export interface OpenAICompatProxyConfig {
  * Controls whether CCS uses local or remote CLIProxyAPI instance.
  */
 export interface CliproxyServerConfig {
+  /** Required deadline for CCS-owned CLIProxy management calls. */
+  management_timeout_ms?: number;
   /** Remote proxy settings */
   remote: ProxyRemoteConfig;
-  /** Fallback behavior when remote is unreachable */
-  fallback: ProxyFallbackConfig;
   /** Local proxy settings */
   local: ProxyLocalConfig;
 }
@@ -135,10 +127,6 @@ export const DEFAULT_CLIPROXY_SERVER_CONFIG: CliproxyServerConfig = {
     host: '',
     protocol: 'http',
     auth_token: '',
-  },
-  fallback: {
-    enabled: true,
-    auto_start: false,
   },
   local: {
     port: 8317,

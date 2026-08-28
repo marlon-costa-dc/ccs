@@ -115,11 +115,6 @@ export function createEmptyUnifiedConfig(): UnifiedConfig {
       },
       safety: { ...DEFAULT_CLIPROXY_SAFETY_CONFIG },
       auto_sync: true,
-      routing: {
-        strategy: 'round-robin',
-        session_affinity: false,
-        session_affinity_ttl: '1h',
-      },
     },
     proxy: {
       port: DEFAULT_OPENAI_COMPAT_PROXY_CONFIG.port,

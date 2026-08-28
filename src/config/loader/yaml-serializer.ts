@@ -122,7 +122,6 @@ export function generateYamlWithComments(config: UnifiedConfig): string {
     lines.push('# Configure via Dashboard (`ccs config`) > Proxy tab.');
     lines.push('#');
     lines.push('# remote: Connect to a remote CLIProxyAPI instance');
-    lines.push('# fallback: Use local proxy if remote is unreachable');
     lines.push('# local: Local proxy settings (port, auto-start)');
     lines.push('# ----------------------------------------------------------------------------');
     lines.push(

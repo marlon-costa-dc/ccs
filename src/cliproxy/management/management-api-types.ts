@@ -43,16 +43,16 @@ export interface ClaudeKey {
 export interface ManagementClientConfig {
   /** Remote proxy host (IP or hostname) */
   host: string;
-  /** Remote proxy port (default: 8317 for HTTP, 443 for HTTPS) */
-  port?: number;
+  /** Remote proxy port, resolved by the typed CCS configuration owner. */
+  port: number;
   /** Protocol to use (http or https) */
   protocol: 'http' | 'https';
   /** Management key for authentication (sent as Bearer token) */
   managementKey: string;
-  /** Request timeout in milliseconds (default: 5000) */
-  timeout?: number;
-  /** Allow self-signed certificates for HTTPS (default: false) */
-  allowSelfSigned?: boolean;
+  /** Request timeout in milliseconds, resolved by cliproxy_server.management_timeout_ms. */
+  timeout: number;
+  /** Explicit self-signed certificate policy. */
+  allowSelfSigned: boolean;
 }
 
 /**

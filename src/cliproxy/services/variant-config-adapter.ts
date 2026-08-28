@@ -16,6 +16,7 @@ import {
   loadOrCreateUnifiedConfig,
   mutateConfig,
 } from '../../config/config-loader-facade';
+import { ConfigError } from '../../errors/error-types';
 
 export const VARIANT_PORT_BASE = CLIPROXY_DEFAULT_PORT + 1;
 export const VARIANT_PORT_MAX_OFFSET = 100;
@@ -34,21 +35,15 @@ export interface VariantConfig {
     sonnet: CompositeTierConfig;
     haiku: CompositeTierConfig;
   };
-  /** Whether any tier has fallback configured */
-  hasFallback?: boolean;
 }
 
 export function variantExistsInConfig(name: string): boolean {
-  try {
-    if (isUnifiedMode()) {
-      const config = loadOrCreateUnifiedConfig();
-      return !!(config.cliproxy?.variants && name in config.cliproxy.variants);
-    }
-    const config = loadConfigSafe();
-    return !!(config.cliproxy && name in config.cliproxy);
-  } catch {
-    return false;
+  if (isUnifiedMode()) {
+    const config = loadOrCreateUnifiedConfig();
+    return !!(config.cliproxy?.variants && name in config.cliproxy.variants);
   }
+  const config = loadConfigSafe();
+  return !!(config.cliproxy && name in config.cliproxy);
 }
 
 export function getNextAvailablePort(): number {
@@ -92,18 +87,16 @@ export function listVariantsFromConfig(): Record<string, VariantConfig> {
             }> | null;
 
             if (!tiers || !tiers.opus || !tiers.sonnet || !tiers.haiku || !composite.default_tier) {
-              console.warn(
-                `[!] Skipping malformed composite variant '${name}': missing required tier configuration`
+              throw new ConfigError(
+                `Malformed composite variant '${name}': missing required tier configuration`
               );
-              continue;
             }
 
             const defaultTierConfig = tiers[composite.default_tier];
             if (!defaultTierConfig) {
-              console.warn(
-                `[!] Skipping malformed composite variant '${name}': missing default tier '${composite.default_tier}'`
+              throw new ConfigError(
+                `Malformed composite variant '${name}': missing default tier '${composite.default_tier}'`
               );
-              continue;
             }
 
             const normalizedTiers = {
@@ -111,12 +104,6 @@ export function listVariantsFromConfig(): Record<string, VariantConfig> {
               sonnet: tiers.sonnet,
               haiku: tiers.haiku,
             };
-
-            const hasFallback = !!(
-              normalizedTiers.opus.fallback ||
-              normalizedTiers.sonnet.fallback ||
-              normalizedTiers.haiku.fallback
-            );
 
             result[name] = {
               provider: defaultTierConfig.provider,
@@ -126,7 +113,6 @@ export function listVariantsFromConfig(): Record<string, VariantConfig> {
               type: 'composite',
               default_tier: composite.default_tier,
               tiers: normalizedTiers,
-              hasFallback,
             };
           } else {
             const single = variantConfig as CLIProxyVariantConfig;
@@ -139,9 +125,7 @@ export function listVariantsFromConfig(): Record<string, VariantConfig> {
             };
           }
         } catch (error) {
-          console.warn(
-            `[!] Skipping malformed variant '${name}': ${(error as Error).message || 'invalid config'}`
-          );
+          throw error;
         }
       }
       return result;
@@ -167,8 +151,8 @@ export function listVariantsFromConfig(): Record<string, VariantConfig> {
       };
     }
     return result;
-  } catch {
-    return {};
+  } catch (error) {
+    throw error;
   }
 }
 

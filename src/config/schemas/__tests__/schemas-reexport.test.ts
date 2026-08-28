@@ -32,9 +32,6 @@ import type {
   CompositeVariantConfig,
   CLIProxyLoggingConfig,
   CLIProxySafetyConfig,
-  CLIProxyRoutingConfig,
-  CLIProxyRetryConfig,
-  CLIProxyPoolRoutingConfig,
   CLIProxyOAuthModelAliasEntry,
   CLIProxyOAuthModelAliasConfig,
   CLIProxyPayloadModelSelector,
@@ -73,7 +70,6 @@ import type {
   CopilotConfig,
   CursorConfig,
   ProxyRemoteConfig,
-  ProxyFallbackConfig,
   ProxyLocalConfig,
   OpenAICompatProxyRoutingConfig,
   OpenAICompatProxyConfig,
@@ -101,14 +97,9 @@ describe('config schemas backward compatibility', () => {
       headers: { 'x-tenant': 'alpha' },
     };
     const payload: CLIProxyPayloadConfig = { override: [rule] };
-    const retry: CLIProxyRetryConfig = { request_retry: 0 };
-    const pool: CLIProxyPoolRoutingConfig = { enabled: false };
-
-    expect({ aliases, payload, retry, pool }).toEqual({
+    expect({ aliases, payload }).toEqual({
       aliases: { codex: [alias] },
       payload: { override: [rule] },
-      retry: { request_retry: 0 },
-      pool: { enabled: false },
     });
   });
 

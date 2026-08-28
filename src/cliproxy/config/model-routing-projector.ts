@@ -85,6 +85,7 @@ export interface CLIProxyRoutingAlias {
 export interface CLIProxyDirectVariant {
   readonly 'variant-key': CLIProxyModelKey & { readonly 'variant-id': string };
   readonly 'display-name': string | null;
+  readonly 'reasoning-option': string | null;
   readonly protocols: readonly string[];
 }
 
@@ -112,15 +113,6 @@ export interface CLIProxyDirectModel {
   readonly routes: readonly CLIProxyDirectRoute[];
 }
 
-export interface CLIProxyRetryRule {
-  readonly 'rule-id': string;
-  readonly 'config-path': string;
-  readonly 'http-statuses': readonly number[];
-  readonly 'classifier-codes': readonly string[];
-  readonly 'retry-before-first-byte': boolean;
-  readonly 'retry-after-first-byte': false;
-}
-
 export interface CLIProxyModelRouting {
   readonly 'schema-version': typeof CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION;
   readonly generation: number;
@@ -128,13 +120,21 @@ export interface CLIProxyModelRouting {
   readonly 'projection-digest': string;
   readonly aliases: readonly CLIProxyRoutingAlias[];
   readonly 'direct-models': readonly CLIProxyDirectModel[];
-  readonly 'retry-policy': {
-    readonly 'max-attempts': number;
-    readonly 'cooldown-seconds': number;
-    readonly 'request-timeout-seconds': number;
-    readonly 'restore-primary-after-cooldown': boolean;
-    readonly 'fail-when-all-candidates-blocked': boolean;
-    readonly rules: readonly CLIProxyRetryRule[];
+  readonly 'failure-policy': {
+    readonly mode: 'classified_candidate_failover';
+    readonly 'credential-acquisition-timeout-seconds': number;
+    readonly 'automatic-retry': false;
+    readonly 'automatic-failover': true;
+    readonly 'max-candidate-attempts': number;
+    readonly 'failover-rules': readonly {
+      readonly 'rule-id': string;
+      readonly 'http-statuses': readonly number[];
+      readonly 'error-codes': readonly string[];
+      readonly 'failure-kinds': readonly string[];
+    }[];
+    readonly 'serve-stale-on-error': false;
+    readonly 'preserve-first-error': true;
+    readonly 'terminate-owned-request-on-cancel': true;
   };
 }
 
@@ -228,6 +228,10 @@ function routeIdentity(
   ].join('\u0000');
 }
 
+function modelIdentity(value: ModelPipelineModelKey): string {
+  return `${value.catalog_provider_id}\u0000${value.canonical_model_id}`;
+}
+
 function catalogRoutesByIdentity(
   snapshot: ModelPipelineSnapshot
 ): ReadonlyMap<string, ModelPipelineCatalogRoute> {
@@ -250,6 +254,7 @@ function catalogRoutesByIdentity(
 
 function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxyDirectModel[] {
   const catalogRoutes = catalogRoutesByIdentity(snapshot);
+  const catalogModels = new Map(snapshot.catalog.map((model) => [modelIdentity(model), model]));
   const projected: CLIProxyDirectModel[] = [];
 
   for (const model of snapshot.inventory.models) {
@@ -287,18 +292,36 @@ function projectDirectModels(snapshot: ModelPipelineSnapshot): readonly CLIProxy
       });
     }
     if (routes.length === 0) continue;
+    const catalogModel = catalogModels.get(modelIdentity(model.model_key));
+    if (!catalogModel) {
+      throw new ConfigError(
+        `model_pipeline direct model ${model.model_key.catalog_provider_id}/${model.model_key.canonical_model_id} has no matching catalog model`
+      );
+    }
+    const catalogVariants = new Map(
+      catalogModel.variants.map((variant) => [variant.variant_id, variant])
+    );
     projected.push({
       'model-key': projectModelKey(model.model_key),
       'display-name': model.display_name,
       active: model.active,
-      variants: model.variants.map((variant) => ({
-        'variant-key': {
-          ...projectModelKey(variant.variant_key),
-          'variant-id': variant.variant_key.variant_id,
-        },
-        'display-name': variant.display_name,
-        protocols: variant.protocols,
-      })),
+      variants: model.variants.map((variant) => {
+        const catalogVariant = catalogVariants.get(variant.variant_key.variant_id);
+        if (!catalogVariant) {
+          throw new ConfigError(
+            `model_pipeline inventory variant ${model.model_key.catalog_provider_id}/${model.model_key.canonical_model_id}/${variant.variant_key.variant_id} has no matching catalog variant`
+          );
+        }
+        return {
+          'variant-key': {
+            ...projectModelKey(variant.variant_key),
+            'variant-id': variant.variant_key.variant_id,
+          },
+          'display-name': variant.display_name,
+          'reasoning-option': catalogVariant.reasoning_option,
+          protocols: variant.protocols,
+        };
+      }),
       routes,
     });
   }
@@ -320,20 +343,23 @@ export function projectModelRouting(snapshot: ModelPipelineSnapshot): CLIProxyMo
       candidates: assignment.candidates.map(projectCandidate),
     })),
     'direct-models': projectDirectModels(snapshot),
-    'retry-policy': {
-      'max-attempts': snapshot.retry_policy.max_attempts,
-      'cooldown-seconds': snapshot.retry_policy.cooldown_seconds,
-      'request-timeout-seconds': snapshot.retry_policy.request_timeout_seconds,
-      'restore-primary-after-cooldown': snapshot.retry_policy.restore_primary_after_cooldown,
-      'fail-when-all-candidates-blocked': snapshot.retry_policy.fail_when_all_candidates_blocked,
-      rules: snapshot.retry_policy.rules.map((rule) => ({
+    'failure-policy': {
+      mode: snapshot.failure_policy.mode,
+      'credential-acquisition-timeout-seconds':
+        snapshot.failure_policy.credential_acquisition_timeout_seconds,
+      'automatic-retry': snapshot.failure_policy.automatic_retry,
+      'automatic-failover': snapshot.failure_policy.automatic_failover,
+      'max-candidate-attempts': snapshot.failure_policy.max_candidate_attempts,
+      'failover-rules': snapshot.failure_policy.failover_rules.map((rule) => ({
         'rule-id': rule.rule_id,
-        'config-path': rule.config_path,
         'http-statuses': rule.http_statuses,
-        'classifier-codes': rule.classifier_codes,
-        'retry-before-first-byte': rule.retry_before_first_byte,
-        'retry-after-first-byte': rule.retry_after_first_byte,
+        'error-codes': rule.error_codes,
+        'failure-kinds': rule.failure_kinds,
       })),
+      'serve-stale-on-error': snapshot.failure_policy.serve_stale_on_error,
+      'preserve-first-error': snapshot.failure_policy.preserve_first_error,
+      'terminate-owned-request-on-cancel':
+        snapshot.failure_policy.terminate_owned_request_on_cancel,
     },
   };
 }

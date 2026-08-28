@@ -6,6 +6,7 @@
  */
 
 import * as https from 'https';
+import type { Socket } from 'node:net';
 import type {
   ManagementClientConfig,
   ManagementHealthStatus,
@@ -16,24 +17,32 @@ import type {
   GetModelDefinitionsResponse,
   ConfigPublicationReceipt,
 } from './management-api-types';
-import { CLIPROXY_DEFAULT_PORT } from '../config/port-manager';
-import type { CliproxyRoutingStrategy } from '../types';
-import { ConfigError } from '../../errors/error-types';
+import { ConfigError, ProxyError, UserAbortError } from '../../errors/error-types';
+import {
+  parseModelPipelineInventory,
+  type ModelPipelineInventory,
+} from '../../config/schemas/model-pipeline';
 
-/** Default timeout for management operations (longer than health check) */
-const DEFAULT_TIMEOUT_MS = 5000;
-const ROUTING_STRATEGY_PATH = '/v0/management/routing/strategy';
 const CONFIG_YAML_PATH = '/v0/management/config.yaml';
-
-/** Default port for HTTPS protocol */
-const DEFAULT_HTTPS_PORT = 443;
-
-/** Avoid duplicate warnings for repeated invalid port inputs */
-const WARNED_INVALID_PORTS = new Set<string>();
+const MODEL_INVENTORY_PATH = '/v0/management/model-inventory';
 
 interface EncodedRequestBody {
   readonly contentType: 'application/json' | 'application/yaml';
   readonly content: string;
+}
+
+type ResponseFormat = 'json' | 'text';
+
+class ManagementRequestError extends ProxyError {
+  readonly errorCode: ManagementApiErrorCode;
+  readonly statusCode?: number;
+
+  constructor(message: string, errorCode: ManagementApiErrorCode, statusCode?: number) {
+    super(message);
+    this.name = 'ManagementRequestError';
+    this.errorCode = errorCode;
+    this.statusCode = statusCode;
+  }
 }
 
 function jsonBody(value: unknown): EncodedRequestBody {
@@ -42,6 +51,18 @@ function jsonBody(value: unknown): EncodedRequestBody {
 
 function yamlBody(value: string): EncodedRequestBody {
   return { contentType: 'application/yaml', content: value };
+}
+
+function decodeResponseBody<T>(content: string, format: ResponseFormat): T | undefined {
+  if (!content) return undefined;
+  if (format === 'text') return content as T;
+  try {
+    return JSON.parse(content) as T;
+  } catch (error) {
+    throw new ConfigError(
+      `CLIProxy management response is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 function readRecord(value: unknown, label: string): Record<string, unknown> {
@@ -67,6 +88,12 @@ function readSha256Digest(value: unknown, label: string): string {
 
 export function parseConfigPublicationReceipt(value: unknown): ConfigPublicationReceipt {
   const receipt = readRecord(value, 'config publication receipt');
+  const allowedKeys = new Set(['ok', 'generation', 'snapshot_digest', 'projection_digest']);
+  for (const key of Object.keys(receipt)) {
+    if (!allowedKeys.has(key)) {
+      throw new ConfigError(`config publication receipt.${key} is not part of the contract`);
+    }
+  }
   if (receipt.ok !== true) {
     throw new ConfigError('config publication receipt.ok must be true');
   }
@@ -78,37 +105,18 @@ export function parseConfigPublicationReceipt(value: unknown): ConfigPublication
   };
 }
 
-function isValidPort(port: number | undefined): port is number {
-  return port !== undefined && Number.isInteger(port) && port > 0 && port <= 65535;
-}
-
-/**
- * Get effective port based on config and protocol.
- */
-function getEffectivePort(port: number | undefined, protocol: 'http' | 'https'): number {
-  if (isValidPort(port)) {
-    return port;
+function readPort(port: number | undefined): number {
+  if (port === undefined || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ConfigError('CLIProxy management port must be a whole number between 1 and 65535');
   }
-
-  const fallbackPort = protocol === 'https' ? DEFAULT_HTTPS_PORT : CLIPROXY_DEFAULT_PORT;
-  if (port !== undefined) {
-    const warningKey = `${protocol}:${String(port)}`;
-    if (!WARNED_INVALID_PORTS.has(warningKey)) {
-      WARNED_INVALID_PORTS.add(warningKey);
-      console.warn(
-        `[management-api-client] Invalid port "${String(port)}", using default ${fallbackPort}`
-      );
-    }
-  }
-
-  return fallbackPort;
+  return port;
 }
 
 /**
  * Build URL for Management API endpoint.
  */
 function buildUrl(config: ManagementClientConfig, path: string): string {
-  const port = getEffectivePort(config.port, config.protocol);
+  const port = readPort(config.port);
   // Only omit port if it matches standard web ports
   if (
     (config.protocol === 'https' && port === 443) ||
@@ -199,8 +207,21 @@ export class ManagementApiClient {
   private readonly timeout: number;
 
   constructor(config: ManagementClientConfig) {
+    if (!config.host.trim()) {
+      throw new ConfigError('CLIProxy management host is required');
+    }
+    if (config.protocol !== 'http' && config.protocol !== 'https') {
+      throw new ConfigError('CLIProxy management protocol must be http or https');
+    }
+    readPort(config.port);
+    if (!config.managementKey) {
+      throw new ConfigError('CLIProxy management key is required');
+    }
+    if (typeof config.allowSelfSigned !== 'boolean') {
+      throw new ConfigError('CLIProxy allowSelfSigned policy is required');
+    }
     this.config = config;
-    this.timeout = config.timeout ?? DEFAULT_TIMEOUT_MS;
+    this.timeout = readPositiveInteger(config.timeout, 'CLIProxy management timeout');
   }
 
   /**
@@ -276,23 +297,11 @@ export class ManagementApiClient {
       'GET',
       `/v0/management/model-definitions/${encodedChannel}`
     );
-    return response.data?.models ?? [];
-  }
-
-  /**
-   * Get the global credential routing strategy from CLIProxy.
-   */
-  async getRoutingStrategy(): Promise<CliproxyRoutingStrategy> {
-    const response = await this.request<{ strategy?: string }>('GET', ROUTING_STRATEGY_PATH);
-    return response.data?.strategy === 'fill-first' ? 'fill-first' : 'round-robin';
-  }
-
-  /**
-   * Update the global credential routing strategy on CLIProxy.
-   */
-  async putRoutingStrategy(strategy: CliproxyRoutingStrategy): Promise<CliproxyRoutingStrategy> {
-    await this.request('PUT', ROUTING_STRATEGY_PATH, jsonBody({ value: strategy }));
-    return strategy;
+    const data = readRecord(response.data, 'model definitions response');
+    if (!Array.isArray(data.models)) {
+      throw new ConfigError('model definitions response.models must be an array');
+    }
+    return data.models as RemoteModelInfo[];
   }
 
   /**
@@ -300,9 +309,35 @@ export class ManagementApiClient {
    * model-routing digest receipt. CLIProxy owns validation, persistence, and
    * online reload for this endpoint.
    */
-  async putConfigYaml(configYaml: string): Promise<ConfigPublicationReceipt> {
-    const response = await this.request<unknown>('PUT', CONFIG_YAML_PATH, yamlBody(configYaml));
+  async putConfigYaml(configYaml: string, signal?: AbortSignal): Promise<ConfigPublicationReceipt> {
+    const response = await this.request<unknown>(
+      'PUT',
+      CONFIG_YAML_PATH,
+      yamlBody(configYaml),
+      signal
+    );
     return parseConfigPublicationReceipt(response.data);
+  }
+
+  /** Read the exact active native config without re-encoding or secret logging. */
+  async getConfigYaml(signal?: AbortSignal): Promise<string> {
+    const response = await this.request<string>('GET', CONFIG_YAML_PATH, undefined, signal, 'text');
+    const contentType = response.headers?.['content-type'];
+    if (!contentType?.toLowerCase().startsWith('application/yaml')) {
+      throw new ConfigError(
+        `CLIProxy config.yaml response must use application/yaml, got ${contentType ?? 'missing content-type'}`
+      );
+    }
+    if (typeof response.data !== 'string' || !response.data.trim()) {
+      throw new ConfigError('CLIProxy config.yaml response must not be empty');
+    }
+    return response.data;
+  }
+
+  /** Read the exact active CLIProxy inventory and reject schema drift. */
+  async getModelInventory(signal?: AbortSignal): Promise<ModelPipelineInventory> {
+    const response = await this.request<unknown>('GET', MODEL_INVENTORY_PATH, undefined, signal);
+    return parseModelPipelineInventory(response.data);
   }
 
   /**
@@ -311,7 +346,12 @@ export class ManagementApiClient {
    */
   async getSection<T>(section: string): Promise<T[]> {
     const response = await this.request<Record<string, T[]>>('GET', `/v0/management/${section}`);
-    return response.data?.[section] ?? [];
+    const data = readRecord(response.data, `${section} response`);
+    const entries = data[section];
+    if (!Array.isArray(entries)) {
+      throw new ConfigError(`${section} response.${section} must be an array`);
+    }
+    return entries as T[];
   }
 
   /**
@@ -327,12 +367,14 @@ export class ManagementApiClient {
   private async request<T>(
     method: string,
     path: string,
-    body?: EncodedRequestBody
+    body?: EncodedRequestBody,
+    signal?: AbortSignal,
+    responseFormat: ResponseFormat = 'json'
   ): Promise<{ data?: T; headers?: Record<string, string> }> {
     const url = buildUrl(this.config, path);
 
     const headers: Record<string, string> = {
-      Accept: 'application/json',
+      Accept: responseFormat === 'text' ? 'application/yaml' : 'application/json',
       Authorization: `Bearer ${this.config.managementKey}`,
     };
 
@@ -342,10 +384,10 @@ export class ManagementApiClient {
 
     // Use native https for self-signed cert support
     if (this.config.protocol === 'https' && this.config.allowSelfSigned) {
-      return this.requestWithHttps<T>(method, url, headers, body);
+      return this.requestWithHttps<T>(method, url, headers, body, signal, responseFormat);
     }
 
-    return this.requestWithFetch<T>(method, url, headers, body);
+    return this.requestWithFetch<T>(method, url, headers, body, signal, responseFormat);
   }
 
   /**
@@ -355,10 +397,25 @@ export class ManagementApiClient {
     method: string,
     url: string,
     headers: Record<string, string>,
-    body?: EncodedRequestBody
+    body?: EncodedRequestBody,
+    signal?: AbortSignal,
+    responseFormat: ResponseFormat = 'json'
   ): Promise<{ data?: T; headers?: Record<string, string> }> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    const cancel = (): void => {
+      controller.abort(
+        signal?.reason instanceof Error
+          ? signal.reason
+          : new UserAbortError('CLIProxy management request cancelled')
+      );
+    };
+    if (signal?.aborted) cancel();
+    signal?.addEventListener('abort', cancel, { once: true });
+    const timeoutError = new ManagementRequestError(
+      'CLIProxy management request timed out',
+      'TIMEOUT'
+    );
+    const timeoutId = setTimeout(() => controller.abort(timeoutError), this.timeout);
 
     try {
       const response = await fetch(url, {
@@ -368,46 +425,40 @@ export class ManagementApiClient {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         const errorCode = mapErrorToCode(new Error(response.statusText), response.status);
-        const error = new Error(getErrorMessage(errorCode)) as Error & {
-          statusCode: number;
-          errorCode: ManagementApiErrorCode;
-        };
-        error.statusCode = response.status;
-        error.errorCode = errorCode;
-        throw error;
+        throw new ManagementRequestError(
+          `CLIProxy management request failed with HTTP ${response.status}: ${response.statusText}`,
+          errorCode,
+          response.status
+        );
       }
 
       // Extract headers we care about
       const responseHeaders: Record<string, string> = {};
       const version = response.headers.get('x-cpa-version');
       const commit = response.headers.get('x-cpa-commit');
+      const contentType = response.headers.get('content-type');
       if (version) responseHeaders['x-cpa-version'] = version;
       if (commit) responseHeaders['x-cpa-commit'] = commit;
+      if (contentType) responseHeaders['content-type'] = contentType;
 
-      // Parse JSON response if present
-      const text = await response.text();
-      let data: T | undefined;
-      if (text) {
-        try {
-          data = JSON.parse(text) as T;
-        } catch {
-          // Non-JSON response is ok for PUT/DELETE
-        }
-      }
+      const data = decodeResponseBody<T>(await response.text(), responseFormat);
 
       return { data, headers: responseHeaders };
     } catch (error) {
-      clearTimeout(timeoutId);
+      if (controller.signal.aborted && controller.signal.reason instanceof Error) {
+        throw controller.signal.reason;
+      }
       const err = error as Error & { statusCode?: number; errorCode?: ManagementApiErrorCode };
       if (!err.errorCode) {
         err.errorCode = mapErrorToCode(err, err.statusCode);
         err.message = getErrorMessage(err.errorCode, err.message);
       }
       throw err;
+    } finally {
+      clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', cancel);
     }
   }
 
@@ -418,7 +469,9 @@ export class ManagementApiClient {
     method: string,
     url: string,
     headers: Record<string, string>,
-    body?: EncodedRequestBody
+    body?: EncodedRequestBody,
+    signal?: AbortSignal,
+    responseFormat: ResponseFormat = 'json'
   ): Promise<{ data?: T; headers?: Record<string, string> }> {
     return new Promise((resolve, reject) => {
       const agent = new https.Agent({ rejectUnauthorized: false });
@@ -427,10 +480,6 @@ export class ManagementApiClient {
       if (bodyStr) {
         headers['Content-Length'] = Buffer.byteLength(bodyStr).toString();
       }
-
-      const reqTimeout = setTimeout(() => {
-        reject(new Error('Request timeout'));
-      }, this.timeout);
 
       const req = https.request(
         url,
@@ -441,35 +490,35 @@ export class ManagementApiClient {
           timeout: this.timeout,
         },
         (res) => {
-          clearTimeout(reqTimeout);
           let data = '';
           res.on('data', (chunk) => (data += chunk));
           res.on('end', () => {
             if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
               const errorCode = mapErrorToCode(new Error(res.statusMessage || ''), res.statusCode);
-              const error = new Error(getErrorMessage(errorCode)) as Error & {
-                statusCode: number;
-                errorCode: ManagementApiErrorCode;
-              };
-              error.statusCode = res.statusCode;
-              error.errorCode = errorCode;
-              reject(error);
+              reject(
+                new ManagementRequestError(
+                  `CLIProxy management request failed with HTTP ${res.statusCode}: ${res.statusMessage ?? ''}`,
+                  errorCode,
+                  res.statusCode
+                )
+              );
               return;
             }
 
             const responseHeaders: Record<string, string> = {};
             const version = res.headers['x-cpa-version'];
             const commit = res.headers['x-cpa-commit'];
+            const contentType = res.headers['content-type'];
             if (typeof version === 'string') responseHeaders['x-cpa-version'] = version;
             if (typeof commit === 'string') responseHeaders['x-cpa-commit'] = commit;
+            if (typeof contentType === 'string') responseHeaders['content-type'] = contentType;
 
             let parsed: T | undefined;
-            if (data) {
-              try {
-                parsed = JSON.parse(data) as T;
-              } catch {
-                // Non-JSON response is ok
-              }
+            try {
+              parsed = decodeResponseBody<T>(data, responseFormat);
+            } catch (error) {
+              reject(error);
+              return;
             }
 
             resolve({ data: parsed, headers: responseHeaders });
@@ -477,8 +526,48 @@ export class ManagementApiClient {
         }
       );
 
+      const timeoutError = new ManagementRequestError(
+        'CLIProxy management request timed out',
+        'TIMEOUT'
+      );
+      let terminationReason: Error | undefined;
+      let reqTimeout: ReturnType<typeof setTimeout> | undefined;
+      const destroyOwnedSocket = (socket: Socket, reason: Error): void => {
+        if (socket.destroyed) return;
+        if (typeof socket.resetAndDestroy === 'function') {
+          socket.resetAndDestroy();
+          return;
+        }
+        socket.destroy(reason);
+      };
+      const terminate = (reason: Error): void => {
+        terminationReason ??= reason;
+        if (req.socket) destroyOwnedSocket(req.socket, terminationReason);
+        req.destroy(terminationReason);
+        agent.destroy();
+      };
+      const cancel = (): void => {
+        terminate(
+          signal?.reason instanceof Error
+            ? signal.reason
+            : new UserAbortError('CLIProxy management request cancelled')
+        );
+      };
+      const cleanup = (): void => {
+        if (reqTimeout !== undefined) clearTimeout(reqTimeout);
+        signal?.removeEventListener('abort', cancel);
+        agent.destroy();
+      };
+      req.once('close', cleanup);
+      req.once('socket', (socket) => {
+        if (terminationReason) destroyOwnedSocket(socket, terminationReason);
+      });
+
       req.on('error', (err) => {
-        clearTimeout(reqTimeout);
+        if (terminationReason) {
+          reject(terminationReason);
+          return;
+        }
         const error = err as Error & { errorCode?: ManagementApiErrorCode };
         error.errorCode = mapErrorToCode(err);
         error.message = getErrorMessage(error.errorCode, err.message);
@@ -486,16 +575,17 @@ export class ManagementApiClient {
       });
 
       req.on('timeout', () => {
-        req.destroy();
-        const error = new Error('Request timeout') as Error & { errorCode: ManagementApiErrorCode };
-        error.errorCode = 'TIMEOUT';
-        reject(error);
+        terminate(timeoutError);
       });
 
-      if (bodyStr) {
+      reqTimeout = setTimeout(() => terminate(timeoutError), this.timeout);
+      signal?.addEventListener('abort', cancel, { once: true });
+      if (signal?.aborted) cancel();
+
+      if (bodyStr && !req.destroyed) {
         req.write(bodyStr);
       }
-      req.end();
+      if (!req.destroyed) req.end();
     });
   }
 }
@@ -507,20 +597,19 @@ export class ManagementApiClient {
 export function createManagementClient(
   remoteConfig: {
     host: string;
-    port?: number;
+    port: number;
     protocol: 'http' | 'https';
-    management_key?: string;
-    auth_token?: string;
-    timeout?: number;
+    management_key: string;
+    timeout: number;
   },
-  allowSelfSigned = true
+  allowSelfSigned: boolean
 ): ManagementApiClient {
   return new ManagementApiClient({
     host: remoteConfig.host,
-    port: remoteConfig.port,
+    port: readPort(remoteConfig.port),
     protocol: remoteConfig.protocol,
-    managementKey: remoteConfig.management_key || remoteConfig.auth_token || '',
-    timeout: remoteConfig.timeout,
+    managementKey: remoteConfig.management_key,
+    timeout: readPositiveInteger(remoteConfig.timeout, 'CLIProxy management timeout'),
     allowSelfSigned,
   });
 }

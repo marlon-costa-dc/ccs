@@ -35,20 +35,11 @@ import {
 import { showStatus, handleInstallVersion, handleInstallLatest } from './install-subcommand';
 import { showHelp } from './help-subcommand';
 import {
-  handleRoutingStatus,
-  handleRoutingExplain,
-  handleRoutingSet,
-  handleRoutingAffinityStatus,
-  handleRoutingAffinityHelp,
-  handleRoutingAffinitySet,
-} from './routing-subcommand';
-import {
   handleCatalogStatus,
   handleCatalogRefresh,
   handleCatalogReset,
   handleCatalogJson,
 } from './catalog-subcommand';
-import { handlePoolSubcommand } from './pool-subcommand';
 import { handleOrderSubcommand } from './order-subcommand';
 
 /**
@@ -146,12 +137,8 @@ export async function handleCliproxyCommand(args: string[]): Promise<void> {
   const verbose = hasAnyFlag(remainingArgs, ['--verbose', '-v']);
   const command = remainingArgs[0];
 
-  // Show global cliproxy help whenever --help/-h appears (order-insensitive, so
-  // `cliproxy status --help` and `cliproxy --verbose --help` both work). The one
-  // exception is `routing affinity --help`, which renders affinity-specific help
-  // after dispatch (handled below).
-  const isRoutingAffinity = command === 'routing' && remainingArgs[1] === 'affinity';
-  if (!isRoutingAffinity && hasAnyFlag(remainingArgs, ['--help', '-h'])) {
+  // Show global cliproxy help whenever --help/-h appears (order-insensitive).
+  if (hasAnyFlag(remainingArgs, ['--help', '-h'])) {
     await showHelp();
     return;
   }
@@ -193,11 +180,6 @@ export async function handleCliproxyCommand(args: string[]): Promise<void> {
     return;
   }
 
-  if (command === 'pool') {
-    await handlePoolSubcommand(remainingArgs.slice(1));
-    return;
-  }
-
   if (command === 'accounts') {
     const subcommand = remainingArgs[1];
     if (subcommand === 'order') {
@@ -210,32 +192,6 @@ export async function handleCliproxyCommand(args: string[]): Promise<void> {
     console.error('    Usage: ccs cliproxy accounts order <provider>');
     process.exitCode = 1;
     await showHelp();
-    return;
-  }
-
-  if (command === 'routing') {
-    const subcommand = remainingArgs[1];
-    if (subcommand === 'set') {
-      await handleRoutingSet(remainingArgs.slice(2));
-      return;
-    }
-    if (subcommand === 'explain') {
-      await handleRoutingExplain();
-      return;
-    }
-    if (subcommand === 'affinity') {
-      if (hasAnyFlag(remainingArgs.slice(2), ['--help', '-h'])) {
-        await handleRoutingAffinityHelp();
-        return;
-      }
-      if (remainingArgs[2]) {
-        await handleRoutingAffinitySet(remainingArgs.slice(2));
-        return;
-      }
-      await handleRoutingAffinityStatus();
-      return;
-    }
-    await handleRoutingStatus();
     return;
   }
 
