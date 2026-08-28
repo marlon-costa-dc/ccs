@@ -1,7 +1,7 @@
 name: Semantic Release
 
-# Sole owner of CCS package versions, changelog entries, npm publication,
-# package tags, and package GitHub releases.
+# Sole owner of CCS package versions, changelog entries, package tags, and
+# package GitHub releases. The fork distributes package assets from GitHub.
 
 on:
   push:

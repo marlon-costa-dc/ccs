@@ -32,6 +32,8 @@ const slowTests = [
   'tests/integration/update-command-install-origin.test.ts',
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
   'tests/unit/commands/persist-command-handler.test.ts',
+  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
+  'tests/unit/docker/docker-release-workflow-context.test.ts',
   'tests/unit/utils/claudecode-env-stripping.test.ts',
   ...browserMcpSplitTests,
   'tests/unit/targets/codex-runtime-integration.test.ts',
@@ -77,6 +79,8 @@ const isolatedTests = new Set([
   // and fails on real shapes. Process isolation is the only correct boundary.
   'tests/unit/cliproxy/router-capability-spike.test.ts',
   'tests/unit/commands/cliproxy-routing-status-capability.test.ts',
+  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
+  'tests/unit/docker/docker-release-workflow-context.test.ts',
 ]);
 
 const filePattern = /(\.test\.(c|m)?[jt]s|\.spec\.(c|m)?[jt]s|-test\.(c|m)?[jt]s)$/;
@@ -273,16 +277,14 @@ function collectFilesByExtension(dir, extension, files = []) {
 
 function isTestSourcePath(sourcePath) {
   const normalized = sourcePath.split(path.sep).join('/');
-  return (
-    normalized.includes('/__tests__/') ||
-    /\.(?:test|spec)\.ts$/.test(normalized)
-  );
+  return normalized.includes('/__tests__/') || /\.(?:test|spec)\.ts$/.test(normalized);
 }
 
 function hasCompleteBuildArtifacts(baseDir = rootDir) {
   const requiredBuildArtifacts = getRequiredBuildArtifacts(baseDir);
-  return requiredBuildArtifacts.length > 0 && requiredBuildArtifacts.every((relativePath) =>
-    fs.existsSync(path.join(baseDir, relativePath))
+  return (
+    requiredBuildArtifacts.length > 0 &&
+    requiredBuildArtifacts.every((relativePath) => fs.existsSync(path.join(baseDir, relativePath)))
   );
 }
 

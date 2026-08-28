@@ -1,7 +1,7 @@
 # CCS CLI Agent Guide
 
 Canonical agent instructions for this repository.
-`AGENTS.md` must stay a symlink to this file.
+`AGENTS.md` and `CLAUDE.md` are physical mirrors; substantive edits must update both.
 
 ## Scope
 
@@ -16,7 +16,8 @@ Factory Droid, CLIProxy, and compatible provider profiles.
   `getCcsDir()` from `src/utils/config-manager.ts`; it respects `CCS_HOME`.
 - Do not commit directly to `main`.
 - Do not manually bump versions or create release tags. Semantic-release owns
-  versions, changelog, tags, npm publish, and GitHub releases.
+  versions, changelog, tags, and GitHub releases; the fork does not publish the
+  upstream-owned npm package.
 - CLI terminal output must be ASCII only: `[OK]`, `[!]`, `[X]`, `[i]`.
 - Respect `NO_COLOR` and TTY-aware output.
 

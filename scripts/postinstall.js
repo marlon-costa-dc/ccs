@@ -24,6 +24,18 @@ function getCcsHome() {
   return process.env.CCS_HOME || os.homedir();
 }
 
+function loadSharedManagerForInstall() {
+  const packageRoot = path.join(__dirname, '..');
+  if (fs.existsSync(path.join(packageRoot, '.git'))) {
+    return null;
+  }
+  const runtimePath = path.join(packageRoot, 'dist', 'management', 'shared-manager');
+  if (fs.existsSync(`${runtimePath}.js`)) {
+    return require(runtimePath).default;
+  }
+  throw new Error('Published package is missing dist/management/shared-manager.js');
+}
+
 /**
  * Check if path is a broken symlink and remove it if so
  * Fixes: ENOENT error when mkdir tries to create over a dangling symlink
@@ -130,13 +142,17 @@ function createConfigFiles() {
     // Migrate from v3.1.1 to v3.2.0 (symlink architecture)
     console.log('');
     try {
-      const SharedManager = require('../dist/management/shared-manager').default;
-      const sharedManager = new SharedManager();
-      sharedManager.migrateFromV311();
-      sharedManager.ensureSharedDirectories();
+      const SharedManager = loadSharedManagerForInstall();
+      if (!SharedManager) {
+        console.log('[i] Source checkout detected; runtime migrations start after build');
+      } else {
+        const sharedManager = new SharedManager();
+        sharedManager.migrateFromV311();
+        sharedManager.ensureSharedDirectories();
 
-      // Run v4.4 migration: Migrate instances to shared settings.json
-      sharedManager.migrateToSharedSettings();
+        // Run v4.4 migration: Migrate instances to shared settings.json
+        sharedManager.migrateToSharedSettings();
+      }
     } catch (err) {
       console.warn('[!] Migration warning:', err.message);
       console.warn('    Migration will retry on next run');
@@ -176,7 +192,10 @@ function createConfigFiles() {
         // Try to use unified config loader if dist is available
         try {
           const { saveUnifiedConfig } = require('../dist/config/unified-config-loader');
-          const { createEmptyUnifiedConfig, UNIFIED_CONFIG_VERSION } = require('../dist/config/unified-config-types');
+          const {
+            createEmptyUnifiedConfig,
+            UNIFIED_CONFIG_VERSION,
+          } = require('../dist/config/unified-config-types');
 
           const config = createEmptyUnifiedConfig();
           config.version = UNIFIED_CONFIG_VERSION;
@@ -207,14 +226,14 @@ function createConfigFiles() {
               accounts: {},
               cliproxy: {
                 variants: {},
-                oauth_accounts: {}
+                oauth_accounts: {},
               },
               cliproxy_server: {
                 local: {
                   port: 8317,
-                  auto_start: true
-                }
-              }
+                  auto_start: true,
+                },
+              },
             };
 
             try {
@@ -222,7 +241,7 @@ function createConfigFiles() {
                 indent: 2,
                 lineWidth: -1,
                 noRefs: true,
-                sortKeys: false
+                sortKeys: false,
               });
               const tmpPath = `${configYamlPath}.tmp`;
               fs.writeFileSync(tmpPath, yamlContent, 'utf8');
@@ -266,7 +285,7 @@ function createConfigFiles() {
     }
 
     const completionFiles = ['ccs.bash', 'ccs.zsh', 'ccs.fish', 'ccs.ps1'];
-    completionFiles.forEach(file => {
+    completionFiles.forEach((file) => {
       const src = path.join(scriptsCompletionDir, file);
       const dest = path.join(completionsDir, file);
 
@@ -313,7 +332,7 @@ function createConfigFiles() {
     if (!validation.success) {
       console.error('');
       console.error('[X] Configuration validation failed:');
-      validation.errors.forEach(err => console.error(`    - ${err}`));
+      validation.errors.forEach((err) => console.error(`    - ${err}`));
       console.error('');
       throw new Error('Configuration incomplete');
     }
@@ -322,13 +341,12 @@ function createConfigFiles() {
     if (validation.warnings.length > 0) {
       console.warn('');
       console.warn('[!] Warnings:');
-      validation.warnings.forEach(warn => console.warn(`    - ${warn}`));
+      validation.warnings.forEach((warn) => console.warn(`    - ${warn}`));
     }
 
     console.log('');
     console.log('[OK] CCS configuration ready!');
     console.log('  Run: ccs --version');
-
   } catch (err) {
     // Show error details
     console.error('');

@@ -37,7 +37,13 @@ const originalHomedir = os.homedir;
 let homedirPatched = false;
 
 function getEffectiveTestHome() {
-  return process.env.CCS_HOME || process.env.HOME || process.env.USERPROFILE || bootstrappedTestHome || originalHomedir();
+  return (
+    process.env.CCS_HOME ||
+    process.env.HOME ||
+    process.env.USERPROFILE ||
+    bootstrappedTestHome ||
+    originalHomedir()
+  );
 }
 
 function patchHomedirForTests() {
@@ -72,6 +78,11 @@ function ensureGlobalTestEnvironment() {
   process.env.XDG_CACHE_HOME = path.join(testHome, '.cache');
   process.env.XDG_STATE_HOME = path.join(testHome, '.state');
   process.env.CCS_TEST_BOOTSTRAP_HOME = testHome;
+  // Shell startup hooks belong to the operator's real HOME and make spawned
+  // test shells depend on machine-local configuration. The isolated test HOME
+  // must not execute either POSIX ENV or Bash BASH_ENV hooks.
+  delete process.env.BASH_ENV;
+  delete process.env.ENV;
 
   bootstrappedTestHome = testHome;
   patchHomedirForTests();
@@ -211,7 +222,7 @@ function createTestEnvironment() {
         // Ignore cleanup errors
         console.warn(`[test-environment] Cleanup warning: ${err.message}`);
       }
-    }
+    },
   };
 }
 
@@ -238,7 +249,7 @@ module.exports = {
   createTestEnvironment,
   ensureGlobalTestEnvironment,
   getCcsHome,
-  getCcsDir
+  getCcsDir,
 };
 
 if (process.env.CCS_TEST_DISABLE_GLOBAL_BOOTSTRAP !== '1') {

@@ -181,8 +181,9 @@ feat(cliproxy): add provider quota check
 docs(contributing): clarify validation
 ```
 
-Semantic-release owns versions, changelog entries, tags, npm publishing, and
-GitHub releases. Do not bump versions, tag, or publish manually. Release effects
+Semantic-release owns versions, changelog entries, tags, and GitHub releases.
+The fork publishes installable GitHub assets, not the upstream npm package. Do
+not bump versions, tag, or publish manually. Release effects
 and downstream packaging are defined in the canonical
 [release process](./release-process.md); commit analysis is configured in
 [`.releaserc.cjs`](../.releaserc.cjs). Governance-only maintenance uses the

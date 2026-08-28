@@ -40,8 +40,8 @@ jobs:
       packages: write
 
     env:
-      DEPRECATION_BASELINE_VERSION: "7.80.0"
-      STABLE_RELEASE_WINDOW: "2"
+      DEPRECATION_BASELINE_VERSION: '7.80.0'
+      STABLE_RELEASE_WINDOW: '2'
 
     steps:
       - name: Resolve target tag
@@ -159,8 +159,8 @@ jobs:
   # Mutable :latest / major / minor aliases are added by promote-mutable-tags
   # ONLY via explicit workflow_dispatch (promote_to_latest=true) after the
   # operator has verified the immutable image is stable. This keeps the rc.1
-  # soak window entirely in the Docker promotion path — npm @latest is always
-  # published immediately by semantic-release on the stable release.
+  # soak window entirely in the Docker promotion path. This fork does not
+  # publish the upstream-owned npm package.
   # ---------------------------------------------------------------------------
   publish-integrated:
     name: Publish integrated image
@@ -169,7 +169,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write  # required for keyless cosign signing
+      id-token: write # required for keyless cosign signing
 
     outputs:
       version: ${{ steps.meta.outputs.version }}
@@ -288,7 +288,7 @@ jobs:
       - name: Sign image with cosign (keyless OIDC)
         if: steps.tag.outputs.publish == 'true'
         env:
-          COSIGN_EXPERIMENTAL: "1"
+          COSIGN_EXPERIMENTAL: '1'
         run: |
           DIGEST="${{ steps.build.outputs.digest }}"
           OWNER_LOWER=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
@@ -457,11 +457,10 @@ jobs:
       needs.publish-integrated.outputs.publish == 'true' &&
       github.event_name == 'workflow_dispatch' && inputs.promote_to_latest == true
     runs-on: [self-hosted, linux, x64, cliproxy]
-
     permissions:
       contents: read
       packages: write
-      id-token: write  # for cosign re-sign of mutable aliases
+      id-token: write # for cosign re-sign of mutable aliases
 
     steps:
       - name: Log in to GitHub Container Registry

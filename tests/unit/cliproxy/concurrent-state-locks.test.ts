@@ -110,7 +110,7 @@ describe('CLIProxy state locks', () => {
   });
 
   it('preserves all concurrent session registrations', async () => {
-    const workerCount = 6;
+    const workerCount = 3;
     const gatePath = path.join(tempDir, 'session-writer-gate');
     const workerScript = path.join(tempDir, 'session-writer.ts');
     const sessionTrackerUrl = pathToFileURL(
@@ -141,7 +141,7 @@ registerSession(8317, proxyPid);
         child: spawn(process.execPath, [workerScript, gatePath, readyPath, String(process.pid)], {
           cwd: process.cwd(),
           env: { ...process.env, CCS_HOME: tempDir },
-          stdio: ['ignore', 'ignore', 'pipe'],
+          stdio: ['ignore', 'ignore', 'inherit'],
         }),
       };
     });

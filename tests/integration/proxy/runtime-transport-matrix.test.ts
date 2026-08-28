@@ -28,16 +28,10 @@ type ProbeResult = {
 };
 
 function resolveNodeBinary(version: 18 | 22 | 26): Promise<string> {
-  const npmExecPath = process.env.npm_execpath;
-  const npmNodeExecPath = process.env.npm_node_execpath;
-  if (!npmExecPath || !npmNodeExecPath) {
-    throw new Error('Unable to resolve npm runtime from npm_execpath and npm_node_execpath');
-  }
-
   return new Promise((resolve, reject) => {
     const child = spawn(
-      npmNodeExecPath,
-      [npmExecPath, 'exec', '--yes', `node@${version}`, '--', '-p', 'process.execPath'],
+      process.platform === 'win32' ? 'npm.cmd' : 'npm',
+      ['exec', '--yes', `node@${version}`, '--', '-p', 'process.execPath'],
       {
         env: Object.fromEntries(
           Object.entries(process.env).filter(([key]) => !proxyKeys.includes(key))
