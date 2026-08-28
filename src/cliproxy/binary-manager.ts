@@ -10,7 +10,7 @@ import * as path from 'path';
 import { info, warn } from '../utils/ui';
 import { getBinDir } from './config/config-generator';
 import { resolveLifecyclePort } from './config/port-manager';
-import type { BinaryInfo, BinaryManagerConfig } from './types';
+import { BinaryInfo, BinaryManagerConfig } from './types';
 import {
   BACKEND_CONFIG,
   DEFAULT_BACKEND,
@@ -20,8 +20,8 @@ import {
 import { stopProxy } from './services/proxy-lifecycle-service';
 import { waitForPortFree } from '../utils/port-utils';
 
-import type { UpdateCheckResult } from './binary';
 import {
+  UpdateCheckResult,
   checkForUpdates,
   deleteBinary,
   getVersionCachePath,

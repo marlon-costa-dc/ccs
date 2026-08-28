@@ -3,7 +3,7 @@
  * Facade for tar.gz and zip archive extraction.
  */
 
-import type { ArchiveExtension, CLIProxyBackend } from '../types';
+import { ArchiveExtension, CLIProxyBackend } from '../types';
 import { DEFAULT_BACKEND } from '../binary/platform-detector';
 import { extractTarGz } from './tar-extractor';
 import { extractZip } from './zip-extractor';

@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { getCliproxyDir, getAuthDir } from '../config/config-generator';
 import type { CLIProxyProvider } from '../types';
-import type { AccountInfo } from './types';
+import { AccountInfo } from './types';
 
 /**
  * Get path to accounts registry file

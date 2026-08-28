@@ -5,7 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { BinaryManagerConfig } from '../types';
+import { BinaryManagerConfig } from '../types';
 import {
   detectPlatform,
   getDownloadUrl,

@@ -6,12 +6,6 @@ name: Semantic Release
 on:
   push:
     branches: [main]
-  # Manual trigger for recovery: when a run is cancelled or never starts (for
-  # example a queue stuck on an unavailable runner), the only way back was an
-  # empty commit on main. semantic-release is idempotent — it exits without
-  # publishing when no releasable commit exists since the last tag — so an
-  # operator-initiated run is safe.
-  workflow_dispatch:
 
 concurrency:
   group: semantic-release-${{ github.ref }}
@@ -20,12 +14,7 @@ concurrency:
 jobs:
   guard:
     if: ${{ github.ref == 'refs/heads/main' }}
-    # GitHub-hosted, like every other active workflow. This fork registers no
-    # self-hosted runners (`/actions/runners` returns zero), so jobs pinned to
-    # that label never start: releases sat pending or were cancelled, and a
-    # merged change could not reach a published artifact. The job needs no
-    # machine-local state — it checks out, builds and calls semantic-release.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     outputs:
       should_release: ${{ steps.release-guard.outputs.should_release }}
 
@@ -49,7 +38,7 @@ jobs:
   release:
     needs: guard
     if: ${{ needs.guard.outputs.should_release == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
 
     permissions:
       contents: write

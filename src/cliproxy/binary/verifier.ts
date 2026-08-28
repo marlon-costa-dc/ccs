@@ -5,7 +5,7 @@
 
 import * as fs from 'fs';
 import * as crypto from 'crypto';
-import type { ChecksumResult } from '../types';
+import { ChecksumResult } from '../types';
 import { fetchText } from './downloader';
 
 /**

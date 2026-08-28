@@ -17,12 +17,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-// mock.module replaces the whole module, so every export the subject graph
-// imports has to be present. Omitting waitForProxyHealthy made any module
-// pulling it fail to link with "Export named 'waitForProxyHealthy' not found".
 mock.module('../../../cliproxy/proxy/proxy-detector', () => ({
   detectRunningProxy: async () => ({ running: false, verified: false }),
-  waitForProxyHealthy: async () => false,
 }));
 
 describe('handleOrderSubcommand', () => {

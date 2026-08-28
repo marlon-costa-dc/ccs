@@ -4,7 +4,7 @@
  */
 
 import * as fs from 'fs';
-import type { BinaryManagerConfig, CLIProxyBackend } from '../types';
+import { BinaryManagerConfig, CLIProxyBackend } from '../types';
 import {
   checkForUpdates,
   fetchLatestVersion,

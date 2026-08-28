@@ -73,12 +73,6 @@ const isolatedTests = new Set([
   'tests/unit/utils/fetch-proxy-setup.test.ts',
   'tests/unit/web-server/usage/account-attribution.test.ts',
   'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
-  // mock.module replaces a shared facade for the whole process and
-  // mock.restore() does not undo module-level replacement in bun, so every
-  // later importer in the shared bucket sees the stub (getBrowserConfig -> {})
-  // and fails on real shapes. Process isolation is the only correct boundary.
-  'tests/unit/cliproxy/router-capability-spike.test.ts',
-  'tests/unit/commands/cliproxy-routing-status-capability.test.ts',
 ]);
 
 const filePattern = /(\.test\.(c|m)?[jt]s|\.spec\.(c|m)?[jt]s|-test\.(c|m)?[jt]s)$/;
@@ -167,11 +161,6 @@ function shouldRunIsolated(file) {
   return (
     file.startsWith('src/') ||
     file.startsWith('tests/npm/') ||
-    // The codex-auth suites drive the CLI through process.env (CCS_HOME,
-    // CODEX_HOME, CCS_CODEX_PROFILE) and spy on fs. Each is green on its own
-    // and flaky in the shared bucket, where a sibling suite overwrites those
-    // variables mid-run. Isolating the directory keeps that per-process.
-    file.startsWith('tests/unit/codex-auth/') ||
     isolatedTests.has(file) ||
     !usesBunTestRunner(file)
   );

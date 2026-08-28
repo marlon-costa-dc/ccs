@@ -6,8 +6,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { getBinDir } from '../config/config-generator';
-import type { VersionCache, VersionListCache } from './types';
-import { VERSION_CACHE_DURATION_MS, VERSION_PIN_FILE, getGitHubRepo } from './types';
+import {
+  VersionCache,
+  VERSION_CACHE_DURATION_MS,
+  VERSION_PIN_FILE,
+  VersionListCache,
+  getGitHubRepo,
+} from './types';
 import { DEFAULT_BACKEND } from '../binary/platform-detector';
 import type { CLIProxyBackend } from '../types';
 
