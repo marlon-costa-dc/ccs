@@ -144,6 +144,7 @@ describe('run-test-bucket', () => {
   test('isolates subprocess launch suites in the slow bucket', () => {
     const runs = bucket.getBunRuns('slow', [
       'tests/unit/commands/persist-command-handler.test.ts',
+      'tests/unit/cliproxy/concurrent-state-locks.test.ts',
       'tests/npm/cli.test.js',
       'tests/unit/targets/droid-command-routing-integration.test.ts',
       'tests/unit/targets/native-claude-effort-launch.test.ts',
@@ -154,6 +155,7 @@ describe('run-test-bucket', () => {
 
     expect(runs.map((run) => run.label)).toEqual([
       'shared',
+      'tests/unit/cliproxy/concurrent-state-locks.test.ts',
       'tests/npm/cli.test.js',
       'tests/unit/targets/droid-command-routing-integration.test.ts',
       'tests/unit/targets/native-claude-effort-launch.test.ts',

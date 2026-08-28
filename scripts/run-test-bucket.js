@@ -53,6 +53,7 @@ const slowTests = [
 const fastJsTests = new Set(['tests/unit/flag-parsing-simple.test.js']);
 
 const isolatedTests = new Set([
+  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
   'tests/integration/update-command-install-origin.test.ts',
   ...browserMcpSplitTests,
   'tests/unit/commands/update-command-beta-channel.test.js',
