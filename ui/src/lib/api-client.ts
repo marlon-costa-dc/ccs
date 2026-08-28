@@ -10,6 +10,7 @@ import type {
   UpsertAiProviderEntryInput,
 } from '../../../src/cliproxy/ai-providers';
 import type { ProviderEntitlementEvidence } from '../../../src/cliproxy/auth/provider-entitlement-types';
+import type { ModelPipelineConfig } from '../../../src/config/schemas/model-pipeline-types';
 import type { BrowserRuntimeEnv } from '../../../src/utils/browser/chrome-reuse';
 
 export const API_BASE_URL = '/api';
@@ -505,72 +506,6 @@ export interface AuthStatus {
   tokenFiles: number;
   accounts: OAuthAccount[];
   defaultAccount?: string;
-}
-
-export type RoutingStrategy = 'round-robin' | 'fill-first';
-
-export interface CliproxyPoolRoutingState {
-  enabled: boolean;
-  maxRetryCredentials?: number;
-  /**
-   * Whether the pool flag reflects the actual proxy. For a remote proxy target
-   * the pool flag is local-only and may not be applied to the remote, so the
-   * backend sets this to false. Undefined is treated as manageable (local).
-   */
-  manageable?: boolean;
-  /** Explanation surfaced when manageable is false (remote target). */
-  message?: string;
-}
-
-export interface CliproxyRoutingState {
-  strategy: RoutingStrategy;
-  source: 'live' | 'config';
-  target: 'local' | 'remote';
-  reachable: boolean;
-  message?: string;
-  /** Pool routing mode (proxy-wide). */
-  poolRouting?: CliproxyPoolRoutingState;
-}
-
-export interface CliproxyRoutingApplyResult extends CliproxyRoutingState {
-  applied: 'live' | 'live-and-config' | 'config-only';
-}
-
-export interface CliproxySessionAffinityState {
-  enabled?: boolean;
-  ttl?: string;
-  source: 'config' | 'unsupported';
-  target: 'local' | 'remote';
-  reachable: boolean;
-  manageable: boolean;
-  message?: string;
-}
-
-export interface CliproxySessionAffinityApplyResult extends CliproxySessionAffinityState {
-  applied: 'config-and-live' | 'config-only' | 'unsupported';
-}
-
-export interface CliproxyRetryValues {
-  request_retry: number;
-  max_retry_interval: number;
-}
-
-export interface CliproxyRetryState extends CliproxyRetryValues {
-  source: 'live' | 'config';
-  target: 'local' | 'remote';
-  reachable: boolean;
-  manageable: boolean;
-  message?: string;
-}
-
-export interface CliproxyRetryApplyResult extends CliproxyRetryState {
-  applied: 'live' | 'live-and-config' | 'config-only';
-}
-
-/** Auth file info for Config tab */
-export interface AuthFile {
-  name: string;
-  provider?: string;
 }
 
 /** CLIProxy model from /v1/models endpoint */
@@ -1082,18 +1017,13 @@ export interface RemoteProxyStatus {
 export interface ProxyRemoteConfig {
   enabled: boolean;
   host: string;
-  /** Port is optional - uses protocol default (443 for HTTPS, 80 for HTTP) */
+  /** Required whenever remote mode is enabled. */
   port?: number;
   protocol: 'http' | 'https';
   auth_token: string;
-  /** Management key for /v0/management/* endpoints (optional, falls back to auth_token) */
+  /** Required for /v0/management/* whenever remote mode is enabled. */
   management_key?: string;
-}
-
-/** Fallback configuration */
-export interface ProxyFallbackConfig {
-  enabled: boolean;
-  auto_start: boolean;
+  allow_self_signed?: boolean;
 }
 
 /** Local proxy configuration */
@@ -1104,8 +1034,8 @@ export interface ProxyLocalConfig {
 
 /** CLIProxy server configuration */
 export interface CliproxyServerConfig {
+  management_timeout_ms: number;
   remote: ProxyRemoteConfig;
-  fallback: ProxyFallbackConfig;
   local: ProxyLocalConfig;
 }
 
@@ -1331,25 +1261,6 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ model }),
       }),
-    getRoutingStrategy: () => request<CliproxyRoutingState>('/cliproxy/routing/strategy'),
-    updateRoutingStrategy: (strategy: RoutingStrategy) =>
-      request<CliproxyRoutingApplyResult>('/cliproxy/routing/strategy', {
-        method: 'PUT',
-        body: JSON.stringify({ value: strategy }),
-      }),
-    getSessionAffinity: () =>
-      request<CliproxySessionAffinityState>('/cliproxy/routing/session-affinity'),
-    updateSessionAffinity: (data: { enabled: boolean; ttl?: string }) =>
-      request<CliproxySessionAffinityApplyResult>('/cliproxy/routing/session-affinity', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
-    getRetrySettings: () => request<CliproxyRetryState>('/cliproxy/retry'),
-    updateRetrySettings: (data: CliproxyRetryValues) =>
-      request<CliproxyRetryApplyResult>('/cliproxy/retry', {
-        method: 'PUT',
-        body: JSON.stringify(data),
-      }),
     aiProviders: {
       list: () => request<ListAiProvidersResult>('/cliproxy/ai-providers'),
       create: (family: AiProviderFamilyId, data: UpsertAiProviderEntryInput) =>
@@ -1372,34 +1283,6 @@ export const api = {
             method: 'DELETE',
           }
         ),
-    },
-
-    // Config YAML for Config tab
-    getConfigYaml: async (): Promise<string> => {
-      const res = await fetch(withApiBase('/cliproxy/config.yaml'));
-      if (!res.ok) throw new Error('Failed to load config');
-      return res.text();
-    },
-    saveConfigYaml: async (content: string): Promise<void> => {
-      const res = await fetch(withApiBase('/cliproxy/config.yaml'), {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/yaml' },
-        body: content,
-      });
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ error: 'Failed to save config' }));
-        throw new Error(error.error || 'Failed to save config');
-      }
-    },
-
-    // Auth files for Config tab
-    getAuthFiles: () => request<{ files: AuthFile[] }>('/cliproxy/auth-files'),
-    getAuthFile: async (name: string): Promise<string> => {
-      const res = await fetch(
-        withApiBase(`/cliproxy/auth-files/download?name=${encodeURIComponent(name)}`)
-      );
-      if (!res.ok) throw new Error('Failed to load auth file');
-      return res.text();
     },
 
     // Multi-account management
@@ -1526,6 +1409,9 @@ export const api = {
         body: JSON.stringify({ backupPath }),
       }),
   },
+  modelPipeline: {
+    get: () => request<ModelPipelineConfig>('/config/model-pipeline'),
+  },
   /** Model presets for quick model switching */
   presets: {
     list: (profile: string) => request<{ presets: ModelPreset[] }>(`/settings/${profile}/presets`),
@@ -1560,11 +1446,10 @@ export const api = {
     /** Test remote proxy connection */
     test: (params: {
       host: string;
-      /** Port is optional - uses protocol default (443 for HTTPS, 80 for HTTP) */
-      port?: number;
+      port: number;
       protocol: 'http' | 'https';
-      authToken?: string;
-      allowSelfSigned?: boolean;
+      authToken: string;
+      allowSelfSigned: boolean;
     }) =>
       request<RemoteProxyStatus>('/cliproxy-server/test', {
         method: 'POST',

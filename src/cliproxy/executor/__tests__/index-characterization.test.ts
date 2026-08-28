@@ -106,15 +106,7 @@ describe('index.ts re-export surface (backwards compatibility)', () => {
     });
 
     it('contains the core CCS flags', () => {
-      const expected = [
-        '--auth',
-        '--accounts',
-        '--use',
-        '--thinking',
-        '--1m',
-        '--no-1m',
-        '--proxy-host',
-      ];
+      const expected = ['--auth', '--accounts', '--use', '--thinking', '--1m', '--no-1m'];
       for (const flag of expected) {
         expect(CCS_FLAGS).toContain(flag);
       }

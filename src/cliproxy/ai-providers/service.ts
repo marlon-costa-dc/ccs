@@ -8,9 +8,11 @@ import {
   type AiProviderModelAlias,
   type ListAiProvidersResult,
   type OpenAICompatEntry,
+  type OpenAICompatModelEntry,
   type UpsertAiProviderEntryInput,
 } from './types';
 import { getAiProvidersSourceSummary, readFamilyEntries, writeFamilyEntries } from './config-store';
+import { ValidationError } from '../../errors/error-types';
 
 function maskSecret(value: string | undefined): string | undefined {
   if (!value) return undefined;
@@ -64,13 +66,21 @@ function toHeaderPairs(
   }));
 }
 
-function readModelRulePart(model: unknown, key: keyof AiProviderModelAlias) {
+function readModelRulePart(model: unknown, key: string) {
   if (!model || typeof model !== 'object') {
     return '';
   }
 
-  const value = (model as Partial<Record<keyof AiProviderModelAlias, unknown>>)[key];
+  const value = (model as Record<string, unknown>)[key];
   return typeof value === 'string' ? value.trim() : '';
+}
+
+function readFirstModelRulePart(model: unknown, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = readModelRulePart(model, key);
+    if (value) return value;
+  }
+  return '';
 }
 
 function normalizeModelAliases(models: unknown): AiProviderModelAlias[] {
@@ -80,6 +90,70 @@ function normalizeModelAliases(models: unknown): AiProviderModelAlias[] {
       alias: readModelRulePart(model, 'alias'),
     }))
     .filter((model) => model.name.length > 0 || model.alias.length > 0);
+}
+
+function readModelProtocols(model: unknown): string[] {
+  if (!model || typeof model !== 'object') return [];
+  const protocols = (model as Record<string, unknown>).protocols;
+  return Array.isArray(protocols)
+    ? protocols
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => value.trim())
+    : [];
+}
+
+function normalizeOpenAICompatModels(models: unknown): AiProviderModelAlias[] {
+  return (Array.isArray(models) ? models : [])
+    .map((model) => {
+      const catalogProviderId = readFirstModelRulePart(
+        model,
+        'catalog-provider-id',
+        'catalogProviderId'
+      );
+      const catalogModelId = readFirstModelRulePart(model, 'catalog-model-id', 'catalogModelId');
+      const catalogRouteProviderId = readFirstModelRulePart(
+        model,
+        'catalog-route-provider-id',
+        'catalogRouteProviderId'
+      );
+      const catalogRouteModelId = readFirstModelRulePart(
+        model,
+        'catalog-route-model-id',
+        'catalogRouteModelId'
+      );
+      const variantId = readFirstModelRulePart(model, 'variant-id', 'variantId');
+      const protocols = readModelProtocols(model);
+      return {
+        name: readModelRulePart(model, 'name'),
+        alias: readModelRulePart(model, 'alias'),
+        ...(catalogProviderId && { catalogProviderId }),
+        ...(catalogModelId && { catalogModelId }),
+        ...(catalogRouteProviderId && { catalogRouteProviderId }),
+        ...(catalogRouteModelId && { catalogRouteModelId }),
+        ...(variantId && { variantId }),
+        ...(protocols.length > 0 && { protocols }),
+      };
+    })
+    .filter((model) => model.name.length > 0 || model.alias.length > 0);
+}
+
+function toOpenAICompatModelEntry(model: AiProviderModelAlias): OpenAICompatModelEntry {
+  const catalogProviderId = model.catalogProviderId?.trim();
+  const catalogModelId = model.catalogModelId?.trim();
+  const catalogRouteProviderId = model.catalogRouteProviderId?.trim();
+  const catalogRouteModelId = model.catalogRouteModelId?.trim();
+  const variantId = model.variantId?.trim();
+  const protocols = model.protocols?.map((value) => value.trim()).filter(Boolean);
+  return {
+    name: model.name.trim(),
+    alias: model.alias.trim(),
+    ...(catalogProviderId && { 'catalog-provider-id': catalogProviderId }),
+    ...(catalogModelId && { 'catalog-model-id': catalogModelId }),
+    ...(catalogRouteProviderId && { 'catalog-route-provider-id': catalogRouteProviderId }),
+    ...(catalogRouteModelId && { 'catalog-route-model-id': catalogRouteModelId }),
+    ...(variantId && { 'variant-id': variantId }),
+    ...(protocols?.length && { protocols }),
+  };
 }
 
 function buildApiKeyEntryView(
@@ -103,15 +177,24 @@ function buildApiKeyEntryView(
 }
 
 function buildOpenAiCompatEntryView(entry: OpenAICompatEntry, index: number): AiProviderEntryView {
+  const quotaDomains = Array.from(
+    new Set(
+      (entry['api-key-entries'] || [])
+        .map((credential) => credential['quota-domain']?.trim())
+        .filter((value): value is string => Boolean(value))
+    )
+  );
   return {
     id: entry.id || `openai-compatibility:${index}`,
     index,
     name: entry.name,
     label: entry.name,
     baseUrl: sanitizeUrlForView(entry['base-url']),
+    routeChannel: entry['route-channel'],
+    quotaDomain: quotaDomains.length === 1 ? quotaDomains[0] : undefined,
     headers: toHeaderPairs(entry.headers),
     excludedModels: [],
-    models: normalizeModelAliases(entry.models),
+    models: normalizeOpenAICompatModels(entry.models),
     apiKeysMasked: (entry['api-key-entries'] || []).map(
       (apiKeyEntry) => maskSecret(apiKeyEntry['api-key']) || '***'
     ),
@@ -160,12 +243,7 @@ function toApiKeyEntry(
   input: UpsertAiProviderEntryInput,
   existing?: AiProviderApiKeyEntry
 ): AiProviderApiKeyEntry {
-  const nextSecret =
-    input.apiKey !== undefined
-      ? input.apiKey.trim()
-      : input.preserveSecrets
-        ? existing?.['api-key'] || ''
-        : existing?.['api-key'] || '';
+  const nextSecret = input.apiKey !== undefined ? input.apiKey.trim() : existing?.['api-key'] || '';
 
   return {
     id: existing?.id,
@@ -192,9 +270,7 @@ function toOpenAiCompatEntry(
   const nextApiKeys =
     input.apiKeys !== undefined
       ? input.apiKeys.map((value) => value.trim()).filter((value) => value.length > 0)
-      : input.preserveSecrets
-        ? (existing?.['api-key-entries'] || []).map((entry) => entry['api-key'])
-        : (existing?.['api-key-entries'] || []).map((entry) => entry['api-key']);
+      : (existing?.['api-key-entries'] || []).map((entry) => entry['api-key']);
 
   return {
     id: existing?.id,
@@ -203,10 +279,95 @@ function toOpenAiCompatEntry(
       restoreMaskedViewValue(input.baseUrl, existing?.['base-url'], sanitizeUrlForView) ||
       existing?.['base-url'] ||
       '',
+    'route-channel': input.routeChannel?.trim() || existing?.['route-channel'],
     headers: normalizeHeaders(input.headers, existing?.headers),
-    'api-key-entries': nextApiKeys.map((apiKey) => ({ 'api-key': apiKey })),
-    models: normalizeModelAliases(input.models),
+    'api-key-entries': nextApiKeys.map((apiKey, index) => ({
+      'api-key': apiKey,
+      'quota-domain':
+        input.quotaDomain?.trim() || existing?.['api-key-entries']?.[index]?.['quota-domain'],
+      'proxy-url': existing?.['api-key-entries']?.[index]?.['proxy-url'],
+    })),
+    models: normalizeOpenAICompatModels(input.models).map(toOpenAICompatModelEntry),
   };
+}
+
+function validateOpenAICompatCatalogContract(input: UpsertAiProviderEntryInput): void {
+  const models = input.models || [];
+  const catalogModels = models.filter(
+    (model) =>
+      [
+        model.catalogProviderId,
+        model.catalogModelId,
+        model.catalogRouteProviderId,
+        model.catalogRouteModelId,
+        model.variantId,
+      ].some((value) => Boolean(value?.trim())) || Boolean(model.protocols?.length)
+  );
+  if (catalogModels.length === 0) return;
+  if (!input.routeChannel?.trim()) {
+    throw new ValidationError(
+      'routeChannel is required when catalog model facts are declared',
+      'routeChannel'
+    );
+  }
+  if (
+    input.routeChannel.trim() !== input.routeChannel ||
+    input.routeChannel.toLowerCase() !== input.routeChannel
+  ) {
+    throw new ValidationError('routeChannel must be a lower-case canonical string', 'routeChannel');
+  }
+  if (!input.quotaDomain?.trim()) {
+    throw new ValidationError(
+      'quotaDomain is required when catalog model facts are declared',
+      'quotaDomain'
+    );
+  }
+  catalogModels.forEach((model, index) => {
+    const required = [
+      ['catalogProviderId', model.catalogProviderId],
+      ['catalogModelId', model.catalogModelId],
+      ['catalogRouteProviderId', model.catalogRouteProviderId],
+      ['catalogRouteModelId', model.catalogRouteModelId],
+    ] as const;
+    required.forEach(([field, value]) => {
+      if (!value || value.trim() !== value) {
+        throw new ValidationError(
+          `models[${index}].${field} must be a non-empty canonical string`,
+          `models[${index}].${field}`
+        );
+      }
+    });
+    const protocols = model.protocols || [];
+    if (protocols.length === 0) {
+      throw new ValidationError(
+        `models[${index}].protocols must contain at least one explicit protocol`,
+        `models[${index}].protocols`
+      );
+    }
+    const normalized = protocols.map((value) => value.trim());
+    if (normalized.some((value, protocolIndex) => !value || value !== protocols[protocolIndex])) {
+      throw new ValidationError(
+        `models[${index}].protocols must contain canonical strings`,
+        `models[${index}].protocols`
+      );
+    }
+    if (new Set(normalized).size !== normalized.length) {
+      throw new ValidationError(
+        `models[${index}].protocols must not contain duplicates`,
+        `models[${index}].protocols`
+      );
+    }
+    if (
+      normalized.some(
+        (value, protocolIndex) => protocolIndex > 0 && value < normalized[protocolIndex - 1]
+      )
+    ) {
+      throw new ValidationError(
+        `models[${index}].protocols must be sorted`,
+        `models[${index}].protocols`
+      );
+    }
+  });
 }
 
 function resolveEntryIndex(entries: Array<{ id?: string }>, entryId: string): number {
@@ -216,54 +377,32 @@ function resolveEntryIndex(entries: Array<{ id?: string }>, entryId: string): nu
     return matchedIndex;
   }
 
-  const legacyIndex = Number.parseInt(normalizedEntryId, 10);
-  if (
-    Number.isInteger(legacyIndex) &&
-    legacyIndex >= 0 &&
-    legacyIndex < entries.length &&
-    String(legacyIndex) === normalizedEntryId
-  ) {
-    return legacyIndex;
-  }
-
-  if (normalizedEntryId.startsWith('openai-compatibility:') || normalizedEntryId.includes(':')) {
-    const legacySuffix = normalizedEntryId.split(':').at(-1) || '';
-    const legacySuffixIndex = Number.parseInt(legacySuffix, 10);
-    if (
-      Number.isInteger(legacySuffixIndex) &&
-      legacySuffixIndex >= 0 &&
-      legacySuffixIndex < entries.length &&
-      String(legacySuffixIndex) === legacySuffix
-    ) {
-      return legacySuffixIndex;
-    }
-  }
-
-  throw new Error('Entry not found');
+  throw new ValidationError('Entry not found', 'entryId');
 }
 
 function assertEntryId(entryId: string): void {
   if (!entryId.trim()) {
-    throw new Error('Entry not found');
+    throw new ValidationError('Entry not found', 'entryId');
   }
 }
 
 function validateFamilyInput(family: AiProviderFamilyId, input: UpsertAiProviderEntryInput): void {
   if (family === 'openai-compatibility') {
     if (!(input.name?.trim() || '').length) {
-      throw new Error('name is required');
+      throw new ValidationError('name is required', 'name');
     }
     if (!(input.baseUrl?.trim() || '').length) {
-      throw new Error('baseUrl is required');
+      throw new ValidationError('baseUrl is required', 'baseUrl');
     }
     if (!input.preserveSecrets && !(input.apiKeys || []).some((value) => value.trim().length > 0)) {
-      throw new Error('At least one api key is required');
+      throw new ValidationError('At least one api key is required', 'apiKeys');
     }
+    validateOpenAICompatCatalogContract(input);
     return;
   }
 
   if (!input.preserveSecrets && !(input.apiKey?.trim() || '').length) {
-    throw new Error('apiKey is required');
+    throw new ValidationError('apiKey is required', 'apiKey');
   }
 }
 

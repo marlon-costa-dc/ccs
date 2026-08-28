@@ -14,6 +14,8 @@ const proxyTarget: ProxyTarget = {
   host: '127.0.0.1',
   port: 8317,
   protocol: 'http',
+  allowSelfSigned: false,
+  managementTimeoutMs: 2_000,
   isRemote: false,
 };
 
@@ -49,6 +51,7 @@ function getAdvertisedHelpText(localScenario: string): string {
 
 async function registerScenarioMocks(): Promise<void> {
   const [
+    realBinaryManager,
     realConfigGenerator,
     realAccountManager,
     realTokenManager,
@@ -56,9 +59,9 @@ async function registerScenarioMocks(): Promise<void> {
     realProxyTargetResolver,
     realAccountSafety,
     realAccountSafetyCrossLane,
-    realPoolOptInPrompt,
     realOAuthPortDiagnostics,
   ] = await Promise.all([
+    import('../../binary-manager'),
     import('../../config/config-generator'),
     import('../../accounts/account-manager'),
     import('../token-manager'),
@@ -66,11 +69,11 @@ async function registerScenarioMocks(): Promise<void> {
     import('../../proxy/proxy-target-resolver'),
     import('../../accounts/account-safety'),
     import('../../accounts/account-safety-cross-lane'),
-    import('../../routing/pool-opt-in-prompt'),
     import('../../../management/oauth-port-diagnostics'),
   ]);
 
   mock.module('../../binary-manager', () => ({
+    ...realBinaryManager,
     ensureCLIProxyBinary: ensureBinaryMock,
     getConfiguredBackend: () => activeBackend,
   }));
@@ -134,11 +137,6 @@ async function registerScenarioMocks(): Promise<void> {
   mock.module('../../accounts/account-safety-cross-lane', () => ({
     ...realAccountSafetyCrossLane,
     checkCrossLaneEmailOverlap: () => null,
-  }));
-
-  mock.module('../../routing/pool-opt-in-prompt', () => ({
-    ...realPoolOptInPrompt,
-    maybeOfferPoolRouting: async () => undefined,
   }));
 }
 

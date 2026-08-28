@@ -27,6 +27,7 @@ const browserMcpSplitTests = [
 // (catches deletion drift) but CANNOT detect new undeclared slow tests.
 // Automated perf-budget enforcement tracked in issue #1071.
 const slowTests = [
+  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
   'tests/integration/logging-request-context.test.ts',
   'tests/integration/proxy/daemon-lifecycle.test.ts',
   'tests/integration/update-command-install-origin.test.ts',
@@ -52,6 +53,7 @@ const slowTests = [
 const fastJsTests = new Set(['tests/unit/flag-parsing-simple.test.js']);
 
 const isolatedTests = new Set([
+  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
   'tests/integration/update-command-install-origin.test.ts',
   ...browserMcpSplitTests,
   'tests/unit/commands/update-command-beta-channel.test.js',
@@ -273,16 +275,14 @@ function collectFilesByExtension(dir, extension, files = []) {
 
 function isTestSourcePath(sourcePath) {
   const normalized = sourcePath.split(path.sep).join('/');
-  return (
-    normalized.includes('/__tests__/') ||
-    /\.(?:test|spec)\.ts$/.test(normalized)
-  );
+  return normalized.includes('/__tests__/') || /\.(?:test|spec)\.ts$/.test(normalized);
 }
 
 function hasCompleteBuildArtifacts(baseDir = rootDir) {
   const requiredBuildArtifacts = getRequiredBuildArtifacts(baseDir);
-  return requiredBuildArtifacts.length > 0 && requiredBuildArtifacts.every((relativePath) =>
-    fs.existsSync(path.join(baseDir, relativePath))
+  return (
+    requiredBuildArtifacts.length > 0 &&
+    requiredBuildArtifacts.every((relativePath) => fs.existsSync(path.join(baseDir, relativePath)))
   );
 }
 
@@ -298,6 +298,28 @@ function ensureBuildForSlowBucket() {
   });
 
   return build.status ?? 1;
+}
+
+function generateBuildProvenance(run = spawnSync) {
+  const result = run(
+    process.execPath,
+    [path.join(rootDir, 'scripts/generate-build-provenance.js')],
+    {
+      cwd: rootDir,
+      stdio: 'inherit',
+    }
+  );
+
+  if (result.error) {
+    console.error(`[X] Failed to generate build provenance: ${result.error.message}`);
+    return 1;
+  }
+
+  const exitCode = result.status ?? 1;
+  if (exitCode !== 0) {
+    console.error(`[X] Build provenance generation exited with status ${exitCode}.`);
+  }
+  return exitCode;
 }
 
 function runBunTest(run) {
@@ -327,6 +349,7 @@ function runBunTest(run) {
   const exitCode = result.status ?? 1;
   if (exitCode !== 0) {
     writeOutput();
+    console.error(`[X] ${run.label} exited with status ${exitCode}.`);
     return exitCode;
   }
 
@@ -369,26 +392,22 @@ function runBucket(name) {
     console.log(`[i] Running ${isolatedCount} test file(s) in isolated Bun processes.`);
   }
 
-  let exitCode = 0;
   for (const run of runs) {
     if (name === 'slow') {
       const buildStatus = ensureBuildForSlowBucket();
       if (buildStatus !== 0) {
-        exitCode = buildStatus;
-        continue;
+        console.error(`[X] Runtime build prerequisite failed before ${run.label}.`);
+        return buildStatus;
       }
     }
     const status = runBunTest(run);
     if (status !== 0) {
-      exitCode = status;
+      return status;
     }
   }
 
-  if (exitCode === 0) {
-    console.log(`[OK] Bucket '${name}' ran ${selected.length} selected test files.`);
-  }
-
-  return exitCode;
+  console.log(`[OK] Bucket '${name}' ran ${selected.length} selected test files.`);
+  return 0;
 }
 
 function main(args = process.argv.slice(2)) {
@@ -399,24 +418,26 @@ function main(args = process.argv.slice(2)) {
     return 1;
   }
 
-  if (bucket === 'all') {
-    let exitCode = 0;
+  const provenanceStatus = generateBuildProvenance();
+  if (provenanceStatus !== 0) {
+    return provenanceStatus;
+  }
 
+  if (bucket === 'all') {
     for (const name of ['fast', 'slow']) {
       const status = runBucket(name);
       if (status !== 0) {
-        exitCode = status;
+        return status;
       }
     }
-
-    return exitCode;
+    return 0;
   }
 
   return runBucket(bucket);
 }
 
 if (require.main === module) {
-  process.exit(main());
+  process.exitCode = main();
 }
 
 module.exports = {
@@ -438,5 +459,6 @@ module.exports = {
   shouldVerifyRunFileCount,
   getRequiredBuildArtifacts,
   hasCompleteBuildArtifacts,
+  generateBuildProvenance,
   main,
 };

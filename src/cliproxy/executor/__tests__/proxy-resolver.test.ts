@@ -5,7 +5,7 @@
  * logic extracted from executor/index.ts.
  */
 
-import { afterEach, beforeEach, describe, expect, it, jest } from 'bun:test';
+import { beforeEach, describe, expect, it, jest } from 'bun:test';
 import type { ResolveExecutorProxyContext } from '../proxy-resolver';
 import type { ExecutorConfig } from '../../types';
 import type { UnifiedConfig } from '../../../config/schemas/unified-config';
@@ -45,37 +45,36 @@ jest.mock('../../services/remote-proxy-client', () => ({
   checkRemoteProxy: mockCheckRemoteProxy,
 }));
 
-jest.mock('../retry-handler', () => ({
+jest.mock('../failure-handler', () => ({
   isNetworkError: jest.fn().mockReturnValue(false),
   handleNetworkError: jest.fn(),
   handleTokenExpiration: jest.fn(),
-  handleQuotaCheck: jest.fn(),
-  PROVIDER_ERROR_PATTERNS: [],
-  detectFailedTier: jest.fn().mockReturnValue(null),
-  isProviderError: jest.fn().mockReturnValue(false),
 }));
 
 // ── Import after mocks ────────────────────────────────────────────────────────
 
 const { resolveExecutorProxy, resolveExecutorProxyConfig } = await import('../proxy-resolver');
 
-const PROXY_ENV_KEYS = [
-  'CCS_PROXY_HOST',
-  'CCS_PROXY_PORT',
-  'CCS_PROXY_PROTOCOL',
-  'CCS_PROXY_AUTH_TOKEN',
-  'CCS_PROXY_TIMEOUT',
-  'CCS_PROXY_FALLBACK_ENABLED',
-  'CCS_ALLOW_SELF_SIGNED',
-] as const;
-
-let proxyEnvSnapshot: Record<string, string | undefined> = {};
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeMinimalUnifiedConfig(): UnifiedConfig {
+function makeUnifiedConfig(remote = false): UnifiedConfig {
   return {
-    cliproxy_server: undefined,
+    cliproxy_server: {
+      management_timeout_ms: 2_000,
+      remote: {
+        enabled: remote,
+        host: remote ? '192.168.1.100' : '',
+        port: remote ? 9443 : undefined,
+        protocol: remote ? 'https' : 'http',
+        auth_token: remote ? 'remote-token' : '',
+        management_key: remote ? 'management-key' : undefined,
+        allow_self_signed: false,
+      },
+      local: {
+        port: 8317,
+        auto_start: true,
+      },
+    },
   } as unknown as UnifiedConfig;
 }
 
@@ -92,7 +91,7 @@ function makeContext(
   overrides: Partial<ResolveExecutorProxyContext> = {}
 ): ResolveExecutorProxyContext {
   return {
-    unifiedConfig: makeMinimalUnifiedConfig(),
+    unifiedConfig: makeUnifiedConfig(),
     allProviders: ['gemini'],
     verbose: false,
     cfg: makeBaseCfg(),
@@ -110,28 +109,13 @@ async function resolveProxyForTest(args: string[], context = makeContext()) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  proxyEnvSnapshot = Object.fromEntries(PROXY_ENV_KEYS.map((key) => [key, process.env[key]]));
-  for (const key of PROXY_ENV_KEYS) {
-    delete process.env[key];
-  }
   mockEnsureCLIProxyBinary.mockResolvedValue('/usr/local/bin/cliproxy');
   mockGetConfiguredBackend.mockReturnValue('original');
 });
 
-afterEach(() => {
-  for (const key of PROXY_ENV_KEYS) {
-    const value = proxyEnvSnapshot[key];
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
-  }
-});
-
 describe('resolveExecutorProxy — local mode', () => {
   it('returns useRemoteProxy=false and correct binary for local mode', async () => {
-    const result = await resolveProxyForTest(['--local-proxy', '--verbose']);
+    const result = await resolveProxyForTest(['--verbose']);
 
     expect(result.useRemoteProxy).toBe(false);
     expect(result.localBackend).toBe('original');
@@ -139,15 +123,15 @@ describe('resolveExecutorProxy — local mode', () => {
     expect(result.argsWithoutProxy).toEqual(['--verbose']);
   });
 
-  it('strips proxy flags and passes remainingArgs through', async () => {
-    const result = await resolveProxyForTest(['--local-proxy', 'clean-arg']);
+  it('passes arguments through without maintaining a proxy override surface', async () => {
+    const result = await resolveProxyForTest(['clean-arg']);
 
     expect(result.argsWithoutProxy).toEqual(['clean-arg']);
     expect(result.useRemoteProxy).toBe(false);
   });
 
   it('does not call checkRemoteProxy in local mode', async () => {
-    await resolveProxyForTest(['--local-proxy']);
+    await resolveProxyForTest([]);
 
     expect(mockCheckRemoteProxy).not.toHaveBeenCalled();
   });
@@ -157,7 +141,10 @@ describe('resolveExecutorProxy — remote mode reachable', () => {
   it('returns useRemoteProxy=true when remote proxy is reachable', async () => {
     mockCheckRemoteProxy.mockResolvedValue({ reachable: true, latencyMs: 12, error: undefined });
 
-    const result = await resolveProxyForTest(['--proxy-host', '192.168.1.100']);
+    const result = await resolveProxyForTest(
+      [],
+      makeContext({ unifiedConfig: makeUnifiedConfig(true) })
+    );
 
     expect(result.useRemoteProxy).toBe(true);
   });
@@ -165,7 +152,10 @@ describe('resolveExecutorProxy — remote mode reachable', () => {
   it('skips binary acquisition when remote proxy is reachable', async () => {
     mockCheckRemoteProxy.mockResolvedValue({ reachable: true, latencyMs: 5, error: undefined });
 
-    const result = await resolveProxyForTest(['--proxy-host', '192.168.1.100']);
+    const result = await resolveProxyForTest(
+      [],
+      makeContext({ unifiedConfig: makeUnifiedConfig(true) })
+    );
 
     expect(result.binaryPath).toBeUndefined();
     expect(mockEnsureCLIProxyBinary).not.toHaveBeenCalled();
@@ -173,38 +163,20 @@ describe('resolveExecutorProxy — remote mode reachable', () => {
 });
 
 describe('resolveExecutorProxy — remote mode unreachable', () => {
-  it('throws expected message when remoteOnly=true and remote is unreachable', async () => {
+  it('preserves the first remote failure and never acquires a local binary', async () => {
     mockCheckRemoteProxy.mockResolvedValue({ reachable: false, error: 'Connection refused' });
 
     await expect(
-      resolveProxyForTest(['--proxy-host', '192.168.1.100', '--remote-only'])
-    ).rejects.toThrow('Remote proxy unreachable and --remote-only specified');
-  });
-
-  it('throws when fallback disabled and remote is unreachable', async () => {
-    process.env.CCS_PROXY_FALLBACK_ENABLED = '0';
-    mockCheckRemoteProxy.mockResolvedValue({ reachable: false, error: 'Timeout' });
-
-    await expect(resolveProxyForTest(['--proxy-host', '192.168.1.100'])).rejects.toThrow(
-      'Remote proxy unreachable and fallback disabled'
-    );
-  });
-
-  it('falls back to local and acquires binary when autoStartLocal=true', async () => {
-    mockCheckRemoteProxy.mockResolvedValue({ reachable: false, error: 'Timeout' });
-    mockEnsureCLIProxyBinary.mockResolvedValue('/usr/local/bin/cliproxy');
-
-    const result = await resolveProxyForTest(['--proxy-host', '192.168.1.100']);
-
-    expect(result.useRemoteProxy).toBe(false);
-    expect(result.binaryPath).toBe('/usr/local/bin/cliproxy');
-    expect(mockEnsureCLIProxyBinary).toHaveBeenCalled();
+      resolveProxyForTest([], makeContext({ unifiedConfig: makeUnifiedConfig(true) }))
+    ).rejects.toThrow('Remote proxy unreachable: Connection refused');
+    expect(mockCheckRemoteProxy).toHaveBeenCalledTimes(1);
+    expect(mockEnsureCLIProxyBinary).not.toHaveBeenCalled();
   });
 });
 
 describe('resolveExecutorProxy — proxyConfig propagated in result', () => {
   it('returns the resolved proxyConfig object', async () => {
-    const result = await resolveProxyForTest(['--local-proxy']);
+    const result = await resolveProxyForTest([]);
 
     expect(result.proxyConfig).toBeDefined();
     expect(result.proxyConfig.mode).toBe('local');
@@ -214,7 +186,7 @@ describe('resolveExecutorProxy — proxyConfig propagated in result', () => {
   it('returns mutated cfg with validated port', async () => {
     const ctx = makeContext();
 
-    const result = await resolveProxyForTest(['--local-proxy'], ctx);
+    const result = await resolveProxyForTest([], ctx);
 
     // cfg is mutated in place and also returned
     expect(result.cfg).toBe(ctx.cfg);

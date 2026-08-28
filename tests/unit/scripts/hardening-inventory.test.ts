@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 const { collectSyncCallSites, isTestFile } = require('../../../scripts/hardening-inventory.js');
+const { isGeneratedSourceFile } = require('../../../scripts/runtime-source-classifier.js');
 
 describe('hardening-inventory sync call scanning', () => {
   test('ignores sync-call names inside regex literals after else', () => {
@@ -36,6 +37,11 @@ describe('hardening-inventory sync call scanning', () => {
 });
 
 describe('hardening-inventory runtime file classification', () => {
+  test('excludes generated projections from source metrics', () => {
+    expect(isGeneratedSourceFile('src/generated/build-provenance.ts')).toBe(true);
+    expect(isGeneratedSourceFile('src/utils/version.ts')).toBe(false);
+  });
+
   test.each([
     'src/cliproxy/__tests__/routing.test.ts',
     'src/commands/fixtures/help-output.ts',

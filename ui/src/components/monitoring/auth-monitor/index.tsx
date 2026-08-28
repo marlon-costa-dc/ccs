@@ -212,10 +212,8 @@ export function AuthMonitor() {
           <div className="space-y-1">
             <p className="font-semibold text-foreground">High CLIProxy failure rate detected</p>
             <p className="text-muted-foreground">
-              Select the affected provider, pause failing accounts, then check{' '}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono">ccs cliproxy routing</code>.
-              For large Codex pools, prefer a smaller healthy active set and attach CLIProxy logs if
-              failures continue.
+              Inspect the active model-pipeline rejection reasons and CLIProxy logs. CCS will not
+              retry, fail over, or replace the failed route.
             </p>
           </div>
         </div>

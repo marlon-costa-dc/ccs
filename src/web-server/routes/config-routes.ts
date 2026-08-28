@@ -29,6 +29,7 @@ import {
   loadUnifiedConfig,
   mutateConfig,
 } from '../../config/config-loader-facade';
+import { createModelPipelineRouter } from './model-pipeline-routes';
 
 const router = Router();
 const LOCAL_CONFIG_ERROR =
@@ -47,6 +48,7 @@ router.use((req: Request, res: Response, next) => {
     next();
   }
 });
+router.use(createModelPipelineRouter());
 
 function redactSecretValue(value: string | undefined): string | undefined {
   if (value === undefined) {
@@ -382,6 +384,7 @@ function mergeCliproxyServerConfig(
   const currentServer = currentConfig.cliproxy_server ?? DEFAULT_CLIPROXY_SERVER_CONFIG;
 
   return {
+    management_timeout_ms: nextServer.management_timeout_ms ?? currentServer.management_timeout_ms,
     remote:
       nextRemote === undefined
         ? currentServer.remote
@@ -395,7 +398,6 @@ function mergeCliproxyServerConfig(
               nextRemote.management_key
             ),
           },
-    fallback: nextServer.fallback ?? currentServer.fallback,
     local: nextServer.local ?? currentServer.local,
   };
 }

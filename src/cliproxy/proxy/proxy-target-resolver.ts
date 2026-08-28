@@ -6,16 +6,9 @@
  */
 
 import type { CliproxyServerConfig } from '../../config/unified-config-types';
-import {
-  CLIPROXY_DEFAULT_PORT,
-  getRemoteDefaultPort,
-  normalizeProtocol,
-  validatePort,
-  validateRemotePort,
-} from '../config/port-manager';
-import { getProxyEnvVars } from './proxy-config-resolver';
 import { getEffectiveManagementSecret } from '../auth/auth-token-manager';
 import { loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
+import { ConfigError } from '../../errors/error-types';
 
 /** Resolved proxy target for making requests */
 export interface ProxyTarget {
@@ -30,7 +23,9 @@ export interface ProxyTarget {
   /** Optional management key for management API endpoints (/v0/management/*) */
   managementKey?: string;
   /** Whether HTTPS requests should allow self-signed certificates */
-  allowSelfSigned?: boolean;
+  allowSelfSigned: boolean;
+  /** CCS-owned deadline for management calls when this target came from CCS config. */
+  managementTimeoutMs: number;
   /** True if targeting remote server, false if local */
   isRemote: boolean;
 }
@@ -49,33 +44,65 @@ function loadCliproxyServerConfig(): CliproxyServerConfig | undefined {
  * Returns remote server config if enabled, otherwise localhost.
  */
 export function getProxyTarget(): ProxyTarget {
-  const config = loadCliproxyServerConfig();
-  const envConfig = getProxyEnvVars();
+  return resolveProxyTarget(loadCliproxyServerConfig());
+}
 
-  if (config?.remote?.enabled && config.remote?.host) {
-    // Normalize protocol (handles case sensitivity and invalid values)
-    const protocol = normalizeProtocol(config.remote.protocol);
-    // Validate port (returns undefined for invalid, triggering default)
-    const validatedPort = validateRemotePort(config.remote.port);
-    const port = validatedPort ?? getRemoteDefaultPort(protocol);
+/** Resolve a target from one already-loaded CCS configuration snapshot. */
+export function resolveProxyTarget(config: CliproxyServerConfig | undefined): ProxyTarget {
+  if (!config) {
+    throw new ConfigError('cliproxy_server is required');
+  }
+  const managementTimeoutMs = config.management_timeout_ms;
+  if (
+    typeof managementTimeoutMs !== 'number' ||
+    !Number.isInteger(managementTimeoutMs) ||
+    managementTimeoutMs < 1
+  ) {
+    throw new ConfigError('cliproxy_server.management_timeout_ms must be a positive whole number');
+  }
+
+  if (config.remote.enabled) {
+    if (!config.remote.host.trim()) {
+      throw new ConfigError('cliproxy_server.remote.host is required when remote mode is enabled');
+    }
+    if (typeof config.remote.allow_self_signed !== 'boolean') {
+      throw new ConfigError(
+        'cliproxy_server.remote.allow_self_signed is required for a remote CLIProxy target'
+      );
+    }
+    if (config.remote.protocol !== 'http' && config.remote.protocol !== 'https') {
+      throw new ConfigError('cliproxy_server.remote.protocol must be http or https');
+    }
+    const port = config.remote.port;
+    if (port === undefined || !Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new ConfigError(
+        'cliproxy_server.remote.port must be a whole number between 1 and 65535'
+      );
+    }
 
     return {
       host: config.remote.host,
       port,
-      protocol,
+      protocol: config.remote.protocol,
       authToken: config.remote.auth_token || undefined, // Empty string -> undefined
       managementKey: config.remote.management_key || undefined, // Empty string -> undefined
-      allowSelfSigned: envConfig.allowSelfSigned,
+      allowSelfSigned: config.remote.allow_self_signed,
+      managementTimeoutMs,
       isRemote: true,
     };
   }
 
-  const localPort = validatePort(config?.local?.port ?? CLIPROXY_DEFAULT_PORT);
+  const localPort = config.local.port;
+  if (!Number.isInteger(localPort) || localPort < 1 || localPort > 65535) {
+    throw new ConfigError('cliproxy_server.local.port must be a whole number between 1 and 65535');
+  }
 
   return {
     host: '127.0.0.1',
     port: localPort,
     protocol: 'http',
+    allowSelfSigned: false,
+    managementTimeoutMs,
     isRemote: false,
   };
 }
@@ -117,7 +144,7 @@ export function buildProxyHeaders(
 
 /**
  * Build request headers for management API endpoints (/v0/management/*).
- * For remote targets: uses management_key, falls back to authToken.
+ * For remote targets: requires the configured management_key.
  * For local targets: uses the effective management secret from CCS config.
  *
  * @param target Resolved proxy target
@@ -132,15 +159,15 @@ export function buildManagementHeaders(
     ...additionalHeaders,
   };
 
-  // Remote: use configured management key or auth token
-  // Local: use CCS management secret (default: 'ccs')
-  const authKey = target.isRemote
-    ? (target.managementKey ?? target.authToken)
-    : getEffectiveManagementSecret();
-
-  if (authKey) {
-    headers['Authorization'] = `Bearer ${authKey}`;
+  const authKey = target.isRemote ? target.managementKey : getEffectiveManagementSecret();
+  if (!authKey) {
+    throw new ConfigError(
+      target.isRemote
+        ? 'cliproxy_server.remote.management_key is required'
+        : 'cliproxy.auth.management_secret is required'
+    );
   }
+  headers['Authorization'] = `Bearer ${authKey}`;
 
   return headers;
 }

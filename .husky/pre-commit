@@ -1,7 +1,16 @@
+#!/usr/bin/env bash
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec bash "$0" "$@"
+fi
+
+set -euo pipefail
+
 # Run quick checks before commit (typecheck + lint + format only).
 # Protected branches still enforce full CI parity in .husky/pre-push.
 # Feature branches use a faster pre-push gate plus GitHub CI.
-bun run typecheck && bun run lint:fix && bun run format:check
+bun run typecheck
+bun run lint:fix
+bun run format:check
 
 # Validate UI if changes detected (typecheck + lint only)
 if git diff --cached --name-only | grep -q "^ui/"; then

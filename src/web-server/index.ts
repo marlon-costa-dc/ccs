@@ -23,6 +23,7 @@ import { startAutoSyncWatcher, stopAutoSyncWatcher } from '../cliproxy/sync';
 import { shutdownUsageAggregator } from './usage/aggregator';
 import { createLogger } from '../services/logging';
 import { DEFAULT_DASHBOARD_HOST, isLoopbackHost } from '../commands/config-dashboard-host';
+import { ProxyError } from '../errors/error-types';
 
 export interface ServerOptions {
   port: number;
@@ -36,6 +37,9 @@ export interface ServerInstance {
   wss: WebSocketServer;
   cleanup: () => void;
 }
+
+/** Shared DoS boundary for dashboard JSON requests and WebSocket messages. */
+const MAX_DASHBOARD_PAYLOAD_BYTES = 1024 * 1024;
 
 function getListenHost(options: ServerOptions): string {
   return options.host || DEFAULT_DASHBOARD_HOST;
@@ -51,19 +55,29 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
   const server = http.createServer(app);
   const wss = new WebSocketServer({
     noServer: true,
-    maxPayload: 1024 * 1024, // 1MB hard limit to prevent DoS
+    maxPayload: MAX_DASHBOARD_PAYLOAD_BYTES,
     perMessageDeflate: false, // Prevent zip bomb attacks
   });
 
   // JSON body parsing with error handler for malformed JSON
-  app.use(express.json());
+  app.use(express.json({ limit: MAX_DASHBOARD_PAYLOAD_BYTES }));
   app.use(
     (
-      err: Error & { status?: number; body?: string },
-      _req: express.Request,
+      err: Error & { status?: number; type?: string; body?: string },
+      req: express.Request,
       res: express.Response,
       next: express.NextFunction
     ) => {
+      if (err.status === 413 && err.type === 'entity.too.large') {
+        logger.warn('server.request_body_too_large', 'Dashboard request body exceeded limit', {
+          limitBytes: MAX_DASHBOARD_PAYLOAD_BYTES,
+          path: req.path,
+        });
+        res.status(413).json({
+          error: `JSON request body exceeds the ${MAX_DASHBOARD_PAYLOAD_BYTES}-byte limit`,
+        });
+        return;
+      }
       if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
         res.status(400).json({ error: 'Invalid JSON in request body' });
         return;
@@ -173,7 +187,12 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
   // Combined cleanup function
   const cleanup = () => {
     wsCleanup();
-    stopAutoSyncWatcher().catch(() => {});
+    stopAutoSyncWatcher().catch((error: unknown) => {
+      const cause = error instanceof Error ? error : new Error(String(error));
+      setImmediate(() => {
+        throw cause;
+      });
+    });
     shutdownUsageAggregator();
   };
 
@@ -263,7 +282,7 @@ function assertSafeDashboardBind(
     return;
   }
 
-  throw new Error(
+  throw new ProxyError(
     `Dashboard host ${listenHost} resolved to non-loopback address ${address.address}; pass --host explicitly to allow network exposure.`
   );
 }

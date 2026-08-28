@@ -13,11 +13,9 @@ import { createLogger } from '../../services/logging';
 import { testConnection } from '../../cliproxy/services/remote-proxy-client';
 import { isProxyRunning } from '../../cliproxy/services/proxy-lifecycle-service';
 import { DEFAULT_BACKEND } from '../../cliproxy/binary/platform-detector';
-import { validatePort } from '../../cliproxy/config/port-manager';
-import {
-  DEFAULT_CLIPROXY_SERVER_CONFIG,
-  CliproxyServerConfig,
-} from '../../config/unified-config-types';
+import { CliproxyServerConfig } from '../../config/unified-config-types';
+import { resolveProxyTarget } from '../../cliproxy/proxy/proxy-target-resolver';
+import { ConfigError } from '../../errors/error-types';
 import { CLIPROXY_PROVIDER_IDS } from '../../cliproxy/provider-capabilities';
 import {
   configNeedsRegeneration,
@@ -30,6 +28,17 @@ import { loadOrCreateUnifiedConfig, mutateConfig } from '../../config/config-loa
 const router = Router();
 
 const logger = createLogger('web-server:routes:cliproxy-server');
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function readPort(value: unknown, path: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 65535) {
+    throw new ConfigError(`${path} must be a whole number between 1 and 65535`);
+  }
+  return value;
+}
 
 router.use((req: Request, res: Response, next) => {
   if (
@@ -49,7 +58,8 @@ router.use((req: Request, res: Response, next) => {
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const config = await loadOrCreateUnifiedConfig();
-    res.json(config.cliproxy_server || DEFAULT_CLIPROXY_SERVER_CONFIG);
+    resolveProxyTarget(config.cliproxy_server);
+    res.json(config.cliproxy_server);
   } catch (error) {
     logger.error('cliproxy_server.route.load_config_failed', 'Failed to load proxy config', {
       err:
@@ -57,7 +67,7 @@ router.get('/', async (_req: Request, res: Response) => {
           ? { name: error.name, message: error.message }
           : { message: String(error) },
     });
-    res.status(500).json({ error: 'Failed to load proxy config' });
+    res.status(500).json({ error: errorMessage(error) });
   }
 });
 
@@ -68,9 +78,13 @@ router.put('/', (req: Request, res: Response) => {
   try {
     const updates = req.body as Partial<CliproxyServerConfig>;
     const currentConfig = loadOrCreateUnifiedConfig();
-    const currentLocalPort = validatePort(
-      currentConfig.cliproxy_server?.local?.port ?? DEFAULT_CLIPROXY_SERVER_CONFIG.local.port
-    );
+    const currentServer = currentConfig.cliproxy_server;
+    if (!currentServer) {
+      throw new ConfigError(
+        'cliproxy_server must exist before applying a partial configuration update'
+      );
+    }
+    const currentLocalPort = readPort(currentServer.local.port, 'cliproxy_server.local.port');
     const requestedLocalPort = updates.local?.port;
 
     if (
@@ -85,8 +99,7 @@ router.put('/', (req: Request, res: Response) => {
       return;
     }
 
-    const nextLocalPort =
-      requestedLocalPort === undefined ? currentLocalPort : validatePort(requestedLocalPort);
+    const nextLocalPort = requestedLocalPort === undefined ? currentLocalPort : requestedLocalPort;
 
     if (nextLocalPort !== currentLocalPort && isProxyRunning()) {
       res.status(409).json({
@@ -100,23 +113,25 @@ router.put('/', (req: Request, res: Response) => {
 
     // Atomic read-modify-write — avoids race between load and save
     const updated = mutateConfig((config) => {
-      config.cliproxy_server = {
+      const currentServer = config.cliproxy_server;
+      if (!currentServer) {
+        throw new ConfigError(
+          'cliproxy_server must exist before applying a partial configuration update'
+        );
+      }
+      const nextServer: CliproxyServerConfig = {
         remote: {
-          ...DEFAULT_CLIPROXY_SERVER_CONFIG.remote,
-          ...config.cliproxy_server?.remote,
+          ...currentServer.remote,
           ...updates.remote,
         },
-        fallback: {
-          ...DEFAULT_CLIPROXY_SERVER_CONFIG.fallback,
-          ...config.cliproxy_server?.fallback,
-          ...updates.fallback,
-        },
+        management_timeout_ms: updates.management_timeout_ms ?? currentServer.management_timeout_ms,
         local: {
-          ...DEFAULT_CLIPROXY_SERVER_CONFIG.local,
-          ...config.cliproxy_server?.local,
+          ...currentServer.local,
           ...updates.local,
         },
       };
+      resolveProxyTarget(nextServer);
+      config.cliproxy_server = nextServer;
     });
 
     res.json(updated.cliproxy_server);
@@ -129,7 +144,7 @@ router.put('/', (req: Request, res: Response) => {
           ? { name: error.name, message: error.message }
           : { message: String(error) },
     });
-    res.status(500).json({ error: 'Failed to save proxy config' });
+    res.status(error instanceof ConfigError ? 400 : 500).json({ error: errorMessage(error) });
   }
 });
 
@@ -175,8 +190,9 @@ router.put('/backend', (req: Request, res: Response) => {
     // Pre-flight read: check running state before acquiring write lock
     const currentConfig = loadOrCreateUnifiedConfig();
     const currentBackend = currentConfig.cliproxy?.backend ?? DEFAULT_BACKEND;
-    const localPort = validatePort(
-      currentConfig.cliproxy_server?.local?.port ?? DEFAULT_CLIPROXY_SERVER_CONFIG.local.port
+    const localPort = readPort(
+      currentConfig.cliproxy_server?.local.port,
+      'cliproxy_server.local.port'
     );
     if (currentBackend !== backend && isProxyRunning() && !force) {
       res.status(409).json({
@@ -225,28 +241,39 @@ router.put('/backend', (req: Request, res: Response) => {
 router.post('/test', async (req: Request, res: Response) => {
   try {
     const { host, port, protocol, authToken, allowSelfSigned } = req.body;
-
-    // Host is required, port is optional (uses protocol defaults)
-    if (!host) {
-      res.status(400).json({ error: 'Host is required' });
+    const extraKeys = Object.keys(req.body).filter(
+      (key) => !['host', 'port', 'protocol', 'authToken', 'allowSelfSigned'].includes(key)
+    );
+    if (extraKeys.length > 0) {
+      res.status(400).json({ error: `Unsupported connection-test field: ${extraKeys[0]}` });
       return;
     }
-
-    // Parse port - treat empty string, 0, null as "use default"
-    const parsedPort = port && port !== '' ? parseInt(String(port), 10) : undefined;
-    const effectivePort =
-      parsedPort && !isNaN(parsedPort) && parsedPort > 0 ? parsedPort : undefined;
+    if (typeof host !== 'string' || host.trim().length === 0) {
+      throw new ConfigError('Remote CLIProxy host is required');
+    }
+    const explicitPort = readPort(port, 'Remote CLIProxy port');
+    if (protocol !== 'http' && protocol !== 'https') {
+      throw new ConfigError('Remote CLIProxy protocol must equal http or https');
+    }
+    if (typeof authToken !== 'string') {
+      throw new ConfigError('Remote CLIProxy authToken must be a string');
+    }
+    if (typeof allowSelfSigned !== 'boolean') {
+      throw new ConfigError('Remote CLIProxy allowSelfSigned policy is required');
+    }
+    const config = await loadOrCreateUnifiedConfig();
+    const timeout = resolveProxyTarget(config.cliproxy_server).managementTimeoutMs;
 
     const status = await testConnection({
       host,
-      port: effectivePort,
-      protocol: protocol || 'http',
+      port: explicitPort,
+      protocol,
       authToken,
-      allowSelfSigned: allowSelfSigned || false,
-      timeout: 5000,
+      allowSelfSigned,
+      timeout,
     });
 
-    res.json(status);
+    res.status(status.reachable ? 200 : 502).json(status);
   } catch (error) {
     logger.error(
       'cliproxy_server.route.test_connection_failed',
@@ -260,7 +287,7 @@ router.post('/test', async (req: Request, res: Response) => {
             : { message: String(error) },
       }
     );
-    res.status(500).json({ error: 'Failed to test connection' });
+    res.status(error instanceof ConfigError ? 400 : 502).json({ error: errorMessage(error) });
   }
 });
 

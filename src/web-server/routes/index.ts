@@ -29,7 +29,6 @@ import imageAnalysisRoutes from './image-analysis-routes';
 import browserRoutes from './browser-routes';
 import cliproxyAuthRoutes from './cliproxy-auth-routes';
 import cliproxyStatsRoutes from './cliproxy-stats-routes';
-import cliproxyRoutingRoutes from './cliproxy-routing-routes';
 import cliproxySyncRoutes from './cliproxy-sync-routes';
 import aiProviderRoutes from './ai-provider-routes';
 import droidRoutes from './droid-routes';
@@ -118,7 +117,6 @@ apiRoutes.use('/claude-extension', claudeExtensionRoutes);
 
 // ==================== CLIProxy ====================
 // Variants, auth, accounts, stats, status, models, error logs
-apiRoutes.use('/cliproxy', cliproxyRoutingRoutes);
 apiRoutes.use('/cliproxy', variantRoutes);
 apiRoutes.use('/cliproxy/auth', cliproxyAuthRoutes);
 apiRoutes.use('/cliproxy', cliproxyStatsRoutes);

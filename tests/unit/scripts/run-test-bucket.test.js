@@ -144,6 +144,7 @@ describe('run-test-bucket', () => {
   test('isolates subprocess launch suites in the slow bucket', () => {
     const runs = bucket.getBunRuns('slow', [
       'tests/unit/commands/persist-command-handler.test.ts',
+      'tests/unit/cliproxy/concurrent-state-locks.test.ts',
       'tests/npm/cli.test.js',
       'tests/unit/targets/droid-command-routing-integration.test.ts',
       'tests/unit/targets/native-claude-effort-launch.test.ts',
@@ -154,6 +155,7 @@ describe('run-test-bucket', () => {
 
     expect(runs.map((run) => run.label)).toEqual([
       'shared',
+      'tests/unit/cliproxy/concurrent-state-locks.test.ts',
       'tests/npm/cli.test.js',
       'tests/unit/targets/droid-command-routing-integration.test.ts',
       'tests/unit/targets/native-claude-effort-launch.test.ts',
@@ -162,6 +164,24 @@ describe('run-test-bucket', () => {
       'tests/unit/web-server/websearch-routes.test.ts',
     ]);
     expect(runs.slice(1).every((run) => run.quietOnPass)).toBe(true);
+  });
+
+  test('generates build provenance through the canonical owner before tests', () => {
+    let invocation;
+    const status = bucket.generateBuildProvenance((command, args, options) => {
+      invocation = { command, args, options };
+      return { status: 0 };
+    });
+
+    expect(status).toBe(0);
+    expect(invocation.command).toBe(process.execPath);
+    expect(invocation.args[0]).toEndWith('scripts/generate-build-provenance.js');
+    expect(invocation.options.cwd).toBe(path.resolve(__dirname, '../../..'));
+    expect(invocation.options.stdio).toBe('inherit');
+  });
+
+  test('propagates build provenance failures', () => {
+    expect(bucket.generateBuildProvenance(() => ({ status: 7 }))).toBe(7);
   });
 
   test('isolates standalone validation scripts that are not Bun test suites', () => {

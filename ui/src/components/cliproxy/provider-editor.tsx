@@ -1,7 +1,7 @@
 /**
  * Provider Editor Component
- * Re-exports from modular directory for backward compatibility
+ * Provider account view export.
  */
 
 export { ProviderEditor } from './provider-editor/index';
-export type { ProviderEditorProps, ModelMappingValues } from './provider-editor/types';
+export type { ProviderEditorProps } from './provider-editor/types';

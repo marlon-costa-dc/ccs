@@ -32,9 +32,6 @@ import type {
   CompositeVariantConfig,
   CLIProxyLoggingConfig,
   CLIProxySafetyConfig,
-  CLIProxyRoutingConfig,
-  CLIProxyRetryConfig,
-  CLIProxyPoolRoutingConfig,
   CLIProxyOAuthModelAliasEntry,
   CLIProxyOAuthModelAliasConfig,
   CLIProxyPayloadModelSelector,
@@ -73,7 +70,6 @@ import type {
   CopilotConfig,
   CursorConfig,
   ProxyRemoteConfig,
-  ProxyFallbackConfig,
   ProxyLocalConfig,
   OpenAICompatProxyRoutingConfig,
   OpenAICompatProxyConfig,
@@ -101,14 +97,9 @@ describe('config schemas backward compatibility', () => {
       headers: { 'x-tenant': 'alpha' },
     };
     const payload: CLIProxyPayloadConfig = { override: [rule] };
-    const retry: CLIProxyRetryConfig = { request_retry: 0 };
-    const pool: CLIProxyPoolRoutingConfig = { enabled: false };
-
-    expect({ aliases, payload, retry, pool }).toEqual({
+    expect({ aliases, payload }).toEqual({
       aliases: { codex: [alias] },
       payload: { override: [rule] },
-      retry: { request_retry: 0 },
-      pool: { enabled: false },
     });
   });
 
@@ -116,8 +107,8 @@ describe('config schemas backward compatibility', () => {
   // Constants
   // -------------------------------------------------------------------------
   it('re-exports UNIFIED_CONFIG_VERSION', () => {
-    expect(barrel.UNIFIED_CONFIG_VERSION).toBe(14);
-    expect(schemas.UNIFIED_CONFIG_VERSION).toBe(14);
+    expect(barrel.UNIFIED_CONFIG_VERSION).toBe(15);
+    expect(schemas.UNIFIED_CONFIG_VERSION).toBe(15);
   });
 
   it('re-exports CLIPROXY_SUPPORTED_PROVIDERS', () => {
@@ -164,7 +155,7 @@ describe('config schemas backward compatibility', () => {
     expect(typeof schemas.createEmptyUnifiedConfig).toBe('function');
 
     const config = barrel.createEmptyUnifiedConfig();
-    expect(config.version).toBe(14);
+    expect(config.version).toBe(15);
     expect(config.accounts).toEqual({});
     expect(config.profiles).toEqual({});
     expect(config.cliproxy).toBeDefined();

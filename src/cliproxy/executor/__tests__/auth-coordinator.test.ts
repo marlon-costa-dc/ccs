@@ -38,11 +38,11 @@ jest.mock('../../auth/antigravity-responsibility', () => ({
 }));
 
 const mockHandleTokenExpiration = jest.fn(async () => {});
-const mockHandleQuotaCheck = jest.fn(async () => {});
 
-jest.mock('../retry-handler', () => ({
+jest.mock('../failure-handler', () => ({
   handleTokenExpiration: (...args: unknown[]) => mockHandleTokenExpiration(...args),
-  handleQuotaCheck: (...args: unknown[]) => mockHandleQuotaCheck(...args),
+  isNetworkError: jest.fn().mockReturnValue(false),
+  handleNetworkError: jest.fn(),
 }));
 
 const mockApplyAccountSafetyGuards = jest.fn(() => {});
@@ -79,7 +79,6 @@ const {
   handleImport,
   runAntigravityGate,
   ensureProviderAuthentication,
-  runPreflightQuotaCheck,
   runAccountSafetyGuards,
   ensureModelConfiguration,
 } = await import('../auth-coordinator');
@@ -415,26 +414,6 @@ describe('ensureProviderAuthentication', () => {
     await ensureProviderAuthentication(ctx);
     expect(exitSpy).not.toHaveBeenCalled();
     expect(mockHandleTokenExpiration).toHaveBeenCalledTimes(2);
-  });
-});
-
-// ── runPreflightQuotaCheck ────────────────────────────────────────────────────
-
-describe('runPreflightQuotaCheck', () => {
-  beforeEach(() => jest.clearAllMocks());
-
-  it('single provider → handleQuotaCheck called once with that provider', async () => {
-    await runPreflightQuotaCheck('gemini', []);
-    expect(mockHandleQuotaCheck).toHaveBeenCalledWith('gemini');
-    expect(mockHandleQuotaCheck).toHaveBeenCalledTimes(1);
-  });
-
-  it('composite list → checks only managed providers from the list', async () => {
-    // Real MANAGED_QUOTA_PROVIDERS = ['agy','claude','codex','gemini','ghcp']
-    // 'gemini' and 'codex' are both managed; 'kiro' is not
-    await runPreflightQuotaCheck('agy', ['gemini', 'kiro']);
-    expect(mockHandleQuotaCheck).toHaveBeenCalledWith('gemini');
-    expect(mockHandleQuotaCheck).not.toHaveBeenCalledWith('kiro');
   });
 });
 

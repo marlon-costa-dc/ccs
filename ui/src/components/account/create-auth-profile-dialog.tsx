@@ -175,7 +175,6 @@ export function CreateAuthProfileDialog({ open, onClose }: CreateAuthProfileDial
               <li>{t('createAuthProfileDialog.afterRunStep1')}</li>
               <li>{t('createAuthProfileDialog.afterRunStep2')}</li>
             </ol>
-            <p className="pt-1">{t('createAuthProfileDialog.poolingHint')}</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

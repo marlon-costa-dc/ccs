@@ -284,10 +284,6 @@ describe('web-server config-routes account context validation', () => {
         auth_token: 'remote-auth-token',
         management_key: 'management-secret',
       },
-      fallback: {
-        enabled: true,
-        auto_start: false,
-      },
       local: {
         port: 8317,
         auto_start: true,
@@ -369,10 +365,6 @@ describe('web-server config-routes account context validation', () => {
         protocol: 'https',
         auth_token: 'remote-auth-token',
         management_key: 'management-secret',
-      },
-      fallback: {
-        enabled: true,
-        auto_start: false,
       },
       local: {
         port: 8317,
@@ -579,10 +571,6 @@ describe('web-server config-routes account context validation', () => {
         protocol: 'https',
         auth_token: 'remote-auth-token',
         management_key: 'management-secret',
-      },
-      fallback: {
-        enabled: true,
-        auto_start: false,
       },
       local: {
         port: 8317,

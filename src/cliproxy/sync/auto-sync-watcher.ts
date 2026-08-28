@@ -9,7 +9,9 @@ import * as chokidar from 'chokidar';
 import * as path from 'path';
 
 import { syncToLocalConfig } from './local-config-sync';
+import { regenerateConfig } from '../config/config-generator';
 import { getCcsDir, loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
+import { ConfigError } from '../../errors/error-types';
 
 /** Debounce delay in milliseconds */
 const DEBOUNCE_MS = 3000;
@@ -23,13 +25,8 @@ let isSyncing = false;
  * Check if auto-sync is enabled in config.
  */
 export function isAutoSyncEnabled(): boolean {
-  try {
-    const config = loadOrCreateUnifiedConfig();
-    // For local sync, check cliproxy.auto_sync (simpler config location)
-    return config.cliproxy?.auto_sync === true;
-  } catch {
-    return false;
-  }
+  const config = loadOrCreateUnifiedConfig();
+  return config.cliproxy?.auto_sync === true;
 }
 
 /**
@@ -39,13 +36,20 @@ function log(message: string): void {
   console.log(`[auto-sync] ${message}`);
 }
 
+function resolveConfiguredLocalPort(): number {
+  const port = loadOrCreateUnifiedConfig().cliproxy_server?.local?.port;
+  if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ConfigError('cliproxy_server.local.port must be a whole number between 1 and 65535');
+  }
+  return port;
+}
+
 /**
  * Execute sync to local CLIProxy config.
  */
 async function triggerSync(): Promise<void> {
   if (isSyncing) {
-    log('Sync already in progress, skipping');
-    return;
+    throw new ConfigError('Auto-sync received overlapping work while a sync is active');
   }
 
   if (!isAutoSyncEnabled()) {
@@ -59,8 +63,7 @@ async function triggerSync(): Promise<void> {
     const result = syncToLocalConfig();
 
     if (!result.success) {
-      log(`Sync failed: ${result.error}`);
-      return;
+      throw new ConfigError(`Auto-sync failed: ${result.error}`);
     }
 
     if (result.syncedCount === 0) {
@@ -69,11 +72,33 @@ async function triggerSync(): Promise<void> {
     }
 
     log(`Success: ${result.syncedCount} profile(s) synced to ${result.configPath}`);
-  } catch (error) {
-    log(`Sync error: ${(error as Error).message}`);
   } finally {
     isSyncing = false;
   }
+}
+
+async function triggerRegeneration(): Promise<void> {
+  if (isSyncing) {
+    throw new ConfigError('Auto-sync received overlapping regeneration work');
+  }
+  if (!isAutoSyncEnabled()) {
+    log('Auto-sync disabled, skipping');
+    return;
+  }
+  isSyncing = true;
+  try {
+    const configPath = regenerateConfig(resolveConfiguredLocalPort());
+    log(`Success: regenerated ${configPath}`);
+  } finally {
+    isSyncing = false;
+  }
+}
+
+function terminateOnBackgroundFailure(error: unknown): void {
+  const cause = error instanceof Error ? error : new Error(String(error));
+  setImmediate(() => {
+    throw cause;
+  });
 }
 
 /**
@@ -93,15 +118,14 @@ function onFileChange(filePath: string): void {
   // Set new debounced timeout
   syncTimeout = setTimeout(() => {
     syncTimeout = null;
-    triggerSync().catch((err) => {
-      log(`Sync error: ${err.message}`);
-    });
+    const operation = fileName === 'config.yaml' ? triggerRegeneration() : triggerSync();
+    operation.catch(terminateOnBackgroundFailure);
   }, DEBOUNCE_MS);
 }
 
 /**
  * Start the auto-sync watcher.
- * Watches ~/.ccs/*.settings.json for changes.
+ * Watches the unified SSOT and profile settings for changes.
  */
 export function startAutoSyncWatcher(): void {
   if (watcherInstance) {
@@ -115,11 +139,11 @@ export function startAutoSyncWatcher(): void {
   }
 
   const ccsDir = getCcsDir();
-  const watchPattern = path.join(ccsDir, '*.settings.json');
+  const watchPatterns = [path.join(ccsDir, 'config.yaml'), path.join(ccsDir, '*.settings.json')];
 
-  log(`Starting watcher on ${watchPattern}`);
+  log(`Starting watcher on ${watchPatterns.join(', ')}`);
 
-  watcherInstance = chokidar.watch(watchPattern, {
+  watcherInstance = chokidar.watch(watchPatterns, {
     ignoreInitial: true, // Don't trigger on initial scan
     persistent: true,
     awaitWriteFinish: {
@@ -133,7 +157,7 @@ export function startAutoSyncWatcher(): void {
   watcherInstance.on('unlink', onFileChange);
 
   watcherInstance.on('error', (error) => {
-    log(`Watcher error: ${error.message}`);
+    terminateOnBackgroundFailure(error);
   });
 
   log('Watcher started');
@@ -151,13 +175,9 @@ export async function stopAutoSyncWatcher(): Promise<void> {
   if (watcherInstance) {
     const closePromise = watcherInstance.close();
     const timeoutPromise = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error('Close timeout')), 5000)
+      setTimeout(() => reject(new ConfigError('Auto-sync watcher close timed out')), 5000)
     );
-    try {
-      await Promise.race([closePromise, timeoutPromise]);
-    } catch (err) {
-      log(`Warning: ${(err as Error).message}, forcing cleanup`);
-    }
+    await Promise.race([closePromise, timeoutPromise]);
     watcherInstance = null;
     log('Watcher stopped');
   }
@@ -178,7 +198,7 @@ export async function restartAutoSyncWatcher(): Promise<void> {
   }
 
   if (isSyncing) {
-    log('Warning: Sync still in progress after 10s timeout, proceeding with restart');
+    throw new ConfigError('Auto-sync remained active after the 10 second restart deadline');
   }
 
   await stopAutoSyncWatcher();
