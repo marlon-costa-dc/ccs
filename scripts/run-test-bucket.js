@@ -127,11 +127,6 @@ function usesBunTestRunner(relativePath) {
   return source.includes('bun:test') || /(^|[^\w.])(?:describe|it)\s*\(/m.test(source);
 }
 
-function mutatesProcessTerminationState(relativePath) {
-  const source = fs.readFileSync(path.join(rootDir, relativePath), 'utf8');
-  return /\bprocess\.exit(?:Code)?\s*=(?!=)/.test(source);
-}
-
 function getSlowSet() {
   const discovered = getDiscoveredTests();
   const forceSlow = discovered.filter((file) => shouldForceSlow(file));
@@ -178,7 +173,6 @@ function shouldRunIsolated(file) {
     // variables mid-run. Isolating the directory keeps that per-process.
     file.startsWith('tests/unit/codex-auth/') ||
     isolatedTests.has(file) ||
-    mutatesProcessTerminationState(file) ||
     !usesBunTestRunner(file)
   );
 }
@@ -306,6 +300,28 @@ function ensureBuildForSlowBucket() {
   return build.status ?? 1;
 }
 
+function generateBuildProvenance(run = spawnSync) {
+  const result = run(
+    process.execPath,
+    [path.join(rootDir, 'scripts/generate-build-provenance.js')],
+    {
+      cwd: rootDir,
+      stdio: 'inherit',
+    }
+  );
+
+  if (result.error) {
+    console.error(`[X] Failed to generate build provenance: ${result.error.message}`);
+    return 1;
+  }
+
+  const exitCode = result.status ?? 1;
+  if (exitCode !== 0) {
+    console.error(`[X] Build provenance generation exited with status ${exitCode}.`);
+  }
+  return exitCode;
+}
+
 function runBunTest(run) {
   const result = spawnSync('bun', run.bunArgs, {
     cwd: rootDir,
@@ -376,26 +392,22 @@ function runBucket(name) {
     console.log(`[i] Running ${isolatedCount} test file(s) in isolated Bun processes.`);
   }
 
-  let exitCode = 0;
   for (const run of runs) {
     if (name === 'slow') {
       const buildStatus = ensureBuildForSlowBucket();
       if (buildStatus !== 0) {
-        exitCode = buildStatus;
-        continue;
+        console.error(`[X] Runtime build prerequisite failed before ${run.label}.`);
+        return buildStatus;
       }
     }
     const status = runBunTest(run);
     if (status !== 0) {
-      exitCode = status;
+      return status;
     }
   }
 
-  if (exitCode === 0) {
-    console.log(`[OK] Bucket '${name}' ran ${selected.length} selected test files.`);
-  }
-
-  return exitCode;
+  console.log(`[OK] Bucket '${name}' ran ${selected.length} selected test files.`);
+  return 0;
 }
 
 function main(args = process.argv.slice(2)) {
@@ -406,24 +418,26 @@ function main(args = process.argv.slice(2)) {
     return 1;
   }
 
-  if (bucket === 'all') {
-    let exitCode = 0;
+  const provenanceStatus = generateBuildProvenance();
+  if (provenanceStatus !== 0) {
+    return provenanceStatus;
+  }
 
+  if (bucket === 'all') {
     for (const name of ['fast', 'slow']) {
       const status = runBucket(name);
       if (status !== 0) {
-        exitCode = status;
+        return status;
       }
     }
-
-    return exitCode;
+    return 0;
   }
 
   return runBucket(bucket);
 }
 
 if (require.main === module) {
-  process.exit(main());
+  process.exitCode = main();
 }
 
 module.exports = {
@@ -438,7 +452,6 @@ module.exports = {
   toBunTestPath,
   getBunArgs,
   usesBunTestRunner,
-  mutatesProcessTerminationState,
   shouldRunIsolated,
   getBunRuns,
   parseBunFileCount,
@@ -446,5 +459,6 @@ module.exports = {
   shouldVerifyRunFileCount,
   getRequiredBuildArtifacts,
   hasCompleteBuildArtifacts,
+  generateBuildProvenance,
   main,
 };

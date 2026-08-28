@@ -7,6 +7,11 @@ function isTestFile(filePath) {
   );
 }
 
+function isGeneratedSourceFile(filePath) {
+  return /(^|\/)src\/generated\//.test(filePath.replace(/\\/g, '/'));
+}
+
 module.exports = {
+  isGeneratedSourceFile,
   isTestFile,
 };
