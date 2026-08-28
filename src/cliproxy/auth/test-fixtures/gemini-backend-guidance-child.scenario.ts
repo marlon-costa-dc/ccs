@@ -51,6 +51,7 @@ function getAdvertisedHelpText(localScenario: string): string {
 
 async function registerScenarioMocks(): Promise<void> {
   const [
+    realBinaryManager,
     realConfigGenerator,
     realAccountManager,
     realTokenManager,
@@ -60,6 +61,7 @@ async function registerScenarioMocks(): Promise<void> {
     realAccountSafetyCrossLane,
     realOAuthPortDiagnostics,
   ] = await Promise.all([
+    import('../../binary-manager'),
     import('../../config/config-generator'),
     import('../../accounts/account-manager'),
     import('../token-manager'),
@@ -71,6 +73,7 @@ async function registerScenarioMocks(): Promise<void> {
   ]);
 
   mock.module('../../binary-manager', () => ({
+    ...realBinaryManager,
     ensureCLIProxyBinary: ensureBinaryMock,
     getConfiguredBackend: () => activeBackend,
   }));
