@@ -7,7 +7,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { CLIProxyProvider } from '../types';
+import { CLIProxyProvider } from '../types';
 import { CLIPROXY_PROFILES } from '../../auth/profile-detector';
 import { getProviderAccounts, getAccountTokenPath } from '../accounts/account-manager';
 import { isRefreshDelegated } from './provider-refreshers';

@@ -3,8 +3,8 @@
  * Bulk pause/resume and solo mode functionality
  */
 
-import type { CLIProxyProvider } from '../types';
-import type { BulkOperationResult, SoloOperationResult } from './types';
+import { CLIProxyProvider } from '../types';
+import { BulkOperationResult, SoloOperationResult } from './types';
 import { pauseAccount, resumeAccount } from './registry';
 import { getProviderAccounts } from './query';
 

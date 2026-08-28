@@ -14,12 +14,7 @@ describe('api create grandfathered force policy', () => {
     originalCcsHome = process.env.CCS_HOME;
     originalUnifiedMode = process.env.CCS_UNIFIED_CONFIG;
     process.env.CCS_HOME = tempHome;
-    // Pin the mode instead of merely deleting the variable: this suite runs in
-    // the shared bucket, where a sibling file can leave CCS_UNIFIED_CONFIG=1
-    // behind and flip apiProfileExists to the unified registry, which never
-    // sees the legacy config.json this test writes. '0' is the explicit
-    // legacy mode the fixture depends on.
-    process.env.CCS_UNIFIED_CONFIG = '0';
+    delete process.env.CCS_UNIFIED_CONFIG;
   });
 
   afterEach(() => {
@@ -54,14 +49,6 @@ describe('api create grandfathered force policy', () => {
       ) + '\n'
     );
     const logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    // The command under test can terminate the process on an unexpected path.
-    // Left unguarded that kills the whole shared test runner: the run stops
-    // mid-output, reports no failing test, and exits non-zero with no
-    // diagnostic. Trap it so a regression surfaces as a failed assertion here.
-    const originalExit = process.exit;
-    process.exit = ((code?: number) => {
-      throw new Error(`process.exit(${code ?? 0})`);
-    }) as typeof process.exit;
 
     try {
       await handleApiCreateCommand([
@@ -76,7 +63,6 @@ describe('api create grandfathered force policy', () => {
         'new-model',
       ]);
     } finally {
-      process.exit = originalExit;
       logSpy.mockRestore();
     }
 

@@ -17,8 +17,7 @@
 
 import { getExistingProxy, registerSession, getRunningProxyVersion } from '../session-tracker';
 import { isCliproxyRunning } from '../services/stats-fetcher';
-import type { PortProcess } from '../../utils/port-utils';
-import { getPortProcess, isCLIProxyProcess } from '../../utils/port-utils';
+import { getPortProcess, isCLIProxyProcess, PortProcess } from '../../utils/port-utils';
 import { CLIPROXY_DEFAULT_PORT } from '../config/port-manager';
 import { createLogger } from '../../services/logging';
 

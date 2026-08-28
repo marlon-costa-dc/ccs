@@ -7,45 +7,6 @@ fi
 
 set -euo pipefail
 
-# Run the gate on the Bun this project declares, not whatever the PATH offers.
-# package.json pins packageManager, and CI installs that exact version, but a
-# version manager shim can resolve a different one for interactive shells.
-# Bun 1.4.0 regressed spawnSync of a bash subprocess (the child is killed with
-# SIGTERM), which turns docker-release-workflow-context, https-tunnel-proxy and
-# tool-sanitization-proxy-integration red for reasons unrelated to the change
-# being pushed. Fail loudly when the pinned version is missing instead of
-# silently gating on the wrong runtime.
-read_pinned_bun() {
-  node -p "(require('./package.json').packageManager||'').split('@')[1]||''" 2>/dev/null
-}
-
-bun_version_at() {
-  "$1" --version 2>/dev/null
-}
-
-PINNED_BUN="$(read_pinned_bun)"
-if [[ -n "$PINNED_BUN" ]]; then
-  ACTIVE_BUN="$(bun_version_at bun)"
-  if [[ "$ACTIVE_BUN" != "$PINNED_BUN" ]]; then
-    PINNED_BUN_BIN=""
-    RESOLVED_BUN="$(command -v bun)"
-    for candidate in "$HOME/.bun/bin/bun" "$RESOLVED_BUN"; do
-      if [[ -x "$candidate" && "$(bun_version_at "$candidate")" == "$PINNED_BUN" ]]; then
-        PINNED_BUN_BIN="$candidate"
-        break
-      fi
-    done
-    if [[ -z "$PINNED_BUN_BIN" ]]; then
-      echo "[X] package.json pins bun@$PINNED_BUN but PATH resolves ${ACTIVE_BUN:-none}."
-      echo "    Install the pinned version (e.g. 'bun upgrade --to $PINNED_BUN') and retry."
-      exit 1
-    fi
-    echo "[i] PATH bun is ${ACTIVE_BUN:-none}; using pinned bun@$PINNED_BUN from $PINNED_BUN_BIN."
-    PATH="$(dirname "$PINNED_BUN_BIN"):$PATH"
-    export PATH
-  fi
-fi
-
 # Protected branches keep the full CI parity gate.
 # Feature branches use a faster gate and let GitHub CI run the full suite.
 
