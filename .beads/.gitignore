@@ -1,4 +1,26 @@
-*
-!interactions.jsonl
+# Dolt database (managed by Dolt, not git)
+dolt/
+embeddeddolt/
+proxieddb/
+
+# Runtime files
+bd.sock
+bd.sock.startlock
+sync-state.json
+last-touched
+.exclusive-lock
+
+# Daemon runtime (lock, log, pid)
+daemon.*
+
+# Push state (runtime, per-machine)
+push-state.json
+
+# Lock files (various runtime locks)
+*.lock
+
+# Credential key (encryption key for federation peer auth — never commit)
+.beads-credential-key
+
+# Interactions log (runtime artifact)
 interactions.jsonl
-!interactions.jsonl
