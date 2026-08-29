@@ -130,3 +130,67 @@ beads/
 .mcp.json
 .runtime/
 .opencode/
+
+# Dolt backup directories
+.dolt-backup/
+.dolt-data.gt-retired-*/
+
+# Mise local config
+.envrc
+mise.toml
+
+# Runtime event logs
+.events.jsonl
+.events.jsonl.lock
+.local_version
+
+# Poolside
+.poolside/
+
+# Serena
+.serena/
+
+# Other runtime dirs
+cosmos/
+dcdoc/
+forkrig/
+rig/
+rig*/
+forge*/
+forge_*/
+forge-local*/
+forge-*/
+beads_global/
+owncloud/
+ops-cli/
+settings/
+daemon/
+testdb/
+testrig/
+testrip/
+dftimewolf/
+agents/
+gastown/
+aihub/
+flext/
+ccs/
+serena/
+plugins/
+plugin*/
+events/
+mcb/
+invest/
+deacon/
+cliproxyapi/
+gmn/
+ESTOP.aihub
+gt-p0-tmpfiles.conf.bak
+beads.bak-*/
+agents.backup-*/
+beads/
+.claude/
+.cursor/
+.mcp.json
+.runtime/
+.opencode/
+agents/
