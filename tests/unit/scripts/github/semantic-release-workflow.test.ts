@@ -32,6 +32,15 @@ describe('semantic-release workflow', () => {
     expect(workflow).not.toContain('kaitranntt/ccs.extraheader');
     expect(workflow).not.toContain('branches: [dev]');
     expect(workflow).not.toContain('scripts/dev-release.sh');
+
+    const require = createRequire(import.meta.url);
+    const releaseConfig = require(path.join(repoRoot, '.releaserc.cjs')) as {
+      plugins: Array<string | [string, Record<string, unknown>]>;
+    };
+    const npmPlugin = releaseConfig.plugins.find(
+      (plugin) => Array.isArray(plugin) && plugin[0] === '@semantic-release/npm',
+    );
+    expect(npmPlugin).toEqual(['@semantic-release/npm', { npmPublish: false }]);
   });
 
   test('keeps governance maintenance explicitly non-releasing', async () => {

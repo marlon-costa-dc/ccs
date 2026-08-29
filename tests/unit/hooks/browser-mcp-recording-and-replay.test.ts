@@ -26,17 +26,45 @@ describe('ccs-browser MCP server - recording and replay', () => {
         },
       ],
       [
-        { jsonrpc: '2.0', id: 1001, method: 'tools/call', params: { name: 'browser_start_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1002, method: 'tools/call', params: { name: 'browser_stop_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1003, method: 'tools/call', params: { name: 'browser_get_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1004, method: 'tools/call', params: { name: 'browser_clear_recording', arguments: {} } },
+        {
+          jsonrpc: '2.0',
+          id: 1001,
+          method: 'tools/call',
+          params: { name: 'browser_start_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1002,
+          method: 'tools/call',
+          params: { name: 'browser_stop_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1003,
+          method: 'tools/call',
+          params: { name: 'browser_get_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1004,
+          method: 'tools/call',
+          params: { name: 'browser_clear_recording', arguments: {} },
+        },
       ]
     );
 
-    expect(getResponseText(responses.find((message) => message.id === 1001))).toContain('status: recording');
-    expect(getResponseText(responses.find((message) => message.id === 1002))).toContain('status: stopped');
-    expect(getResponseText(responses.find((message) => message.id === 1003))).toContain('type: click');
-    expect(getResponseText(responses.find((message) => message.id === 1004))).toContain('status: cleared');
+    expect(getResponseText(responses.find((message) => message.id === 1001))).toContain(
+      'status: recording'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1002))).toContain(
+      'status: stopped'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1003))).toContain(
+      'type: click'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1004))).toContain(
+      'status: cleared'
+    );
   });
 
   it('rejects invalid recording lifecycle operations', async () => {
@@ -49,18 +77,54 @@ describe('ccs-browser MCP server - recording and replay', () => {
         },
       ],
       [
-        { jsonrpc: '2.0', id: 1011, method: 'tools/call', params: { name: 'browser_start_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1012, method: 'tools/call', params: { name: 'browser_start_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1013, method: 'tools/call', params: { name: 'browser_stop_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1014, method: 'tools/call', params: { name: 'browser_stop_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1015, method: 'tools/call', params: { name: 'browser_clear_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1016, method: 'tools/call', params: { name: 'browser_get_recording', arguments: {} } },
+        {
+          jsonrpc: '2.0',
+          id: 1011,
+          method: 'tools/call',
+          params: { name: 'browser_start_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1012,
+          method: 'tools/call',
+          params: { name: 'browser_start_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1013,
+          method: 'tools/call',
+          params: { name: 'browser_stop_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1014,
+          method: 'tools/call',
+          params: { name: 'browser_stop_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1015,
+          method: 'tools/call',
+          params: { name: 'browser_clear_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1016,
+          method: 'tools/call',
+          params: { name: 'browser_get_recording', arguments: {} },
+        },
       ]
     );
 
-    expect(getResponseText(responses.find((message) => message.id === 1012))).toContain('recording already active');
-    expect(getResponseText(responses.find((message) => message.id === 1014))).toContain('no active recording');
-    expect(getResponseText(responses.find((message) => message.id === 1016))).toContain('no recording available');
+    expect(getResponseText(responses.find((message) => message.id === 1012))).toContain(
+      'recording already active'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1014))).toContain(
+      'no active recording'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1016))).toContain(
+      'no recording available'
+    );
   });
 
   it('routes recording start by pageId and rejects page conflicts', async () => {
@@ -86,13 +150,20 @@ describe('ccs-browser MCP server - recording and replay', () => {
           jsonrpc: '2.0',
           id: 1019,
           method: 'tools/call',
-          params: { name: 'browser_start_recording', arguments: { pageIndex: 0, pageId: 'page-1' } },
+          params: {
+            name: 'browser_start_recording',
+            arguments: { pageIndex: 0, pageId: 'page-1' },
+          },
         },
       ]
     );
 
-    expect(getResponseText(responses.find((message) => message.id === 1017))).toContain('pageIndex: 1');
-    expect(getResponseText(responses.find((message) => message.id === 1019))).toContain('pageIndex and pageId cannot be used together');
+    expect(getResponseText(responses.find((message) => message.id === 1017))).toContain(
+      'pageIndex: 1'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1019))).toContain(
+      'pageIndex and pageId cannot be used together'
+    );
   });
 
   it('cleans up recording state when stop finalization fails', async () => {
@@ -107,23 +178,20 @@ describe('ccs-browser MCP server - recording and replay', () => {
       },
     ];
 
-    const stopResponses = await runMcpRequests(
-      pages,
-      [
-        {
-          jsonrpc: '2.0',
-          id: 1019_1,
-          method: 'tools/call',
-          params: { name: 'browser_start_recording', arguments: {} },
-        },
-        {
-          jsonrpc: '2.0',
-          id: 1019_2,
-          method: 'tools/call',
-          params: { name: 'browser_stop_recording', arguments: {} },
-        },
-      ]
-    );
+    const stopResponses = await runMcpRequests(pages, [
+      {
+        jsonrpc: '2.0',
+        id: 1019_1,
+        method: 'tools/call',
+        params: { name: 'browser_start_recording', arguments: {} },
+      },
+      {
+        jsonrpc: '2.0',
+        id: 1019_2,
+        method: 'tools/call',
+        params: { name: 'browser_stop_recording', arguments: {} },
+      },
+    ]);
 
     expect(getResponseText(stopResponses.find((message) => message.id === 1019_2))).toContain(
       'recording finalize failed'
@@ -158,13 +226,27 @@ describe('ccs-browser MCP server - recording and replay', () => {
         },
       ],
       [
-        { jsonrpc: '2.0', id: 1020, method: 'tools/call', params: { name: 'browser_start_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1020_1, method: 'tools/call', params: { name: 'browser_get_recording', arguments: {} } },
+        {
+          jsonrpc: '2.0',
+          id: 1020,
+          method: 'tools/call',
+          params: { name: 'browser_start_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1020_1,
+          method: 'tools/call',
+          params: { name: 'browser_get_recording', arguments: {} },
+        },
       ]
     );
 
-    expect(getResponseText(responses.find((message) => message.id === 1020))).toContain('recording injection failed');
-    expect(getResponseText(responses.find((message) => message.id === 1020_1))).toContain('no recording available');
+    expect(getResponseText(responses.find((message) => message.id === 1020))).toContain(
+      'recording injection failed'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1020_1))).toContain(
+      'no recording available'
+    );
   });
 
   it('normalizes type, press_key, scroll, and warnings in a recording result', async () => {
@@ -176,18 +258,44 @@ describe('ccs-browser MCP server - recording and replay', () => {
           currentUrl: 'https://example.com/normalize',
           recording: {
             events: [
-              { kind: 'type', selector: '#email', text: 'walker@example.com', timestamp: 1710000000100 },
+              {
+                kind: 'type',
+                selector: '#email',
+                text: 'walker@example.com',
+                timestamp: 1710000000100,
+              },
               { kind: 'press_key', key: 'Enter', modifiers: ['Shift'], timestamp: 1710000000200 },
-              { kind: 'scroll', selector: '#results', deltaX: 0, deltaY: 320, timestamp: 1710000000300 },
+              {
+                kind: 'scroll',
+                selector: '#results',
+                deltaX: 0,
+                deltaY: 320,
+                timestamp: 1710000000300,
+              },
             ],
             warnings: [{ message: 'cross-origin frame events were skipped' }],
           },
         },
       ],
       [
-        { jsonrpc: '2.0', id: 1021, method: 'tools/call', params: { name: 'browser_start_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1022, method: 'tools/call', params: { name: 'browser_stop_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1023, method: 'tools/call', params: { name: 'browser_get_recording', arguments: {} } },
+        {
+          jsonrpc: '2.0',
+          id: 1021,
+          method: 'tools/call',
+          params: { name: 'browser_start_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1022,
+          method: 'tools/call',
+          params: { name: 'browser_stop_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1023,
+          method: 'tools/call',
+          params: { name: 'browser_get_recording', arguments: {} },
+        },
       ]
     );
 
@@ -228,9 +336,24 @@ describe('ccs-browser MCP server - recording and replay', () => {
         },
       ],
       [
-        { jsonrpc: '2.0', id: 1031, method: 'tools/call', params: { name: 'browser_start_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1032, method: 'tools/call', params: { name: 'browser_stop_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1033, method: 'tools/call', params: { name: 'browser_get_recording', arguments: {} } },
+        {
+          jsonrpc: '2.0',
+          id: 1031,
+          method: 'tools/call',
+          params: { name: 'browser_start_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1032,
+          method: 'tools/call',
+          params: { name: 'browser_stop_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1033,
+          method: 'tools/call',
+          params: { name: 'browser_get_recording', arguments: {} },
+        },
       ]
     );
 
@@ -255,9 +378,24 @@ describe('ccs-browser MCP server - recording and replay', () => {
         },
       ],
       [
-        { jsonrpc: '2.0', id: 1034, method: 'tools/call', params: { name: 'browser_start_recording', arguments: {} } },
-        { jsonrpc: '2.0', id: 1035, method: 'tools/call', params: { name: 'browser_close_page', arguments: { pageId: 'page-1' } } },
-        { jsonrpc: '2.0', id: 1036, method: 'tools/call', params: { name: 'browser_get_recording', arguments: {} } },
+        {
+          jsonrpc: '2.0',
+          id: 1034,
+          method: 'tools/call',
+          params: { name: 'browser_start_recording', arguments: {} },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1035,
+          method: 'tools/call',
+          params: { name: 'browser_close_page', arguments: { pageId: 'page-1' } },
+        },
+        {
+          jsonrpc: '2.0',
+          id: 1036,
+          method: 'tools/call',
+          params: { name: 'browser_get_recording', arguments: {} },
+        },
       ]
     );
 
@@ -340,13 +478,19 @@ describe('ccs-browser MCP server - recording and replay', () => {
         jsonrpc: '2.0',
         id: 1102,
         method: 'tools/call',
-        params: { name: 'browser_get_replay', arguments: {} },
+        params: { name: 'browser_get_replay', arguments: { waitForCompletion: true } },
       },
     ]);
 
-    expect(getResponseText(responses.find((message) => message.id === 1101))).toContain('status: completed');
-    expect(getResponseText(responses.find((message) => message.id === 1102))).toContain('completedSteps: 3');
-    expect(getResponseText(responses.find((message) => message.id === 1102))).toContain('status: completed');
+    expect(getResponseText(responses.find((message) => message.id === 1101))).toContain(
+      'replayId: rep_0001'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1102))).toContain(
+      'completedSteps: 3'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1102))).toContain(
+      'status: completed'
+    );
   });
 
   it('rejects invalid replay payloads before execution starts', async () => {
@@ -377,7 +521,14 @@ describe('ccs-browser MCP server - recording and replay', () => {
           params: {
             name: 'browser_start_replay',
             arguments: {
-              steps: [createReplayStep({ type: 'click', pageId: 'page-2', selector: '#submit', args: {} })],
+              steps: [
+                createReplayStep({
+                  type: 'click',
+                  pageId: 'page-2',
+                  selector: '#submit',
+                  args: {},
+                }),
+              ],
               pageId: 'page-1',
             },
           },
@@ -385,9 +536,15 @@ describe('ccs-browser MCP server - recording and replay', () => {
       ]
     );
 
-    expect(getResponseText(responses.find((message) => message.id === 1111))).toContain('steps must be a non-empty array');
-    expect(getResponseText(responses.find((message) => message.id === 1112))).toContain('unsupported replay step type');
-    expect(getResponseText(responses.find((message) => message.id === 1113))).toContain('replay step pageId mismatch');
+    expect(getResponseText(responses.find((message) => message.id === 1111))).toContain(
+      'steps must be a non-empty array'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1112))).toContain(
+      'unsupported replay step type'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1113))).toContain(
+      'replay step pageId mismatch'
+    );
   });
 
   it('fails replay on the first failing step and reports failedStepIndex', async () => {
@@ -430,8 +587,18 @@ describe('ccs-browser MCP server - recording and replay', () => {
             name: 'browser_start_replay',
             arguments: {
               steps: [
-                createReplayStep({ type: 'click', pageId: 'page-1', selector: '#submit', args: {} }),
-                createReplayStep({ type: 'click', pageId: 'page-1', selector: '#missing', args: {} }),
+                createReplayStep({
+                  type: 'click',
+                  pageId: 'page-1',
+                  selector: '#submit',
+                  args: {},
+                }),
+                createReplayStep({
+                  type: 'click',
+                  pageId: 'page-1',
+                  selector: '#missing',
+                  args: {},
+                }),
               ],
             },
           },
@@ -627,8 +794,11 @@ describe('ccs-browser MCP server - recording and replay', () => {
       },
     ]);
 
-    expect(getResponseText(responses.find((message) => message.id === 1121))).toContain('status: completed');
-    expect(getResponseText(responses.find((message) => message.id === 1121))).toContain('completedSteps: 2');
+    expect(getResponseText(responses.find((message) => message.id === 1121))).toContain(
+      'status: completed'
+    );
+    expect(getResponseText(responses.find((message) => message.id === 1121))).toContain(
+      'completedSteps: 2'
+    );
   });
-
 });
