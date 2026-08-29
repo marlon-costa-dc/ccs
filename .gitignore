@@ -194,3 +194,5 @@ beads/
 .runtime/
 .opencode/
 agents/
+agents
+agents/
