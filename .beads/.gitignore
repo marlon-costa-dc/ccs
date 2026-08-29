@@ -24,3 +24,13 @@ push-state.json
 
 # Interactions log (runtime artifact)
 interactions.jsonl
+
+# Additional runtime artifacts
+.~*
+backup/
+data/
+dolt-server.log
+dolt-server.port
+formulas/
+issues.jsonl
+locks/
