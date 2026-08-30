@@ -5,6 +5,7 @@
 
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { CLIPROXY_DEFAULT_PORT } from '@/lib/preset-utils';
 import type { CliproxyServerConfig } from '../../types';
 import { useTranslation } from 'react-i18next';
 
@@ -41,7 +42,7 @@ export function LocalProxyCard({
             value={displayLocalPort}
             onChange={(e) => setEditedLocalPort(e.target.value.replace(/\D/g, ''))}
             onBlur={onSaveLocalPort}
-            placeholder={t('settingsProxy.requiredPortPlaceholder')}
+            placeholder={`${CLIPROXY_DEFAULT_PORT}`}
             className="font-mono max-w-32"
             disabled={saving}
           />
@@ -54,7 +55,7 @@ export function LocalProxyCard({
             <p className="text-xs text-muted-foreground">{t('settingsProxy.localAutoStartDesc')}</p>
           </div>
           <Switch
-            checked={localConfig.auto_start}
+            checked={localConfig.auto_start ?? true}
             onCheckedChange={(checked) =>
               onSaveConfig({ local: { ...localConfig, auto_start: checked } })
             }

@@ -27,6 +27,7 @@ import { LocalProxyCard } from './local-proxy-card';
 import { RemoteProxyCard } from './remote-proxy-card';
 import { ProxyStatusWidget } from '@/components/monitoring/proxy-status-widget';
 import { api } from '@/lib/api-client';
+import { CLIPROXY_DEFAULT_PORT } from '@/lib/preset-utils';
 import { RISK_ACK_PHRASE } from '@/components/account/antigravity-responsibility-constants';
 import {
   CORE_CLIPROXY_PROVIDERS,
@@ -276,17 +277,18 @@ export default function ProxySection() {
     );
   }
 
-  const isRemoteMode = config.remote.enabled;
+  const isRemoteMode = config.remote.enabled ?? false;
   // Only block backend switching in local mode when proxy is running
   const isBackendSwitchBlocked = !isRemoteMode && isProxyRunning;
   const remoteConfig = config.remote;
+  const fallbackConfig = config.fallback;
 
   // Get display values (edited or from config)
   const hostInput = config.remote.host ?? '';
   const portInput = config.remote.port !== undefined ? config.remote.port.toString() : '';
   const authTokenInput = config.remote.auth_token ?? '';
   const managementKeyInput = config.remote.management_key ?? '';
-  const localPortInput = config.local.port.toString();
+  const localPortInput = (config.local.port ?? CLIPROXY_DEFAULT_PORT).toString();
 
   const displayHost = editedHost ?? hostInput;
   const displayPort = editedPort ?? portInput;
@@ -306,7 +308,9 @@ export default function ProxySection() {
   const savePort = () => {
     const portStr = (editedPort ?? displayPort).trim();
     if (portStr === '') {
-      toast.error(t('settingsProxy.invalidPortOrEmpty'));
+      if (config.remote.port !== undefined) {
+        saveConfig({ remote: { ...remoteConfig, port: undefined } });
+      }
       setEditedPort(null);
       return;
     }
@@ -333,12 +337,7 @@ export default function ProxySection() {
   };
 
   const saveManagementKey = () => {
-    const value = (editedManagementKey ?? displayManagementKey).trim();
-    if (isRemoteMode && value === '') {
-      toast.error(t('settingsProxy.managementKeyRequired'));
-      setEditedManagementKey(null);
-      return;
-    }
+    const value = editedManagementKey ?? displayManagementKey;
     if (value !== config.remote.management_key) {
       saveConfig({ remote: { ...remoteConfig, management_key: value || undefined } });
     }
@@ -347,14 +346,9 @@ export default function ProxySection() {
 
   const saveLocalPort = () => {
     const localPortStr = (editedLocalPort ?? displayLocalPort).trim();
-    const parsedPort = Number(localPortStr);
+    const parsedPort = localPortStr === '' ? CLIPROXY_DEFAULT_PORT : Number(localPortStr);
 
-    if (
-      localPortStr === '' ||
-      !Number.isInteger(parsedPort) ||
-      parsedPort < 1 ||
-      parsedPort > 65535
-    ) {
+    if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
       toast.error(t('settingsProxy.invalidLocalPort'));
       setEditedLocalPort(null);
       return;
@@ -367,16 +361,11 @@ export default function ProxySection() {
   };
 
   const handleTestConnection = () => {
-    if (typeof config.remote.allow_self_signed !== 'boolean') {
-      toast.error(t('settingsProxy.selfSignedPolicyRequired'));
-      return;
-    }
     testConnection({
       host: displayHost,
       port: displayPort,
-      protocol: config.remote.protocol,
+      protocol: config.remote.protocol || 'http',
       authToken: displayAuthToken,
-      allowSelfSigned: config.remote.allow_self_signed,
     });
   };
 
@@ -685,6 +674,46 @@ export default function ProxySection() {
               onTestConnection={handleTestConnection}
             />
           )}
+
+          {/* Fallback Settings */}
+          <div className="space-y-3">
+            <h3 className="text-base font-medium">{t('settingsProxy.fallbackSettings')}</h3>
+            <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+              {/* Enable Fallback */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">{t('settingsProxy.enableFallback')}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('settingsProxy.enableFallbackDesc')}
+                  </p>
+                </div>
+                <Switch
+                  checked={fallbackConfig.enabled ?? true}
+                  onCheckedChange={(checked) =>
+                    saveConfig({ fallback: { ...fallbackConfig, enabled: checked } })
+                  }
+                  disabled={saving || !isRemoteMode}
+                />
+              </div>
+
+              {/* Auto-start on fallback */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">{t('settingsProxy.autoStartLocal')}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t('settingsProxy.autoStartLocalDesc')}
+                  </p>
+                </div>
+                <Switch
+                  checked={fallbackConfig.auto_start ?? false}
+                  onCheckedChange={(checked) =>
+                    saveConfig({ fallback: { ...fallbackConfig, auto_start: checked } })
+                  }
+                  disabled={saving || !isRemoteMode || !fallbackConfig.enabled}
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Advanced Settings */}
           <div className="space-y-3">

@@ -5,29 +5,27 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 import type { CLIProxyBackend, CLIProxyProvider, ProviderConfig } from '../types';
 import { getProviderDisplayName } from '../provider-capabilities';
 import { getModelMappingFromConfig } from '../config/base-config-loader';
 import { AI_PROVIDER_FAMILY_IDS } from '../ai-providers/types';
 
-import { getEffectiveApiKey, getEffectiveManagementSecret } from '../auth/auth-token-manager';
-import { getDeniedModelIdReasonForProvider } from '../ai-providers/model-id-normalizer';
 import { getAuthDir, getProviderAuthDir, getConfigPathForPort } from './path-resolver';
 import { CLIPROXY_DEFAULT_PORT } from './port-manager';
 import { loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
 import { getActiveDockerLegacyApiKeys } from '../../docker/docker-key-rotation';
-import { isValidCliproxyRetryValue } from '../../config/schemas/cliproxy';
 import type { CLIProxyOAuthModelAliasConfig } from '../../config/schemas/cliproxy';
-import {
-  mergeOAuthModelAliases,
-  parseOAuthModelAliasSection,
-  serializeOAuthModelAliasBody,
-} from './oauth-model-alias-config';
+import { mergeOAuthModelAliases, serializeOAuthModelAliasBody } from './oauth-model-alias-config';
 import {
   mergePayloadConfig,
   parsePayloadSection,
   serializePayloadSection,
 } from './payload-rule-config';
+import { projectModelRouting } from './model-routing-projector';
+import type { UnifiedConfig } from '../../config/unified-config-types';
+import type { ModelPipelineSnapshot } from '../../config/schemas/model-pipeline';
+import { ConfigError } from '../../errors/error-types';
 
 /** Internal API key for CCS-managed requests */
 export const CCS_INTERNAL_API_KEY = 'ccs-internal-managed';
@@ -58,8 +56,11 @@ export const CCS_CONTROL_PANEL_SECRET = 'ccs';
  * v19: Persist backend-aware management panel repository from CCS unified config
  * v20: Pool-gated cooling/routing/retry-cap block; disable-cooling flips to false for pool users
  * v21: Persist user-defined OAuth aliases and scoped payload override rules
+ * v22: Project source-attributed model prices from the unified AI Hub catalog
+ * v23: Replace the legacy price list with the canonical model-routing projection
+ * v24: Remove generated compatibility aliases; only explicit CCS aliases remain
  */
-export const CLIPROXY_CONFIG_VERSION = 21;
+export const CLIPROXY_CONFIG_VERSION = 24;
 
 export const ORIGINAL_MANAGEMENT_PANEL_REPOSITORY =
   'https://github.com/router-for-me/Cli-Proxy-API-Management-Center';
@@ -75,54 +76,6 @@ interface PreservedYamlSection {
   key: string;
   body: string;
 }
-
-interface OAuthModelAliasEntry {
-  name: string;
-  alias: string;
-  fork?: boolean;
-}
-
-interface PreservedAntigravityAliasesResult {
-  yaml: string;
-  prunedLegacyAliasCount: number;
-}
-
-const DEPRECATED_ANTIGRAVITY_ALIAS_PREFIX = 'gemini-claude-';
-const UPSTREAM_CLAUDE_ALIAS_PREFIX = 'claude-';
-const DEPRECATED_ANTIGRAVITY_SONNET_46_THINKING_REGEX = /^claude-sonnet-4(?:[.-])6-thinking$/i;
-const CANONICAL_ANTIGRAVITY_SONNET_46_ALIAS = 'claude-sonnet-4-6';
-
-/**
- * Default Antigravity oauth-model-alias entries.
- * Maps user-facing model names to Antigravity internal model names.
- * Additional compatibility aliases are derived automatically at generation time.
- */
-const DEFAULT_ANTIGRAVITY_ALIASES: OAuthModelAliasEntry[] = [
-  { name: 'rev19-uic3-1p', alias: 'gemini-2.5-computer-use-preview-10-2025' },
-  { name: 'gemini-3-pro-image', alias: 'gemini-3-pro-image-preview' },
-  { name: 'gemini-3-pro-high', alias: 'gemini-3-pro-preview' },
-  { name: 'gemini-3-pro-high', alias: 'gemini-3.1-pro-preview' },
-  { name: 'gemini-3-pro-high', alias: 'gemini-3.1-pro-preview-customtools' },
-  { name: 'gemini-3-flash', alias: 'gemini-3-flash-preview' },
-  { name: 'gemini-3-flash', alias: 'gemini-3.1-flash-preview' },
-  { name: 'claude-sonnet-4-6', alias: 'claude-sonnet-4-6', fork: true },
-  // Backward compatibility: legacy sonnet thinking alias now routes to canonical model ID.
-  { name: 'claude-sonnet-4-6-thinking', alias: 'claude-sonnet-4-6', fork: true },
-  { name: 'claude-opus-4-6-thinking', alias: 'claude-opus-4-6-thinking', fork: true },
-];
-
-const BUILT_IN_GEMINI_ALIAS_NAMES = new Set(
-  DEFAULT_ANTIGRAVITY_ALIASES.filter((entry) => entry.alias.startsWith('gemini-3')).map(
-    (entry) => entry.name
-  )
-);
-const MIN_STALE_GUESSED_GEMINI_MINOR_VERSIONS = 2;
-const MIN_STALE_HIGH_ONLY_GEMINI_MINOR_VERSIONS = 3;
-const MIN_STALE_GUESSED_GEMINI_AVERAGE_VARIANTS_PER_MINOR = 2;
-const LEGACY_GEMINI_STALE_ALIAS_MIGRATION_VERSION = 16;
-const MAX_LEGACY_MANUAL_GEMINI_MINOR_VERSION = 2;
-const GO_DURATION_SEGMENT = String.raw`(?:\d+(?:\.\d+)?(?:ns|us|µs|μs|ms|s|m|h))`;
-const GO_DURATION_PATTERN = new RegExp(`^${GO_DURATION_SEGMENT}+$`);
 
 /**
  * Get provider configuration
@@ -144,84 +97,14 @@ export function getProviderConfig(provider: CLIProxyProvider): ProviderConfig {
  * Get CLIProxy logging settings from user config.
  * Defaults to disabled to prevent disk bloat.
  */
-function getLoggingSettings(): { loggingToFile: boolean; requestLog: boolean } {
-  const config = loadOrCreateUnifiedConfig();
+function getLoggingSettings(config: UnifiedConfig): {
+  loggingToFile: boolean;
+  requestLog: boolean;
+} {
   return {
     loggingToFile: config.cliproxy.logging?.enabled ?? false,
     requestLog: config.cliproxy.logging?.request_log ?? false,
   };
-}
-
-/**
- * Check whether pool routing is enabled in the CCS unified config.
- *
- * Cooling archaeology (CCS v5, commit fb77d72a, Jan 26 2026):
- * disable-cooling: true was added for stability because single-account users
- * hit a blackout cliff when their only credential entered cooldown.  Two upstream
- * bugs compounded the issue:
- *   1. Transient-error blackout (fixed upstream Jan 21 2026, commit 30a59168)
- *   2. 401/402/403/404 ignoring the disable-cooling flag entirely
- *      (fixed upstream Apr 7 2026, commit 0ea76801)
- *
- * The concern no longer applies on current CLIProxy versions (fallback 6.9.45,
- * which postdates both fixes).  For pool users (2+ accounts per provider)
- * cooling-ON is the correct behavior: a suspended credential rotates out and
- * a healthy one takes over, which is the pool-routing value proposition.
- * For single-account users the original stability concern still holds, so
- * disable-cooling: true is preserved when pool routing is disabled.
- *
- * Per-auth metadata override cannot be used to enable cooling — the upstream
- * override is "true-only" (types.go:384-404): a false per-auth value falls back
- * to the global flag.  The flip must be at the top-level config key.
- *
- * Retry-cap note: max-retry-credentials is ONLY valid with cooling ON.
- * Without cooling, a just-exhausted credential is still "available" on the
- * next request; retry-cap would not prevent re-targeting it.
- */
-function isPoolRoutingEnabled(): boolean {
-  return loadOrCreateUnifiedConfig().cliproxy?.pool_routing?.enabled === true;
-}
-
-/**
- * Get max-retry-credentials for pool routing config.
- * Only consulted when pool routing is enabled.
- * Defaults to 3 (try up to 3 credentials before returning 429 to caller).
- */
-function getPoolMaxRetryCredentials(): number {
-  return loadOrCreateUnifiedConfig().cliproxy?.pool_routing?.max_retry_credentials ?? 3;
-}
-
-function getRoutingStrategy(): 'round-robin' | 'fill-first' {
-  const config = loadOrCreateUnifiedConfig();
-  return config.cliproxy?.routing?.strategy === 'fill-first' ? 'fill-first' : 'round-robin';
-}
-
-function getSessionAffinityEnabled(): boolean {
-  return loadOrCreateUnifiedConfig().cliproxy?.routing?.session_affinity ?? false;
-}
-
-function getSessionAffinityTtl(): string {
-  const ttl = loadOrCreateUnifiedConfig().cliproxy?.routing?.session_affinity_ttl?.trim();
-  return ttl && GO_DURATION_PATTERN.test(ttl) && hasPositiveDuration(ttl) ? ttl : '1h';
-}
-
-/**
- * Number of times CLIProxy retries a request on a transient error
- * (403, 408, 500, 502, 503, 504). Opt-in via config.cliproxy.retry.request_retry;
- * defaults to 0 (disabled) to avoid burning quota on multi-account pools.
- */
-function getRequestRetry(): number {
-  const value = loadOrCreateUnifiedConfig().cliproxy?.retry?.request_retry;
-  return isValidCliproxyRetryValue(value) ? value : 0;
-}
-
-/**
- * Maximum wait time in seconds for a cooled-down credential before CLIProxy
- * retries. Opt-in via config.cliproxy.retry.max_retry_interval; defaults to 0.
- */
-function getMaxRetryInterval(): number {
-  const value = loadOrCreateUnifiedConfig().cliproxy?.retry?.max_retry_interval;
-  return isValidCliproxyRetryValue(value) ? value : 0;
 }
 
 function normalizeManagementPanelRepository(value: unknown): string | undefined {
@@ -239,8 +122,9 @@ function getDefaultManagementPanelRepository(backend: CLIProxyBackend | undefine
     : ORIGINAL_MANAGEMENT_PANEL_REPOSITORY;
 }
 
-export function getManagementPanelRepository(): string {
-  const config = loadOrCreateUnifiedConfig();
+export function getManagementPanelRepository(
+  config: UnifiedConfig = loadOrCreateUnifiedConfig()
+): string {
   return (
     normalizeManagementPanelRepository(config.cliproxy?.management_panel_repository) ??
     getDefaultManagementPanelRepository(config.cliproxy?.backend)
@@ -249,18 +133,6 @@ export function getManagementPanelRepository(): string {
 
 function quoteYamlString(value: string): string {
   return JSON.stringify(value);
-}
-
-function hasPositiveDuration(value: string): boolean {
-  const segments = value.match(new RegExp(GO_DURATION_SEGMENT, 'g'));
-  if (!segments) {
-    return false;
-  }
-
-  return segments.some((segment) => {
-    const numeric = parseFloat(segment);
-    return Number.isFinite(numeric) && numeric > 0;
-  });
 }
 
 function sanitizeYamlScalar(rawValue: string): string {
@@ -279,144 +151,6 @@ function parseManagementPanelRepository(content: string): string | null {
   return match ? sanitizeYamlScalar(match[1]) : null;
 }
 
-function normalizeAntigravityAlias(rawAlias: string): string {
-  const normalized = sanitizeYamlScalar(rawAlias);
-  if (normalized.toLowerCase().startsWith(DEPRECATED_ANTIGRAVITY_ALIAS_PREFIX)) {
-    const migratedPrefix =
-      UPSTREAM_CLAUDE_ALIAS_PREFIX + normalized.slice(DEPRECATED_ANTIGRAVITY_ALIAS_PREFIX.length);
-    return normalizeAntigravityAlias(migratedPrefix);
-  }
-
-  if (DEPRECATED_ANTIGRAVITY_SONNET_46_THINKING_REGEX.test(normalized)) {
-    return CANONICAL_ANTIGRAVITY_SONNET_46_ALIAS;
-  }
-
-  return normalized;
-}
-
-function addAliasEntry(
-  entries: OAuthModelAliasEntry[],
-  indexByKey: Map<string, number>,
-  entry: OAuthModelAliasEntry
-): void {
-  const normalized: OAuthModelAliasEntry = {
-    name: sanitizeYamlScalar(entry.name),
-    alias: normalizeAntigravityAlias(entry.alias),
-    fork: entry.fork || undefined,
-  };
-  if (!normalized.name || !normalized.alias) return;
-  if (getDeniedModelIdReasonForProvider(normalized.name, 'agy')) return;
-  if (getDeniedModelIdReasonForProvider(normalized.alias, 'agy')) return;
-
-  // Dedupe on the (name, alias) PAIR — buildAntigravityAliasKey already does.
-  // Repeating one alias with different upstream names is how CLIProxyAPI
-  // declares a sequential failover pool, so alias-only keying would collapse
-  // the chain to its first candidate.
-  const key = buildAntigravityAliasKey(normalized);
-  const existingIndex = indexByKey.get(key);
-  if (existingIndex !== undefined) {
-    if (normalized.fork) entries[existingIndex].fork = true;
-    return;
-  }
-
-  indexByKey.set(key, entries.length);
-  entries.push(normalized);
-}
-
-function upsertConfiguredAliasEntry(
-  entries: OAuthModelAliasEntry[],
-  indexByKey: Map<string, number>,
-  entry: OAuthModelAliasEntry
-): void {
-  const normalized: OAuthModelAliasEntry = {
-    name: sanitizeYamlScalar(entry.name),
-    alias: normalizeAntigravityAlias(entry.alias),
-    fork: entry.fork || undefined,
-  };
-  if (!normalized.name || !normalized.alias) return;
-  if (getDeniedModelIdReasonForProvider(normalized.name, 'agy')) return;
-  if (getDeniedModelIdReasonForProvider(normalized.alias, 'agy')) return;
-
-  // Replace only the entry carrying the SAME (name, alias) pair. Two entries
-  // that share an alias but map to different upstream names are distinct
-  // candidates of one sequential failover pool, so a configured entry must
-  // join the chain instead of overwriting a sibling candidate.
-  const normalizedKey = buildAntigravityAliasKey(normalized);
-  const existingIndex = entries.findIndex(
-    (candidate) => buildAntigravityAliasKey(candidate) === normalizedKey
-  );
-  if (existingIndex === -1) {
-    addAliasEntry(entries, indexByKey, normalized);
-    return;
-  }
-
-  entries[existingIndex] = normalized;
-  indexByKey.clear();
-  entries.forEach((candidate, index) => {
-    indexByKey.set(buildAntigravityAliasKey(candidate), index);
-  });
-}
-
-function buildAntigravityAliasKey(entry: Pick<OAuthModelAliasEntry, 'name' | 'alias'>): string {
-  return `${sanitizeYamlScalar(entry.name)}\u0000${normalizeAntigravityAlias(entry.alias)}`;
-}
-
-function parseExistingAntigravityAliases(existingAliases: string): OAuthModelAliasEntry[] {
-  const entries: OAuthModelAliasEntry[] = [];
-  const lines = existingAliases.replace(/\r\n/g, '\n').split('\n');
-
-  let currentChannel = '';
-  let currentName = '';
-  let currentAlias = '';
-  let currentFork = false;
-
-  const flushCurrent = () => {
-    if (currentName && currentAlias && (!currentChannel || currentChannel === 'antigravity')) {
-      entries.push({
-        name: sanitizeYamlScalar(currentName),
-        alias: sanitizeYamlScalar(currentAlias),
-        fork: currentFork || undefined,
-      });
-    }
-    currentName = '';
-    currentAlias = '';
-    currentFork = false;
-  };
-
-  for (const line of lines) {
-    const channelMatch = line.match(/^\s{2}([a-zA-Z0-9_-]+):\s*$/);
-    if (channelMatch) {
-      flushCurrent();
-      currentChannel = channelMatch[1].trim().toLowerCase();
-      continue;
-    }
-
-    if (currentChannel && currentChannel !== 'antigravity') continue;
-
-    const nameMatch = line.match(/^\s+-\s*name:\s*(.+)/);
-    const aliasMatch = line.match(/^\s+alias:\s*(.+)/);
-    const forkMatch = line.match(/^\s+fork:\s*(.+)/);
-
-    if (nameMatch) {
-      flushCurrent();
-      currentName = nameMatch[1];
-      continue;
-    }
-
-    if (aliasMatch) {
-      currentAlias = aliasMatch[1];
-      continue;
-    }
-
-    if (forkMatch) {
-      currentFork = sanitizeYamlScalar(forkMatch[1]).toLowerCase() === 'true';
-    }
-  }
-
-  flushCurrent();
-  return entries;
-}
-
 function getConfigVersionFromContent(content: string): number | null {
   const versionMatch = content.match(/CCS v(\d+)/);
   if (!versionMatch) {
@@ -427,299 +161,15 @@ function getConfigVersionFromContent(content: string): number | null {
   return Number.isNaN(parsedVersion) ? null : parsedVersion;
 }
 
-function toDottedGeminiVersionAlias(alias: string): string | null {
-  const match = alias.match(/^(gemini-\d+)-(\d+)(-.+)$/);
-  if (!match) return null;
-  return `${match[1]}.${match[2]}${match[3]}`;
-}
-
-function toHyphenatedGeminiVersionAlias(alias: string): string | null {
-  const match = alias.match(/^(gemini-\d+)\.(\d+)(-.+)$/);
-  if (!match) return null;
-  return `${match[1]}-${match[2]}${match[3]}`;
-}
-
-function buildGeminiCompatibilityAliases(alias: string): string[] {
-  if (!alias.startsWith('gemini-') || !alias.includes('-preview')) return [];
-
-  const variants = new Set<string>();
-  const queue: string[] = [alias];
-
-  const enqueue = (candidate: string) => {
-    if (!candidate || candidate === alias || variants.has(candidate)) return;
-    variants.add(candidate);
-    queue.push(candidate);
-  };
-
-  const visited = new Set<string>();
-  while (queue.length > 0) {
-    const current = queue.pop();
-    if (!current || visited.has(current)) continue;
-    visited.add(current);
-
-    if (current.startsWith('gemini-') && current.includes('-preview')) {
-      if (current.endsWith('-customtools')) {
-        enqueue(current.slice(0, -'-customtools'.length));
-      } else {
-        enqueue(`${current}-customtools`);
-      }
-    }
-
-    const dotted = toDottedGeminiVersionAlias(current);
-    if (dotted) enqueue(dotted);
-
-    const hyphenated = toHyphenatedGeminiVersionAlias(current);
-    if (hyphenated) enqueue(hyphenated);
-  }
-
-  return [...variants];
-}
-
-function getCompatibilityAliases(entries: OAuthModelAliasEntry[]): OAuthModelAliasEntry[] {
-  const compatibilityAliases: OAuthModelAliasEntry[] = [];
-  for (const entry of entries) {
-    const variants = buildGeminiCompatibilityAliases(entry.alias);
-    for (const variant of variants) {
-      compatibilityAliases.push({
-        name: entry.name,
-        alias: variant,
-        fork: entry.fork,
-      });
-    }
-  }
-  return compatibilityAliases;
-}
-
-function buildGeneratedAntigravityAliases(): OAuthModelAliasEntry[] {
-  const generatedAliases: OAuthModelAliasEntry[] = [];
-  const generatedAliasIndex = new Map<string, number>();
-
-  for (const alias of DEFAULT_ANTIGRAVITY_ALIASES) {
-    addAliasEntry(generatedAliases, generatedAliasIndex, alias);
-  }
-
-  for (const alias of getCompatibilityAliases(generatedAliases)) {
-    addAliasEntry(generatedAliases, generatedAliasIndex, alias);
-  }
-
-  return generatedAliases;
-}
-
-const GENERATED_ANTIGRAVITY_ALIASES = buildGeneratedAntigravityAliases();
-const GENERATED_ANTIGRAVITY_ALIAS_MAP = new Map(
-  GENERATED_ANTIGRAVITY_ALIASES.map((entry) => [buildAntigravityAliasKey(entry), entry] as const)
-);
-
-function serializeAntigravityAliases(entries: OAuthModelAliasEntry[]): string {
-  if (entries.length === 0) {
-    return '';
-  }
-
-  const lines = ['  antigravity:'];
-  for (const entry of entries) {
-    lines.push(`    - name: ${entry.name}`);
-    lines.push(`      alias: ${entry.alias}`);
-    if (entry.fork) {
-      lines.push('      fork: true');
-    }
-  }
-
-  return lines.join('\n');
-}
-
-function getLegacyGeneratedGeminiPreviewInfo(
-  entry: OAuthModelAliasEntry
-): { nameKey: string; minorVersion: string } | null {
-  if (!BUILT_IN_GEMINI_ALIAS_NAMES.has(entry.name)) {
-    return null;
-  }
-
-  const normalizedAlias = normalizeAntigravityAlias(entry.alias).toLowerCase();
-  if (!normalizedAlias.startsWith('gemini-3') || !normalizedAlias.includes('-preview')) {
-    return null;
-  }
-
-  const aliasWithoutCustomtools = normalizedAlias.endsWith('-customtools')
-    ? normalizedAlias.slice(0, -'-customtools'.length)
-    : normalizedAlias;
-  const canonicalAlias =
-    toDottedGeminiVersionAlias(aliasWithoutCustomtools) ?? aliasWithoutCustomtools;
-  const minorVersionMatch = canonicalAlias.match(/^gemini-3\.(\d+)(-.+-preview)$/);
-  if (!minorVersionMatch) {
-    return null;
-  }
-
-  return {
-    nameKey: sanitizeYamlScalar(entry.name),
-    minorVersion: minorVersionMatch[1],
-  };
-}
-
-function buildLegacyGeneratedGeminiAliasPruneSet(
-  parsedEntries: OAuthModelAliasEntry[]
-): Set<string> {
-  const aliasKeysByNameAndMinor = new Map<string, Map<string, string[]>>();
-
-  for (const entry of parsedEntries) {
-    if (entry.fork) {
-      continue;
-    }
-
-    const aliasKey = buildAntigravityAliasKey(entry);
-    if (GENERATED_ANTIGRAVITY_ALIAS_MAP.has(aliasKey)) {
-      continue;
-    }
-
-    const previewInfo = getLegacyGeneratedGeminiPreviewInfo(entry);
-    if (!previewInfo) {
-      continue;
-    }
-
-    const aliasKeysByMinor = aliasKeysByNameAndMinor.get(previewInfo.nameKey) ?? new Map();
-    const aliasKeys = aliasKeysByMinor.get(previewInfo.minorVersion) ?? [];
-    aliasKeys.push(aliasKey);
-    aliasKeysByMinor.set(previewInfo.minorVersion, aliasKeys);
-    aliasKeysByNameAndMinor.set(previewInfo.nameKey, aliasKeysByMinor);
-  }
-
-  const staleAliasKeys = new Set<string>();
-
-  for (const aliasKeysByMinor of aliasKeysByNameAndMinor.values()) {
-    const sortedMinorVersions = [...aliasKeysByMinor.keys()].sort((left, right) => {
-      return Number(left) - Number(right);
-    });
-    const totalAliasCount = sortedMinorVersions.reduce((total, minorVersion) => {
-      return total + (aliasKeysByMinor.get(minorVersion)?.length ?? 0);
-    }, 0);
-    const preservedMinorVersion =
-      Number(sortedMinorVersions[0]) <= MAX_LEGACY_MANUAL_GEMINI_MINOR_VERSION
-        ? sortedMinorVersions[0]
-        : null;
-    const minimumMinorVersionsToPrune = preservedMinorVersion
-      ? MIN_STALE_GUESSED_GEMINI_MINOR_VERSIONS
-      : MIN_STALE_HIGH_ONLY_GEMINI_MINOR_VERSIONS;
-    if (sortedMinorVersions.length < minimumMinorVersionsToPrune) {
-      continue;
-    }
-    if (
-      totalAliasCount <
-      sortedMinorVersions.length * MIN_STALE_GUESSED_GEMINI_AVERAGE_VARIANTS_PER_MINOR
-    ) {
-      continue;
-    }
-
-    for (const minorVersion of sortedMinorVersions) {
-      if (minorVersion === preservedMinorVersion) {
-        continue;
-      }
-
-      const aliasKeys = aliasKeysByMinor.get(minorVersion) ?? [];
-      for (const aliasKey of aliasKeys) {
-        staleAliasKeys.add(aliasKey);
-      }
-    }
-  }
-
-  return staleAliasKeys;
-}
-
-function extractPreservedAntigravityAliases(
-  existingAliases: string,
-  options?: { enableLegacyGeminiStaleCleanup?: boolean }
-): PreservedAntigravityAliasesResult {
-  if (!existingAliases.trim()) {
-    return { yaml: '', prunedLegacyAliasCount: 0 };
-  }
-
-  const parsedEntries = parseExistingAntigravityAliases(existingAliases);
-  const staleAliasKeys = options?.enableLegacyGeminiStaleCleanup
-    ? buildLegacyGeneratedGeminiAliasPruneSet(parsedEntries)
-    : new Set<string>();
-
-  const preservedEntries = parsedEntries.filter((entry) => {
-    const aliasKey = buildAntigravityAliasKey(entry);
-    const generatedEntry = GENERATED_ANTIGRAVITY_ALIAS_MAP.get(aliasKey);
-
-    if (generatedEntry) {
-      return Boolean(entry.fork) && !generatedEntry.fork;
-    }
-
-    if (entry.fork) {
-      return true;
-    }
-
-    return !staleAliasKeys.has(aliasKey);
-  });
-
-  return {
-    yaml: serializeAntigravityAliases(preservedEntries),
-    prunedLegacyAliasCount: parsedEntries.filter((entry) =>
-      staleAliasKeys.has(buildAntigravityAliasKey(entry))
-    ).length,
-  };
-}
-
-function writeLegacyGeminiAliasCleanupBackup(configPath: string, existingContent: string): void {
-  const backupPath = `${configPath}.pre-v16-gemini-alias-cleanup.bak`;
-  if (fs.existsSync(backupPath)) {
-    return;
-  }
-
-  fs.writeFileSync(backupPath, existingContent, { mode: 0o600 });
-}
-
 /**
  * Generate oauth-model-alias YAML section.
- * Merges default Antigravity aliases with any user-added custom aliases.
+ * Only explicit CCS configuration may create aliases. Runtime model-pipeline
+ * aliases are projected separately from the immutable snapshot.
  */
-function generateOAuthModelAliasSection(
-  existingAliases?: string,
-  configuredAliases?: CLIProxyOAuthModelAliasConfig
-): string {
-  const aliasEntries: OAuthModelAliasEntry[] = [];
-  const aliasIndexByKey = new Map<string, number>();
-  const normalizedConfiguredAliases = mergeOAuthModelAliases({}, configuredAliases);
-
-  // Start with default aliases.
-  for (const alias of DEFAULT_ANTIGRAVITY_ALIASES) {
-    addAliasEntry(aliasEntries, aliasIndexByKey, alias);
-  }
-
-  // Merge existing user aliases (dedupe by name+alias, not by name only).
-  if (existingAliases) {
-    const parsed = parseExistingAntigravityAliases(existingAliases);
-    for (const alias of parsed) {
-      addAliasEntry(aliasEntries, aliasIndexByKey, alias);
-    }
-  }
-
-  // CCS-owned structured aliases replace the same client alias in place.
-  for (const alias of normalizedConfiguredAliases.antigravity ?? []) {
-    upsertConfiguredAliasEntry(aliasEntries, aliasIndexByKey, alias);
-  }
-
-  // Expand lightweight compatibility aliases (dot/hyphen + customtools toggle).
-  for (const alias of getCompatibilityAliases(aliasEntries)) {
-    addAliasEntry(aliasEntries, aliasIndexByKey, alias);
-  }
-
-  const entries = aliasEntries
-    .map((a) => {
-      let entry = `    - name: ${a.name}\n      alias: ${a.alias}`;
-      if (a.fork) entry += '\n      fork: true';
-      return entry;
-    })
-    .join('\n');
-
-  const existingAliasConfig = parseOAuthModelAliasSection(existingAliases ?? '');
-  const mergedAliasConfig = mergeOAuthModelAliases(
-    existingAliasConfig,
-    normalizedConfiguredAliases
-  );
-  delete mergedAliasConfig.antigravity;
-  const otherProviders = serializeOAuthModelAliasBody(mergedAliasConfig);
-
-  return `oauth-model-alias:\n  antigravity:\n${entries}${otherProviders ? `\n${otherProviders}` : ''}`;
+function generateOAuthModelAliasSection(configuredAliases?: CLIProxyOAuthModelAliasConfig): string {
+  const normalizedConfiguredAliases = mergeOAuthModelAliases({}, configuredAliases ?? {});
+  const body = serializeOAuthModelAliasBody(normalizedConfiguredAliases);
+  return body ? `oauth-model-alias:\n${body}` : '';
 }
 
 /**
@@ -729,36 +179,35 @@ function generateOAuthModelAliasSection(
  *
  * @param port - Server port (default: 8317)
  * @param userApiKeys - User-added API keys to preserve (default: [])
- * @param existingAliases - Existing oauth-model-alias content to merge with defaults
  * @param existingPayload - Existing payload content to merge with structured CCS rules
  */
 function generateUnifiedConfigContent(
   port: number = CLIPROXY_DEFAULT_PORT,
   userApiKeys: string[] = [],
-  existingAliases?: string,
-  existingPayload?: string
+  existingPayload?: string,
+  unifiedConfig: UnifiedConfig = loadOrCreateUnifiedConfig()
 ): string {
+  if (unifiedConfig.model_pipeline) {
+    throw new ConfigError(
+      'model_pipeline is active; CLIProxy config may only be changed through the canonical publication transaction'
+    );
+  }
   const authDir = getAuthDir(); // Base auth dir - CLIProxyAPI scans subdirectories
   // Convert Windows backslashes to forward slashes for YAML compatibility
   const authDirNormalized = authDir.split(path.sep).join('/');
 
   // Get logging settings from user config (disabled by default)
-  const { loggingToFile, requestLog } = getLoggingSettings();
-  const poolEnabled = isPoolRoutingEnabled();
-  const routingStrategy = getRoutingStrategy();
-  const sessionAffinityEnabled = getSessionAffinityEnabled();
-  const sessionAffinityTtl = getSessionAffinityTtl();
-  const requestRetry = getRequestRetry();
-  const maxRetryInterval = getMaxRetryInterval();
-  const managementPanelRepository = getManagementPanelRepository();
-  const userRoutingConfig = loadOrCreateUnifiedConfig().cliproxy;
+  const { loggingToFile, requestLog } = getLoggingSettings(unifiedConfig);
+  const managementPanelRepository = getManagementPanelRepository(unifiedConfig);
+  const userRoutingConfig = unifiedConfig.cliproxy;
   const payloadSection = serializePayloadSection(
     mergePayloadConfig(parsePayloadSection(existingPayload ?? ''), userRoutingConfig.payload)
   );
 
   // Get effective auth tokens (respects user customization)
-  const effectiveApiKey = getEffectiveApiKey();
-  const effectiveSecret = getEffectiveManagementSecret();
+  const effectiveApiKey = unifiedConfig.cliproxy.auth?.api_key ?? CCS_INTERNAL_API_KEY;
+  const effectiveSecret =
+    unifiedConfig.cliproxy.auth?.management_secret ?? CCS_CONTROL_PANEL_SECRET;
 
   // Build api-keys section with internal key + preserved user keys.
   // Docker upgrades may temporarily keep the historical default key as a
@@ -768,28 +217,7 @@ function generateUnifiedConfigContent(
   );
   const apiKeysYaml = allApiKeys.map((key) => `  - "${key}"`).join('\n');
 
-  // Pool routing block: emitted only when pool routing is enabled.
-  // When pool routing is off, disable-cooling stays true (v5 stability default).
-  // See isPoolRoutingEnabled() and the cooling archaeology comment above it.
-  //
-  // Hot-reload note: CLIProxy watches config for changes and hot-reloads it
-  // (server.go calls auth.SetQuotaCooldownDisabled on config update).
-  // Changing pool routing state writes a new config; CLIProxy will pick it up
-  // live and evict all SessionAffinity pins on the next request (one recompute
-  // per conversation). A restart is not required.
-  const poolMaxRetry = poolEnabled ? getPoolMaxRetryCredentials() : null;
-  const disableCoolingValue = poolEnabled ? 'false' : 'true';
-  const coolingComment = poolEnabled
-    ? '# Pool routing enabled: cooling ON so exhausted accounts enter backoff and rotate out.\n# First 429 gets a 1s backoff (exponential to 30m cap); Retry-After header is honored.\n# Retry-cap below stops burn loops from retrying already-known-bad credentials.'
-    : '# Disable quota cooldown scheduling for stability.\n# Pool routing is off: cooling stays disabled to prevent single-account blackouts.\n# Re-enabled automatically when pool routing is turned on (ccs cliproxy pool --enable).';
-  const poolRoutingBlock = poolEnabled
-    ? `\n# Max credentials to try per request before returning 429 to caller.\n# ONLY valid with cooling on (above). Without cooling a just-exhausted credential\n# remains "available" and retry-cap would not prevent re-targeting it.\nmax-retry-credentials: ${poolMaxRetry}\n`
-    : '';
-  const routingBlock = `# Credential selection strategy when multiple matching accounts are available
-routing:
-  strategy: ${poolEnabled ? 'fill-first' : routingStrategy}
-  session-affinity: ${poolEnabled ? 'true' : sessionAffinityEnabled}
-  session-affinity-ttl: "${poolEnabled ? '1h' : sessionAffinityTtl}"`;
+  const oauthAliasSection = generateOAuthModelAliasSection(userRoutingConfig.oauth_model_alias);
 
   // Unified config with enhanced CLIProxyAPI features
   const config = `# CLIProxyAPI config generated by CCS v${CLIPROXY_CONFIG_VERSION}
@@ -842,21 +270,6 @@ remote-management:
 # Reliability & Quota Management
 # =============================================================================
 
-${coolingComment}
-disable-cooling: ${disableCoolingValue}
-
-# Auto-retry on transient errors (403, 408, 500, 502, 503, 504)
-request-retry: ${requestRetry}
-max-retry-interval: ${maxRetryInterval}
-${poolRoutingBlock}
-# Auto-switch accounts on quota exceeded (429)
-# This enables seamless multi-account rotation when rate limited
-quota-exceeded:
-  switch-project: true
-  switch-preview-model: true
-
-${routingBlock}
-
 # =============================================================================
 # Authentication
 # =============================================================================
@@ -868,11 +281,47 @@ ${apiKeysYaml}
 
 # OAuth tokens directory (auto-discovered by CLIProxyAPI)
 auth-dir: "${authDirNormalized}"
-${generateOAuthModelAliasSection(existingAliases, userRoutingConfig.oauth_model_alias)}
+${oauthAliasSection}
 ${payloadSection ? `${payloadSection}\n` : ''}
 `;
 
   return config;
+}
+
+/**
+ * Replace the one CCS-owned section in the exact active CLIProxy document.
+ * Parsing and sorting the entire mapping makes the output a deterministic
+ * fixed point without a provider whitelist or runtime timestamp.
+ */
+export function renderUnifiedConfigForPublication(
+  activeConfigYaml: string,
+  snapshot: ModelPipelineSnapshot
+): string {
+  if (!activeConfigYaml.trim()) {
+    throw new ConfigError('active CLIProxy config.yaml is required for canonical publication');
+  }
+  let parsed: unknown;
+  try {
+    parsed = yaml.load(activeConfigYaml, { schema: yaml.JSON_SCHEMA });
+  } catch (error) {
+    throw new ConfigError(
+      'active CLIProxy config.yaml is not valid single-document YAML',
+      undefined,
+      error
+    );
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new ConfigError('active CLIProxy config.yaml root must be a mapping');
+  }
+  const document = parsed as Record<string, unknown>;
+  document['model-routing'] = projectModelRouting(snapshot);
+  return yaml.dump(document, {
+    noRefs: true,
+    lineWidth: -1,
+    noCompatMode: true,
+    sortKeys: true,
+    schema: yaml.JSON_SCHEMA,
+  });
 }
 
 /**
@@ -973,6 +422,25 @@ function extractYamlSection(content: string, sectionKey: string): string {
   return sectionLines.join('\n').replace(/^\n+/, '').replace(/\n+$/, '');
 }
 
+function extractProviderSections(content: string): PreservedYamlSection[] {
+  const sections: PreservedYamlSection[] = [];
+  for (const familyId of AI_PROVIDER_FAMILY_IDS) {
+    const body = extractYamlSection(content, familyId);
+    if (body) {
+      sections.push({ key: familyId, body });
+    }
+  }
+  return sections;
+}
+
+function appendSections(content: string, sections: readonly PreservedYamlSection[]): string {
+  let nextContent = content;
+  for (const section of sections) {
+    nextContent += `${section.key}:\n${section.body}\n`;
+  }
+  return nextContent;
+}
+
 /**
  * Force regenerate config.yaml with latest settings.
  * Preserves user-added API keys, claude-api-key section, and port settings.
@@ -990,79 +458,47 @@ export function regenerateConfig(
   // Preserve user settings from existing config
   let effectivePort = port;
   let userApiKeys: string[] = [];
-  let existingAliases = '';
   let existingPayload = '';
   const preservedSections: PreservedYamlSection[] = [];
 
   if (fs.existsSync(configPath)) {
-    try {
-      const content = fs.readFileSync(configPath, 'utf-8');
+    const content = fs.readFileSync(configPath, 'utf-8');
 
-      // Preserve port setting
-      const portMatch = content.match(/^port:\s*(\d+)/m);
-      if (portMatch) {
-        effectivePort = parseInt(portMatch[1], 10);
-      }
-
-      // Preserve user-added API keys (fix for issue #200)
-      userApiKeys = parseUserApiKeys(content);
-
-      // Preserve AI provider sections managed outside the generated defaults.
-      for (const familyId of AI_PROVIDER_FAMILY_IDS) {
-        const sectionBody = extractYamlSection(content, familyId);
-        if (sectionBody) {
-          preservedSections.push({
-            key: familyId,
-            body: sectionBody,
-          });
-        }
-      }
-
-      // Preserve user customizations while pruning legacy generated Gemini preview noise.
-      const existingConfigVersion = getConfigVersionFromContent(content);
-      const existingAliasBody = extractYamlSection(content, 'oauth-model-alias');
-      const preservedAliases = extractPreservedAntigravityAliases(existingAliasBody, {
-        enableLegacyGeminiStaleCleanup:
-          existingConfigVersion === null ||
-          existingConfigVersion < LEGACY_GEMINI_STALE_ALIAS_MIGRATION_VERSION,
-      });
-      const preservedAliasConfig = parseOAuthModelAliasSection(existingAliasBody);
-      const preservedAntigravityConfig = parseOAuthModelAliasSection(preservedAliases.yaml);
-      if (preservedAntigravityConfig.antigravity) {
-        preservedAliasConfig.antigravity = preservedAntigravityConfig.antigravity;
-      } else {
-        delete preservedAliasConfig.antigravity;
-      }
-      existingAliases = serializeOAuthModelAliasBody(preservedAliasConfig);
-      existingPayload = extractYamlSection(content, 'payload');
-      if (preservedAliases.prunedLegacyAliasCount > 0) {
-        writeLegacyGeminiAliasCleanupBackup(configPath, content);
-      }
-    } catch {
-      // Use defaults if reading fails
+    // Preserve port setting
+    const portMatch = content.match(/^port:\s*(\d+)/m);
+    if (portMatch) {
+      effectivePort = parseInt(portMatch[1], 10);
     }
-    // Delete existing config
-    fs.unlinkSync(configPath);
+
+    // Preserve user-added API keys (fix for issue #200)
+    userApiKeys = parseUserApiKeys(content);
+
+    // Preserve AI provider sections managed outside the generated defaults.
+    preservedSections.push(...extractProviderSections(content));
+
+    // The payload section is user-owned and must survive regeneration; the
+    // generator merges it with the structured CCS rules further down.
+    existingPayload = extractYamlSection(content, 'payload');
   }
 
   // Ensure directories exist
   fs.mkdirSync(path.dirname(configPath), { recursive: true });
   fs.mkdirSync(authDir, { recursive: true, mode: 0o700 });
 
-  // Generate fresh config with preserved user API keys and aliases
-  let configContent = generateUnifiedConfigContent(
-    effectivePort,
-    userApiKeys,
-    existingAliases,
-    existingPayload
-  );
+  // Generate fresh config with preserved user API keys and structured settings.
+  let configContent = generateUnifiedConfigContent(effectivePort, userApiKeys, existingPayload);
 
   // Re-append managed top-level sections that are not part of the generated defaults.
-  for (const section of preservedSections) {
-    configContent += `${section.key}:\n${section.body}\n`;
-  }
+  configContent = appendSections(configContent, preservedSections);
 
-  fs.writeFileSync(configPath, configContent, { mode: 0o600 });
+  const candidatePath = `${configPath}.ccs-candidate-${process.pid}`;
+  try {
+    fs.writeFileSync(candidatePath, configContent, { mode: 0o600, flag: 'wx' });
+    fs.renameSync(candidatePath, configPath);
+  } catch (error) {
+    if (fs.existsSync(candidatePath)) fs.unlinkSync(candidatePath);
+    throw error;
+  }
 
   return configPath;
 }

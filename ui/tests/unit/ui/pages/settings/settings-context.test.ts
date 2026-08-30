@@ -135,6 +135,7 @@ describe('settingsReducer', () => {
           protocol: 'https' as const,
           authToken: '',
         },
+        fallback: { enabled: false, host: '', port: 0, protocol: 'http' as const },
         local: { enabled: true, port: 3001 },
       };
       const action: SettingsAction = { type: 'SET_PROXY_CONFIG', payload: config };

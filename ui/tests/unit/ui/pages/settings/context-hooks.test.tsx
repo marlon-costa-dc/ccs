@@ -320,6 +320,7 @@ describe('useSettingsActions', () => {
           protocol: 'https' as const,
           authToken: '',
         },
+        fallback: { enabled: false, host: '', port: 0, protocol: 'http' as const },
         local: { enabled: true, port: 3001 },
       };
 

@@ -292,12 +292,17 @@ describe('HttpsTunnelProxy', () => {
         method: 'POST',
       });
 
+      // Contain the expected abort error: without a listener the 'error'
+      // event escapes as an unhandled process error and kills the test file.
+      const aborted = new Promise<void>((resolve) => req.once('error', () => resolve()));
+
       req.write('{}');
       req.end();
 
       // Abort after a short delay to trigger premature close
       await new Promise((resolve) => setTimeout(resolve, 50));
       req.destroy();
+      await aborted;
 
       // Give time for error handling
       await new Promise((resolve) => setTimeout(resolve, 100));
