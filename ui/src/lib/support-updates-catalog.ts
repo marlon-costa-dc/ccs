@@ -271,7 +271,10 @@ const BASE_CLI_SUPPORT_ENTRIES: CliSupportEntry[] = [
       auth: 'OAuth account via CLIProxy auth flow',
       model: 'Selectable per provider or variant',
     },
-    routes: [{ label: 'CLIProxy', path: '/cliproxy' }],
+    routes: [
+      { label: 'CLIProxy', path: '/cliproxy' },
+      { label: 'Control Panel', path: '/cliproxy/control-panel' },
+    ],
     commands: [
       'ccsxp "your prompt"',
       'ccs codex --target codex',
@@ -293,7 +296,10 @@ const BASE_CLI_SUPPORT_ENTRIES: CliSupportEntry[] = [
       auth: 'OAuth account via CLIProxy auth flow',
       model: 'Selectable per provider or variant',
     },
-    routes: [{ label: 'CLIProxy', path: '/cliproxy' }],
+    routes: [
+      { label: 'CLIProxy', path: '/cliproxy' },
+      { label: 'Control Panel', path: '/cliproxy/control-panel' },
+    ],
     commands: ['ccs gemini', 'ccs cliproxy create mygem --provider gemini'],
   },
   {
@@ -307,7 +313,10 @@ const BASE_CLI_SUPPORT_ENTRIES: CliSupportEntry[] = [
       auth: 'OAuth account via CLIProxy auth flow',
       model: 'Selectable per provider or variant',
     },
-    routes: [{ label: 'CLIProxy', path: '/cliproxy' }],
+    routes: [
+      { label: 'CLIProxy', path: '/cliproxy' },
+      { label: 'Control Panel', path: '/cliproxy/control-panel' },
+    ],
     commands: ['ccs agy', 'ccs cliproxy create myagy --provider agy --target droid'],
   },
   {

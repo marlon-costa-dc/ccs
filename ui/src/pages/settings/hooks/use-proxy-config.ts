@@ -35,8 +35,8 @@ export function useProxyConfig() {
       if (!config) return;
 
       const optimisticConfig = {
-        management_timeout_ms: updates.management_timeout_ms ?? config.management_timeout_ms,
         remote: { ...config.remote, ...updates.remote },
+        fallback: { ...config.fallback, ...updates.fallback },
         local: { ...config.local, ...updates.local },
       };
       actions.setProxyConfig(optimisticConfig);
@@ -66,9 +66,8 @@ export function useProxyConfig() {
       port: string;
       protocol: 'http' | 'https';
       authToken: string;
-      allowSelfSigned: boolean;
     }) => {
-      const { host, port, protocol, authToken, allowSelfSigned } = params;
+      const { host, port, protocol, authToken } = params;
       if (!host) {
         actions.setProxyError('Host is required');
         return;
@@ -79,16 +78,12 @@ export function useProxyConfig() {
         actions.setProxyError(null);
         actions.setProxyTestResult(null);
 
-        const portNum = Number(port);
-        if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
-          throw new Error('Port must be a whole number between 1 and 65535');
-        }
+        const portNum = port ? parseInt(port, 10) : undefined;
         const result = await api.cliproxyServer.test({
           host,
-          port: portNum,
+          port: portNum || undefined,
           protocol,
-          authToken,
-          allowSelfSigned,
+          authToken: authToken || undefined,
         });
         actions.setProxyTestResult(result);
       } catch (err) {

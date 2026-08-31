@@ -8,6 +8,10 @@ const boundedConsumers = [
     expectedCount: 2,
   },
   {
+    file: 'src/components/cliproxy/provider-editor/raw-editor-section.tsx',
+    expectedCount: 1,
+  },
+  {
     file: 'src/components/profiles/editor/raw-editor-section.tsx',
     expectedCount: 1,
   },
@@ -24,6 +28,13 @@ const boundedConsumers = [
 const boundedLayoutContracts = [
   {
     file: 'src/components/profiles/editor/index.tsx',
+    snippets: [
+      'min-h-0 flex-1 grid grid-cols-[40%_60%] divide-x overflow-hidden',
+      'flex min-h-0 min-w-0 flex-col overflow-hidden',
+    ],
+  },
+  {
+    file: 'src/components/cliproxy/provider-editor/index.tsx',
     snippets: [
       'min-h-0 flex-1 grid grid-cols-[40%_60%] divide-x overflow-hidden',
       'flex min-h-0 min-w-0 flex-col overflow-hidden',

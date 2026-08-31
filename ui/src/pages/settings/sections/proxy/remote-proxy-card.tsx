@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Cloud, RefreshCw, Wifi, WifiOff, CheckCircle2 } from 'lucide-react';
+import { CLIPROXY_DEFAULT_PORT } from '@/lib/preset-utils';
 import type { CliproxyServerConfig, RemoteProxyStatus } from '../../types';
 import { useTranslation } from 'react-i18next';
 
@@ -60,6 +61,10 @@ export function RemoteProxyCard({
   const { t } = useTranslation();
   const remoteConfig = config.remote;
 
+  // HTTP defaults to 8317 (CLIProxyAPI default), HTTPS to 443 (standard SSL)
+  const getDefaultPort = (protocol: 'http' | 'https') =>
+    protocol === 'https' ? 443 : CLIPROXY_DEFAULT_PORT;
+
   return (
     <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
       <h4 className="text-sm font-medium flex items-center gap-2">
@@ -83,14 +88,25 @@ export function RemoteProxyCard({
       {/* Port and Protocol */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <label className="text-sm text-muted-foreground">{t('settingsProxy.port')}</label>
+          <label className="text-sm text-muted-foreground">
+            {t('settingsProxy.port')}{' '}
+            <span className="text-xs opacity-70">
+              (
+              {t('settingsProxy.defaultPort', {
+                value: getDefaultPort(config.remote.protocol || 'http'),
+              })}
+              )
+            </span>
+          </label>
           <Input
             type="text"
             inputMode="numeric"
             value={displayPort}
             onChange={(e) => setEditedPort(e.target.value.replace(/\D/g, ''))}
             onBlur={onSavePort}
-            placeholder={t('settingsProxy.requiredPortPlaceholder')}
+            placeholder={t('settingsProxy.portPlaceholder', {
+              value: getDefaultPort(config.remote.protocol || 'http'),
+            })}
             className="font-mono"
             disabled={saving}
           />
@@ -98,7 +114,7 @@ export function RemoteProxyCard({
         <div className="space-y-1">
           <label className="text-sm text-muted-foreground">{t('settingsProxy.protocol')}</label>
           <Select
-            value={config.remote.protocol}
+            value={config.remote.protocol || 'http'}
             onValueChange={(value: 'http' | 'https') =>
               onSaveConfig({ remote: { ...remoteConfig, protocol: value } })
             }

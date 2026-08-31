@@ -10,6 +10,12 @@ const GITHUB_HOSTED_ACTIVE_WORKFLOWS = [
   'ci.yml',
   'push-ci.yml',
   'release.yml',
+  // Semantic Release owns versions, tags and releases for this fork. It was
+  // pinned to [self-hosted, linux, x64] by the 1defab25 revert while the fork
+  // registers no self-hosted runners, so every run queued and was cancelled and
+  // no release could be published. It needs no machine-local state; keeping it
+  // on this list stops that regression from returning silently.
+  'semantic-release.yml',
   'docs-parity.yml',
   'label-pending-release.yml',
   'breaking-change-guard.yml',

@@ -52,7 +52,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useQuery, useIsMutating } from '@tanstack/react-query';
 import { api, type CliproxyServerConfig } from '@/lib/api-client';
 import { Trans, useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import {
   useProxyStatus,
   useStartProxy,
@@ -61,6 +60,10 @@ import {
   useCliproxyVersions,
   useInstallVersion,
   useRestartProxy,
+  useCliproxyRoutingStrategy,
+  useCliproxySessionAffinity,
+  useUpdateCliproxyRoutingStrategy,
+  useUpdateCliproxySessionAffinity,
 } from '@/hooks/use-cliproxy';
 import { useSyncStatus, useExecuteSync } from '@/hooks/use-cliproxy-sync';
 import { cn } from '@/lib/utils';
@@ -68,6 +71,7 @@ import {
   isCliproxyVersionExperimental,
   isCliproxyVersionInRange,
 } from '@/lib/cliproxy-version-risk';
+import { RoutingGuidanceCard } from '@/components/cliproxy/routing-guidance-card';
 
 type PendingInstallRisk = 'faulty' | 'experimental';
 
@@ -151,6 +155,20 @@ export function ProxyStatusWidget() {
   const { data: status, isLoading } = useProxyStatus();
   const { data: updateCheck } = useCliproxyUpdateCheck();
   const { data: versionsData, isLoading: versionsLoading } = useCliproxyVersions();
+  const {
+    data: routingState,
+    isLoading: routingLoading,
+    error: routingError,
+  } = useCliproxyRoutingStrategy();
+  const updateRouting = useUpdateCliproxyRoutingStrategy();
+  const {
+    data: sessionAffinityState,
+    isLoading: sessionAffinityLoading,
+    error: sessionAffinityError,
+  } = useCliproxySessionAffinity();
+  const updateSessionAffinity = useUpdateCliproxySessionAffinity();
+  const isSavingRoutingConfig = updateRouting.isPending || updateSessionAffinity.isPending;
+  const routingConfigError = routingError instanceof Error ? routingError : null;
   const startProxy = useStartProxy();
   const stopProxy = useStopProxy();
   const restartProxy = useRestartProxy();
@@ -182,6 +200,19 @@ export function ProxyStatusWidget() {
   // Determine if remote mode is enabled
   const remoteConfig = cliproxyConfig?.remote;
   const isRemoteMode = remoteConfig?.enabled && remoteConfig?.host;
+  const effectiveSessionAffinityState =
+    sessionAffinityState ??
+    (sessionAffinityError instanceof Error
+      ? {
+          source: 'unsupported' as const,
+          target: (routingState?.target ?? (isRemoteMode ? 'remote' : 'local')) as
+            | 'local'
+            | 'remote',
+          reachable: false,
+          manageable: false,
+          message: sessionAffinityError.message,
+        }
+      : undefined);
 
   const isRunning = status?.running ?? false;
   const isActioning =
@@ -205,7 +236,8 @@ export function ProxyStatusWidget() {
   const targetVersion = isUnstable
     ? updateCheck?.maxStableVersion || versionsData?.latestStable
     : updateCheck?.latestVersion;
-  const maxStableVersion = versionsData?.maxStableVersion || updateCheck?.maxStableVersion;
+  const maxStableVersion =
+    versionsData?.maxStableVersion || updateCheck?.maxStableVersion || '6.6.80';
 
   const faultyRange = versionsData?.faultyRange;
   const faultyRangeLabel =
@@ -219,12 +251,8 @@ export function ProxyStatusWidget() {
   };
 
   // Handle version install (shows confirmation for risky versions)
-  const handleInstallVersion = (version: string) => {
+  const handleInstallVersion = async (version: string) => {
     if (!version) return;
-    if (!maxStableVersion) {
-      toast.error('CLIProxy stability metadata is required before installing a version');
-      return;
-    }
     const isVersionExperimental = isCliproxyVersionExperimental(version, maxStableVersion);
     const isVersionFaulty =
       faultyRange !== undefined &&
@@ -240,16 +268,14 @@ export function ProxyStatusWidget() {
       return;
     }
 
-    installVersion.mutate(
-      { version },
-      {
-        onSuccess(result) {
-          if (result.requiresConfirmation) {
-            queueInstallConfirmation(version, result.isFaulty ? 'faulty' : 'experimental');
-          }
-        },
+    try {
+      const result = await installVersion.mutateAsync({ version });
+      if (result.requiresConfirmation) {
+        queueInstallConfirmation(version, result.isFaulty ? 'faulty' : 'experimental');
       }
-    );
+    } catch {
+      // Hook-level onError already reports install failures.
+    }
   };
 
   // Confirm risky version install
@@ -269,29 +295,15 @@ export function ProxyStatusWidget() {
   };
 
   // Build remote display info
-  const remoteConfigError =
-    remoteConfig?.enabled === true &&
-    (!remoteConfig.host ||
-      !remoteConfig.protocol ||
-      !Number.isInteger(remoteConfig.port) ||
-      (remoteConfig.port ?? 0) < 1);
-  const remoteDisplayHost =
-    isRemoteMode && !remoteConfigError
-      ? `${remoteConfig.protocol}://${remoteConfig.host}:${remoteConfig.port}`
-      : null;
-
-  if (remoteConfigError) {
-    return (
-      <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-        <div className="flex items-center gap-2 font-medium text-destructive">
-          <AlertCircle className="h-4 w-4" /> Invalid remote CLIProxy configuration
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          An enabled remote CLIProxy requires an explicit host, protocol, and positive port.
-        </p>
-      </div>
-    );
-  }
+  const remoteDisplayHost = isRemoteMode
+    ? (() => {
+        const protocol = remoteConfig.protocol || 'http';
+        const port = remoteConfig.port || (protocol === 'https' ? 443 : 80);
+        const isDefaultPort =
+          (protocol === 'https' && port === 443) || (protocol === 'http' && port === 80);
+        return isDefaultPort ? remoteConfig.host : `${remoteConfig.host}:${port}`;
+      })()
+    : null;
 
   // Remote mode: show remote server info
   if (isRemoteMode) {
@@ -324,6 +336,19 @@ export function ProxyStatusWidget() {
             {t('proxyStatusWidget.trafficAutoRouted')}
           </p>
         </div>
+
+        <RoutingGuidanceCard
+          key={`remote:${routingState?.strategy ?? 'round-robin'}:${effectiveSessionAffinityState?.enabled ?? 'na'}:${effectiveSessionAffinityState?.ttl ?? 'na'}:${effectiveSessionAffinityState?.manageable ?? 'na'}`}
+          compact
+          className="mt-3"
+          state={routingState}
+          sessionAffinityState={effectiveSessionAffinityState}
+          isLoading={routingLoading || sessionAffinityLoading}
+          isSaving={isSavingRoutingConfig}
+          error={routingConfigError}
+          onApply={(strategy) => updateRouting.mutate(strategy)}
+          onApplyAffinity={(data) => updateSessionAffinity.mutate(data)}
+        />
       </div>
     );
   }
@@ -469,6 +494,19 @@ export function ProxyStatusWidget() {
             {syncStatusText}
           </span>
         </div>
+
+        <RoutingGuidanceCard
+          key={`local:${routingState?.strategy ?? 'round-robin'}:${effectiveSessionAffinityState?.enabled ?? 'na'}:${effectiveSessionAffinityState?.ttl ?? 'na'}:${effectiveSessionAffinityState?.manageable ?? 'na'}`}
+          compact
+          className="mt-3"
+          state={routingState}
+          sessionAffinityState={effectiveSessionAffinityState}
+          isLoading={routingLoading || sessionAffinityLoading}
+          isSaving={isSavingRoutingConfig}
+          error={routingConfigError}
+          onApply={(strategy) => updateRouting.mutate(strategy)}
+          onApplyAffinity={(data) => updateSessionAffinity.mutate(data)}
+        />
 
         {/* Expanded section: Version Management (available even when not running) */}
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>

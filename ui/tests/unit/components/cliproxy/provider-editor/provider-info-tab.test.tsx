@@ -12,31 +12,43 @@ const authenticatedStatus = {
 };
 
 describe('ProviderInfoTab', () => {
-  it('shows account commands without exposing a model editor command', () => {
+  it('routes management commands through Claude target for codex-target variants', () => {
     render(
-      <ProviderInfoTab provider="codex" displayName="Codex" authStatus={authenticatedStatus} />
+      <ProviderInfoTab
+        provider="codex"
+        displayName="Codex"
+        defaultTarget="codex"
+        authStatus={authenticatedStatus}
+        supportsModelConfig
+      />
     );
 
-    expect(screen.queryByText(/--config/)).not.toBeInTheDocument();
-    expect(screen.getByText('ccs codex --auth --add')).toBeInTheDocument();
-    expect(screen.getByText('ccs codex --accounts')).toBeInTheDocument();
+    expect(screen.getByText('ccs codex --target claude --config')).toBeInTheDocument();
+    expect(screen.getByText('ccs codex --target claude --auth --add')).toBeInTheDocument();
+    expect(screen.getByText('ccs codex --target claude --accounts')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Codex and Droid runtime launches reject those CLIProxy management commands\./
+      )
+    ).toBeInTheDocument();
   });
 
-  it('renders an unauthenticated provider without inventing a connected state', () => {
+  it('hides unsupported model-config commands when the provider has no catalog support', () => {
     render(
       <ProviderInfoTab
         provider="custom-provider"
         displayName="Custom Provider"
+        defaultTarget="claude"
         authStatus={{
           ...authenticatedStatus,
           provider: 'custom-provider',
           displayName: 'Custom Provider',
-          authenticated: false,
         }}
+        supportsModelConfig={false}
       />
     );
 
-    expect(screen.getAllByText('Not connected')).not.toHaveLength(0);
+    expect(screen.queryByText('Change model')).not.toBeInTheDocument();
     expect(screen.getByText('ccs custom-provider --auth --add')).toBeInTheDocument();
   });
 
@@ -45,11 +57,13 @@ describe('ProviderInfoTab', () => {
       <ProviderInfoTab
         provider="cursor"
         displayName="Cursor"
+        defaultTarget="claude"
         authStatus={{
           ...authenticatedStatus,
           provider: 'cursor',
           displayName: 'Cursor',
         }}
+        supportsModelConfig
       />
     );
 
@@ -60,5 +74,25 @@ describe('ProviderInfoTab', () => {
         /Requires the optional Plus backend while that track remains community-maintained\./
       )
     ).toBeInTheDocument();
+  });
+
+  it('uses the base provider when rendering variant track metadata', () => {
+    render(
+      <ProviderInfoTab
+        provider="my-cursor"
+        baseProvider="cursor"
+        displayName="My Cursor Variant"
+        defaultTarget="claude"
+        authStatus={{
+          ...authenticatedStatus,
+          provider: 'cursor',
+          displayName: 'Cursor',
+        }}
+        supportsModelConfig
+      />
+    );
+
+    expect(screen.getByText('Track')).toBeInTheDocument();
+    expect(screen.getByText('Plus extras / community-maintained')).toBeInTheDocument();
   });
 });

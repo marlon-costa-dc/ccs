@@ -70,6 +70,9 @@ function ensureGlobalTestEnvironment() {
     return bootstrappedTestHome;
   }
 
+  // Capture the operator's real home before sandboxing: PATH-resolved tools
+  // (mise shims) still need to read the host trust store to run at all.
+  const hostHome = process.env.HOME || os.homedir();
   const testHome = createIsolatedTestHome();
   process.env.HOME = testHome;
   process.env.USERPROFILE = testHome;
@@ -83,6 +86,24 @@ function ensureGlobalTestEnvironment() {
   // must not execute either POSIX ENV or Bash BASH_ENV hooks.
   delete process.env.BASH_ENV;
   delete process.env.ENV;
+
+  // PATH-resolved tools on this machine may be mise shims; a shim refuses to
+  // exec when the state home lacks a trust entry for the config it resolves.
+  // Mirror the host trust list (symlinks only — no hooks are executed) so
+  // spawned tools behave exactly as they do outside the sandbox.
+  const hostTrustDir = path.join(hostHome, '.local', 'state', 'mise', 'trusted-configs');
+  if (fs.existsSync(hostTrustDir)) {
+    const sandboxTrustDir = path.join(testHome, '.state', 'mise', 'trusted-configs');
+    fs.mkdirSync(sandboxTrustDir, { recursive: true });
+    for (const entry of fs.readdirSync(hostTrustDir)) {
+      try {
+        fs.symlinkSync(fs.readlinkSync(path.join(hostTrustDir, entry)), path.join(sandboxTrustDir, entry));
+      } catch {
+        // A vanished or unmirrorable entry stays unmirrored; the shim error
+        // names it loudly if a test actually needs it.
+      }
+    }
+  }
 
   bootstrappedTestHome = testHome;
   patchHomedirForTests();
