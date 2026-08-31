@@ -294,7 +294,12 @@ describe('HttpsTunnelProxy', () => {
 
       // Contain the expected abort error: without a listener the 'error'
       // event escapes as an unhandled process error and kills the test file.
-      const aborted = new Promise<void>((resolve) => req.once('error', () => resolve()));
+      // req.destroy() with no argument closes without emitting 'error', so
+      // settling only on 'error' would hang until the test timeout.
+      const aborted = new Promise<void>((resolve) => {
+        req.once('error', () => resolve());
+        req.once('close', () => resolve());
+      });
 
       req.write('{}');
       req.end();
