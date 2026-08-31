@@ -34,6 +34,7 @@
     "ccsxp": "dist/bin/ccsxp-runtime.js"
   },
   "files": [
+    "bin/",
     "dist/",
     "lib/",
     "scripts/",

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# CCS fork launcher — runs THIS package's dist directly.
+#
+# The upstream bootstrap (lib/ccs) delegates to `npx @kaitranntt/ccs`, which
+# always resolves the npm-published upstream version. A versioned install (mise,
+# release tarball) must instead execute the exact code it shipped: dist/ccs.js
+# plus the node_modules bundled beside it. Without this launcher, the shim falls
+# back to whatever `ccs` sits on PATH — an unrelated upstream install.
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if ! command -v node &>/dev/null; then
+    echo "[X] Node.js not found" >&2
+    exit 127
+fi
+
+exec node "$DIR/dist/ccs.js" "$@"
