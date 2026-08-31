@@ -1,3 +1,9 @@
+## [8.9.0-fd.4](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.3...v8.9.0-fd.4) (2026-08-31)
+
+### Bug Fixes
+
+* **release:** ship a launcher that runs this package, not npx upstream ([93c3ee9](https://github.com/marlon-costa-dc/ccs/commit/93c3ee97e79a2da4097406fa15c1658481afd9f7))
+
 ## [8.9.0-fd.3](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.2...v8.9.0-fd.3) (2026-08-31)
 
 ### Bug Fixes
