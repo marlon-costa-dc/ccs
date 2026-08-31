@@ -53,6 +53,17 @@ export function useCliproxyCatalog() {
   });
 }
 
+export function useModelPipeline() {
+  return useQuery({
+    queryKey: ['model-pipeline'],
+    queryFn: () => api.modelPipeline.get(),
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+  });
+}
+
 export function useCliproxyRoutingStrategy() {
   return useQuery({
     queryKey: ['cliproxy-routing'],
