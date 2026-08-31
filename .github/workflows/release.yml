@@ -111,6 +111,37 @@ jobs:
             echo "CHECKSUMS=ccs_${version}_checksums.txt"
           } >> "$GITHUB_ENV"
 
+      - name: Install production dependencies for the bundle
+        run: |
+          set -euo pipefail
+          # The tarball has to carry its own runtime dependencies. Without them
+          # the installed CLI resolves modules from whatever happens to sit in
+          # the user's home: express@4 calls mime.lookup(), does not declare
+          # mime itself, and picked up a hoisted mime@4 where .lookup no longer
+          # exists -- so `ccs config` died with "mime.lookup is not a function"
+          # and the dashboard never served a request.
+          #
+          # Bundling alone is not enough. express@4 reaches mime through
+          # hoisting it never declares: a clean install nests mime@1.6.0 under
+          # send/, where express cannot see it. The overrides block in
+          # package.json pins mime@1 at the top level so express resolves the
+          # API it actually calls.
+          rm -rf node_modules
+          npm install --omit=dev --ignore-scripts --no-audit --no-fund
+          test -d node_modules/express || { echo "[X] express missing from bundle"; exit 1; }
+          node -e "
+            const m = require('module');
+            const ep = require.resolve('express', { paths: [process.cwd()] });
+            const req = m.createRequire(ep);
+            const version = req('mime/package.json').version;
+            const lookup = typeof req('mime').lookup;
+            console.log('bundled mime for express: ' + version + ' lookup=' + lookup);
+            if (lookup !== 'function') {
+              console.error('[X] bundled express cannot resolve a mime exposing .lookup');
+              process.exit(1);
+            }
+          "
+
       - name: Pack release assets
         run: |
           set -euo pipefail
@@ -127,7 +158,8 @@ jobs:
             dist \
             lib \
             scripts \
-            config
+            config \
+            node_modules
           sha256sum "$ASSET" > "$CHECKSUMS"
 
       - name: Upload assets to existing release
