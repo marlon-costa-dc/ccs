@@ -1,3 +1,9 @@
+## [8.9.0-fd.2](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.1...v8.9.0-fd.2) (2026-08-31)
+
+### Bug Fixes
+
+* **release:** publish this fork on its own fd prerelease channel (aihub-6k1.19) ([a3e0a5f](https://github.com/marlon-costa-dc/ccs/commit/a3e0a5f25b3b55b0aa8531b3322150a28bc00ee4))
+
 ## [8.9.0](https://github.com/kaitranntt/ccs/compare/v8.8.1...v8.9.0) (2026-08-09)
 
 ### Features
