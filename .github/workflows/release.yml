@@ -153,6 +153,7 @@ jobs:
             --numeric-owner \
             -czf "$ASSET" \
             package.json \
+            bin \
             README.md \
             LICENSE \
             dist \
