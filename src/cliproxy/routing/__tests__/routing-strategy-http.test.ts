@@ -74,6 +74,7 @@ describe('routing-strategy-http', () => {
       protocol: 'https',
       allowSelfSigned: true,
       isRemote: true,
+      managementKey: 'test-management-key',
     };
 
     try {
@@ -98,6 +99,7 @@ describe('routing-strategy-http', () => {
       protocol: 'https',
       allowSelfSigned: true,
       isRemote: true,
+      managementKey: 'test-management-key',
     };
 
     expect(getCliproxyRoutingManagementUrl(target)).toBe(
