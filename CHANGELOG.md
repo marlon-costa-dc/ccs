@@ -1,3 +1,9 @@
+## [8.9.0-fd.3](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.2...v8.9.0-fd.3) (2026-08-31)
+
+### Bug Fixes
+
+* **release:** ship the runtime dependencies the CLI needs ([591c6af](https://github.com/marlon-costa-dc/ccs/commit/591c6af5a25a993432b32e30f2b7212a134b90eb))
+
 ## [8.9.0-fd.2](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.1...v8.9.0-fd.2) (2026-08-31)
 
 ### Bug Fixes
