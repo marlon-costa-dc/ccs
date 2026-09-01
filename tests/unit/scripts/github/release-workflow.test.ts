@@ -37,10 +37,16 @@ describe('release asset packaging workflow', () => {
       resolvePath('../../../../scripts/build-release-asset.sh'),
       'utf8'
     );
-    expect(packer).toContain('npm pack --ignore-scripts --json | node');
-    expect(packer).toContain('fs.readFileSync(0, "utf8")');
+    expect(packer).toContain('npm pack --pack-destination "$scratch"');
+    expect(packer).toContain('package_tarballs=("$scratch"/*.tgz)');
     expect(packer).toContain('manifest.files');
-    expect(packer).toContain('cp -a node_modules "$bundle/node_modules"');
+    expect(packer).toContain('cp bun.lock "$bundle/bun.lock"');
+    expect(packer).toContain('bun install');
+    expect(packer).toContain('--cwd "$bundle"');
+    expect(packer).toContain('--production');
+    expect(packer).toContain('--frozen-lockfile');
+    expect(packer).toContain('rm "$bundle/bun.lock"');
+    expect(packer).not.toContain('cp -a node_modules');
     expect(packer).toContain('^[A-Za-z0-9][A-Za-z0-9._-]*$');
 
     const manifest = JSON.parse(

@@ -47,6 +47,3 @@ Treat the following as medium severity:
 
 Use low severity only for small, concrete follow-ups that are worth tracking.
 """
-
-[github_action_config]
-pr_actions = ["opened", "reopened", "ready_for_review", "synchronize"]
