@@ -72,9 +72,17 @@
 # - github.token    → use GITHUB_TOKEN env var instead
 
 sync.remote: "git+https://github.com/marlon-costa-dc/ccs.git"
-prefix: 
-issue-prefix: 
+prefix:
+issue-prefix: ccs
 dolt.idle-timeout: "0"
-export.auto: "false"
-types.custom: agent,role,rig,convoy,slot,queue,event,message,molecule,gate,merge-request
+export.auto: false
+types.custom: agent,role,rig,convoy,slot,queue,event,message,molecule,gate,merge-request,session,spec,convergence,step
 types.infra: agent,role,message
+issue_prefix: ccs
+dolt.auto-start: false
+dolt:
+  disable-event-flush: true
+backup.enabled: false
+gc.endpoint_origin: inherited_city
+gc.endpoint_status: verified
+dolt.mode: server

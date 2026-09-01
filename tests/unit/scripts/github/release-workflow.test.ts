@@ -26,9 +26,27 @@ describe('release asset packaging workflow', () => {
     expect(workflow).toContain('package_version="$(node -p');
     expect(workflow).toContain('gh release view "$TAG"');
     expect(workflow).toContain('ASSET=ccs_${version}_package.tar.gz');
+    expect(workflow).toContain('bash scripts/build-release-asset.sh');
+    expect(workflow).not.toContain('-czf "$ASSET"');
     expect(workflow).toContain('gh release upload "$TAG" "$ASSET" "$CHECKSUMS"');
     expect(workflow).not.toContain('gh release create');
     expect(workflow).not.toContain('--clobber');
     expect(workflow).toContain('GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
+
+    const packer = fs.readFileSync(
+      resolvePath('../../../../scripts/build-release-asset.sh'),
+      'utf8'
+    );
+    expect(packer).toContain('npm pack --ignore-scripts --json | node');
+    expect(packer).toContain('fs.readFileSync(0, "utf8")');
+    expect(packer).toContain('manifest.files');
+    expect(packer).toContain('cp -a node_modules "$bundle/node_modules"');
+    expect(packer).toContain('^[A-Za-z0-9][A-Za-z0-9._-]*$');
+
+    const manifest = JSON.parse(
+      fs.readFileSync(resolvePath('../../../../package.json'), 'utf8')
+    ) as { files: string[] };
+    expect(manifest.files).toContain('schemas/model-pipeline-snapshot-v2.json');
+    expect(manifest.files).not.toContain('schemas/');
   });
 });

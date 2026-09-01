@@ -38,10 +38,9 @@
     "dist/",
     "lib/",
     "scripts/",
-    "schemas/",
+    "schemas/model-pipeline-snapshot-v2.json",
     "config/",
     ".claude/",
-    "VERSION",
     "README.md",
     "LICENSE"
   ],
