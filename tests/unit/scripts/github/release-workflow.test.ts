@@ -41,5 +41,6 @@ describe('release asset packaging workflow', () => {
     expect(packer).toContain('fs.readFileSync(0, "utf8")');
     expect(packer).toContain('manifest.files');
     expect(packer).toContain('cp -a node_modules "$bundle/node_modules"');
+    expect(packer).toContain('^[A-Za-z0-9][A-Za-z0-9._-]*$');
   });
 });

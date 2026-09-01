@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ -z "${ASSET:-}" || "$ASSET" == */* ]]; then
-  echo "[X] ASSET must be a filename in the repository root" >&2
+if [[ ! "${ASSET:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "[X] ASSET must be a portable filename in the repository root" >&2
   exit 1
 fi
 if [[ ! -d node_modules ]]; then
