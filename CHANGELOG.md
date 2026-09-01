@@ -1,3 +1,12 @@
+## [8.9.0-fd.6](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.5...v8.9.0-fd.6) (2026-09-01)
+
+### Bug Fixes
+
+* **ci:** make AI review explicitly selected ([c23cd73](https://github.com/marlon-costa-dc/ccs/commit/c23cd738438dbcacc7bea4e0bb116f774e3be436))
+* **release:** confine asset output to portable basename ([4adffce](https://github.com/marlon-costa-dc/ccs/commit/4adffcedbaaacc56d8e5bf2255a218ecef6f10f9))
+* **release:** declare canonical schema artifact ([7e66c06](https://github.com/marlon-costa-dc/ccs/commit/7e66c06edd70bbb9e4ad3f87729c98e0f9584f2f))
+* **release:** package manifest-owned runtime assets ([ed9dfb8](https://github.com/marlon-costa-dc/ccs/commit/ed9dfb896a5656a8640c9b1223965df811618372))
+
 ## [8.9.0-fd.5](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.4...v8.9.0-fd.5) (2026-09-01)
 
 ### Bug Fixes
