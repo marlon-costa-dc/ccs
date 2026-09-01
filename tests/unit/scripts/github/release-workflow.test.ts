@@ -42,5 +42,11 @@ describe('release asset packaging workflow', () => {
     expect(packer).toContain('manifest.files');
     expect(packer).toContain('cp -a node_modules "$bundle/node_modules"');
     expect(packer).toContain('^[A-Za-z0-9][A-Za-z0-9._-]*$');
+
+    const manifest = JSON.parse(
+      fs.readFileSync(resolvePath('../../../../package.json'), 'utf8')
+    ) as { files: string[] };
+    expect(manifest.files).toContain('schemas/model-pipeline-snapshot-v2.json');
+    expect(manifest.files).not.toContain('schemas/');
   });
 });
