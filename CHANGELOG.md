@@ -1,3 +1,9 @@
+## [8.9.0-fd.5](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.4...v8.9.0-fd.5) (2026-09-01)
+
+### Bug Fixes
+
+* **config:** --no-open dashboard flag; mount pipeline card; drop npx-delegating launchers ([294750e](https://github.com/marlon-costa-dc/ccs/commit/294750e8fe8340f45040ec8b5f2df0fc2941887e))
+
 ## [8.9.0-fd.4](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.3...v8.9.0-fd.4) (2026-08-31)
 
 ### Bug Fixes
