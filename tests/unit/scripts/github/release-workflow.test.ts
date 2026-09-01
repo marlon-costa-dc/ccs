@@ -37,7 +37,7 @@ describe('release asset packaging workflow', () => {
       resolvePath('../../../../scripts/build-release-asset.sh'),
       'utf8'
     );
-    expect(packer).toContain('npm pack --json | node');
+    expect(packer).toContain('npm pack --silent --json | node');
     expect(packer).toContain('fs.readFileSync(0, "utf8")');
     expect(packer).toContain('manifest.files');
     expect(packer).toContain('--prefix "$bundle"');

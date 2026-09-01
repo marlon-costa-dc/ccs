@@ -21,7 +21,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-package_tarball="$(npm pack --json | node -e '
+package_tarball="$(npm pack --silent --json | node -e '
   const fs = require("node:fs");
   const result = JSON.parse(fs.readFileSync(0, "utf8"));
   if (!Array.isArray(result) || result.length !== 1 || !result[0].filename) {
