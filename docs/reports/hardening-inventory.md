@@ -98,7 +98,7 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | `src/cliproxy/auth/oauth-process.ts` | 1048 |
 | `src/cliproxy/config/env-builder.ts` | 1045 |
 | `src/web-server/routes/settings-routes.ts` | 1042 |
-| `src/cliproxy/proxy/tool-sanitization-proxy.ts` | 1020 |
+| `src/cliproxy/proxy/tool-sanitization-proxy.ts` | 1021 |
 | `src/commands/cliproxy/variant-subcommand.ts` | 998 |
 | `src/cliproxy/quota/quota-manager.ts` | 954 |
 | `src/web-server/services/codex-dashboard-service.ts` | 940 |

@@ -27,6 +27,7 @@ import { getModelMaxLevel } from '../model-catalog';
 import { createLogger } from '../../services/logging';
 import {
   attachUpstreamResponseTimeout,
+  buildTimeoutSafeResponseHeaders,
   writeForwardResponseHead,
 } from './upstream-response-timeout';
 
@@ -717,7 +718,7 @@ export class ToolSanitizationProxy {
                     const modifiedResponse = JSON.stringify(parsed);
 
                     // Update content-length header
-                    const headers = { ...upstreamRes.headers };
+                    const headers = buildTimeoutSafeResponseHeaders(upstreamRes.headers);
                     headers['content-length'] = String(Buffer.byteLength(modifiedResponse));
 
                     clientRes.writeHead(upstreamRes.statusCode || 200, headers);

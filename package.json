@@ -41,7 +41,6 @@
     "schemas/",
     "config/",
     ".claude/",
-    "VERSION",
     "README.md",
     "LICENSE"
   ],
