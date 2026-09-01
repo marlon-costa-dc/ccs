@@ -2,13 +2,23 @@ import { extractOption, hasAnyFlag, scanCommandArgs } from './arg-extractor';
 import { getOfficialChannelsSupportMessage } from '../channels/official-channels-runtime';
 import { DEFAULT_DASHBOARD_HOST } from './config-dashboard-host';
 
-const CONFIG_COMMAND_FLAGS = ['--help', '-h', '--port', '-p', '--host', '-H', '--dev'] as const;
+const CONFIG_COMMAND_FLAGS = [
+  '--help',
+  '-h',
+  '--port',
+  '-p',
+  '--host',
+  '-H',
+  '--dev',
+  '--no-open',
+] as const;
 
 export interface ConfigCommandOptions {
   port?: number;
   host?: string;
   hostProvided: boolean;
   dev: boolean;
+  noOpen: boolean;
 }
 
 export interface ConfigCommandParseResult {
@@ -26,6 +36,7 @@ export function parseConfigCommandArgs(args: string[]): ConfigCommandParseResult
     host: DEFAULT_DASHBOARD_HOST,
     hostProvided: false,
     dev: false,
+    noOpen: false,
   };
 
   if (hasAnyFlag(args, ['--help', '-h'])) {
@@ -62,9 +73,10 @@ export function parseConfigCommandArgs(args: string[]): ConfigCommandParseResult
   }
 
   options.dev = hasAnyFlag(hostOption.remainingArgs, ['--dev']);
+  options.noOpen = hasAnyFlag(hostOption.remainingArgs, ['--no-open']);
 
   const unexpected = scanCommandArgs(hostOption.remainingArgs, {
-    knownFlags: ['--dev'],
+    knownFlags: ['--dev', '--no-open'],
   });
   const unexpectedTokens = [...unexpected.unknownFlags, ...unexpected.positionals];
   if (unexpectedTokens.length > 0) {
@@ -134,6 +146,7 @@ export function showConfigCommandHelp(): void {
   console.log('  --port, -p PORT    Specify server port (default: auto-detect)');
   console.log('  --host, -H HOST    Bind dashboard server host (default: localhost)');
   console.log('  --dev              Development mode with Vite HMR');
+  console.log('  --no-open          Do not launch a browser after the dashboard starts');
   console.log('  --help, -h         Show this help message');
   console.log('');
   console.log('Examples:');
