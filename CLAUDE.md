@@ -114,7 +114,7 @@ logs, fix root cause, push again, and re-watch.
 ## Issue Intake and Triage
 
 GitHub Issues are the public intake and discussion surface for external
-reports. In a Gas Town workspace, the assigned Bead remains the execution
+reports. In a Gas City rig, the assigned Bead remains the execution
 source of truth: read it before the GitHub issue and record durable findings
 there. Triage-only requests are read-only unless implementation is explicitly
 requested. Always inspect live GitHub state first:
@@ -149,15 +149,17 @@ Use `feat:` or `fix:` for main promotion PRs so release automation runs.
 
 ## Governed Execution
 
-Beads is the execution source of truth when this repository is attached to Gas
-Town. `gt prime` loads the current lifecycle, `gt hook` identifies the assigned
-bead, and `bd show <id>` provides its durable requirements and evidence.
+Beads is the execution source of truth when this repository is registered as a
+Gas City rig. `gc prime` renders the agent's operating context,
+`gc hook --claim --drain-ack --json` claims the assigned bead, and
+`bd show <id>` provides its durable requirements and evidence.
 
-Hooked workers use only the Gas Town-created lane, keep evidence on the bead,
-and finish with `gt done`. Gas Town owns branch and worktree creation, remote
-submission, the merge queue, and tracker closure. Generic Git handoff examples
-in the managed Beads section do not replace that lifecycle. External
-contributors follow [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+Dispatched workers use only the lane the formula created, keep evidence on the
+bead, and land through a reviewed pull request on `main`. Gas City owns branch
+and worktree creation; remote submission, review, merge, and tracker closure stay
+with this repository's own gates. Generic Git handoff examples in the managed
+Beads section do not replace that lifecycle. External contributors follow
+[`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:46cd31e7 -->
 ## Beads Issue Tracker

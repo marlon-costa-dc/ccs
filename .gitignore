@@ -196,3 +196,7 @@ beads/
 agents/
 agents
 agents/
+
+# Gas City
+.beads/*
+!.beads/identity.toml
