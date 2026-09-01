@@ -37,8 +37,8 @@ describe('release asset packaging workflow', () => {
       resolvePath('../../../../scripts/build-release-asset.sh'),
       'utf8'
     );
-    expect(packer).toContain('npm pack --silent --json | node');
-    expect(packer).toContain('fs.readFileSync(0, "utf8")');
+    expect(packer).toContain('npm pack --pack-destination "$scratch"');
+    expect(packer).toContain('package_tarballs=("$scratch"/*.tgz)');
     expect(packer).toContain('manifest.files');
     expect(packer).toContain('--prefix "$bundle"');
     expect(packer).toContain('--omit=dev');

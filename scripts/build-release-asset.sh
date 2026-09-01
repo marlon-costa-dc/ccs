@@ -12,23 +12,19 @@ fi
 
 asset_path="$(pwd)/$ASSET"
 scratch="$(mktemp -d "${TMPDIR:-/tmp}/ccs-release-asset.XXXXXX")"
-package_tarball=""
 cleanup() {
   rm -rf "$scratch"
-  if [[ -n "$package_tarball" ]]; then
-    rm -f "$package_tarball"
-  fi
 }
 trap cleanup EXIT
 
-package_tarball="$(npm pack --silent --json | node -e '
-  const fs = require("node:fs");
-  const result = JSON.parse(fs.readFileSync(0, "utf8"));
-  if (!Array.isArray(result) || result.length !== 1 || !result[0].filename) {
-    throw new Error("npm pack returned no unique package filename");
-  }
-  process.stdout.write(result[0].filename);
-')"
+npm pack --pack-destination "$scratch"
+shopt -s nullglob
+package_tarballs=("$scratch"/*.tgz)
+if [[ "${#package_tarballs[@]}" -ne 1 ]]; then
+  echo "[X] npm pack returned no unique package tarball" >&2
+  exit 1
+fi
+package_tarball="${package_tarballs[0]}"
 
 bundle="$scratch/bundle"
 mkdir -p "$bundle"
