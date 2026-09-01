@@ -17,6 +17,7 @@ import { AccountSafetyWarningCard } from '@/components/account/account-safety-wa
 import { ProviderEditor } from '@/components/cliproxy/provider-editor';
 import { ProviderLogo } from '@/components/cliproxy/provider-logo';
 import { ProxyStatusWidget } from '@/components/monitoring/proxy-status-widget';
+import { ModelPipelineSnapshotCard } from '@/components/monitoring/model-pipeline-snapshot-card';
 import {
   useCliproxy,
   useCliproxyAuth,
@@ -539,6 +540,11 @@ export function CliproxyPage() {
         {/* Proxy Status Widget */}
         <div className="p-3 border-t">
           <ProxyStatusWidget />
+        </div>
+
+        {/* Model Pipeline Snapshot */}
+        <div className="p-3 border-t">
+          <ModelPipelineSnapshotCard />
         </div>
 
         {/* Footer Stats */}
