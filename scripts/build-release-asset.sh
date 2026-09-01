@@ -30,12 +30,14 @@ bundle="$scratch/bundle"
 mkdir -p "$bundle"
 tar -xzf "$package_tarball" -C "$bundle" --strip-components=1
 
-npm install \
-  --prefix "$bundle" \
-  --omit=dev \
+cp bun.lock "$bundle/bun.lock"
+bun install \
+  --cwd "$bundle" \
+  --production \
+  --frozen-lockfile \
   --ignore-scripts \
-  --no-audit \
-  --no-fund
+  --no-save
+rm "$bundle/bun.lock"
 
 if [[ ! -d "$bundle/node_modules/express" ]]; then
   echo "[X] express missing from bundle" >&2

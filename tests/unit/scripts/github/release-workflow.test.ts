@@ -40,8 +40,12 @@ describe('release asset packaging workflow', () => {
     expect(packer).toContain('npm pack --pack-destination "$scratch"');
     expect(packer).toContain('package_tarballs=("$scratch"/*.tgz)');
     expect(packer).toContain('manifest.files');
-    expect(packer).toContain('--prefix "$bundle"');
-    expect(packer).toContain('--omit=dev');
+    expect(packer).toContain('cp bun.lock "$bundle/bun.lock"');
+    expect(packer).toContain('bun install');
+    expect(packer).toContain('--cwd "$bundle"');
+    expect(packer).toContain('--production');
+    expect(packer).toContain('--frozen-lockfile');
+    expect(packer).toContain('rm "$bundle/bun.lock"');
     expect(packer).not.toContain('cp -a node_modules');
     expect(packer).toContain('^[A-Za-z0-9][A-Za-z0-9._-]*$');
 
