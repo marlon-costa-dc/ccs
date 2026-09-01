@@ -14,6 +14,7 @@ describe('PR-Agent review lane migration', () => {
 
     expect(fs.existsSync(workflowPath)).toBe(true);
     expect(fs.existsSync(prAgentConfigPath)).toBe(true);
+    expect(fs.existsSync(contributingPath)).toBe(true);
 
     const workflow = fs.readFileSync(workflowPath, 'utf8');
     const config = fs.readFileSync(prAgentConfigPath, 'utf8');
