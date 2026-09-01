@@ -5,8 +5,8 @@ if [[ ! "${ASSET:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
   echo "[X] ASSET must be a portable filename in the repository root" >&2
   exit 1
 fi
-if [[ ! -d node_modules ]]; then
-  echo "[X] production node_modules is required before packaging" >&2
+if [[ ! -x node_modules/.bin/husky ]]; then
+  echo "[X] development dependencies are required before packaging" >&2
   exit 1
 fi
 
@@ -21,7 +21,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-package_tarball="$(npm pack --ignore-scripts --json | node -e '
+package_tarball="$(npm pack --json | node -e '
   const fs = require("node:fs");
   const result = JSON.parse(fs.readFileSync(0, "utf8"));
   if (!Array.isArray(result) || result.length !== 1 || !result[0].filename) {
@@ -33,7 +33,33 @@ package_tarball="$(npm pack --ignore-scripts --json | node -e '
 bundle="$scratch/bundle"
 mkdir -p "$bundle"
 tar -xzf "$package_tarball" -C "$bundle" --strip-components=1
-cp -a node_modules "$bundle/node_modules"
+
+npm install \
+  --prefix "$bundle" \
+  --omit=dev \
+  --ignore-scripts \
+  --no-audit \
+  --no-fund
+
+if [[ ! -d "$bundle/node_modules/express" ]]; then
+  echo "[X] express missing from bundle" >&2
+  exit 1
+fi
+
+node - "$bundle" <<'NODE'
+const path = require('node:path');
+const { createRequire } = require('node:module');
+
+const bundle = process.argv[2];
+const expressPath = require.resolve('express', { paths: [bundle] });
+const runtimeRequire = createRequire(expressPath);
+const mimeVersion = runtimeRequire('mime/package.json').version;
+const lookupType = typeof runtimeRequire('mime').lookup;
+console.log(`bundled mime for express: ${mimeVersion} lookup=${lookupType}`);
+if (lookupType !== 'function') {
+  throw new Error('bundled express cannot resolve a mime exposing .lookup');
+}
+NODE
 
 node - "$bundle" <<'NODE'
 const fs = require('node:fs');

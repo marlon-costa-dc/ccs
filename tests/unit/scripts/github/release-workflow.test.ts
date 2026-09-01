@@ -37,10 +37,12 @@ describe('release asset packaging workflow', () => {
       resolvePath('../../../../scripts/build-release-asset.sh'),
       'utf8'
     );
-    expect(packer).toContain('npm pack --ignore-scripts --json | node');
+    expect(packer).toContain('npm pack --json | node');
     expect(packer).toContain('fs.readFileSync(0, "utf8")');
     expect(packer).toContain('manifest.files');
-    expect(packer).toContain('cp -a node_modules "$bundle/node_modules"');
+    expect(packer).toContain('--prefix "$bundle"');
+    expect(packer).toContain('--omit=dev');
+    expect(packer).not.toContain('cp -a node_modules');
     expect(packer).toContain('^[A-Za-z0-9][A-Za-z0-9._-]*$');
 
     const manifest = JSON.parse(
