@@ -75,11 +75,11 @@ _serve*.log
 .beads/proxieddb/
 *.gate.lock*
 
-# Gas Town runtime artifacts (not product WIP)
+# Gas Town legacy runtime artifacts (runtime retired 2026-08-24; rules kept)
 .opencode/
 .runtime/
 
-# Gas Town (added by gt)
+# Gas Town legacy (added by gt, retired 2026-08-24)
 .claude/
 .logs/
 __pycache__/
