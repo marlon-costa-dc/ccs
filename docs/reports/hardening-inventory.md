@@ -92,7 +92,7 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 | `src/web-server/usage/native-quota-collector.ts` | 1758 |
 | `src/web-server/routes/cliproxy-auth-routes.ts` | 1531 |
 | `src/cliproxy/auth/oauth-handler.ts` | 1491 |
-| `src/config/schemas/model-pipeline.ts` | 1480 |
+| `src/config/schemas/model-pipeline.ts` | 1486 |
 | `src/cliproxy/model-catalog.ts` | 1152 |
 | `src/web-server/model-pricing.ts` | 1127 |
 | `src/cliproxy/auth/oauth-process.ts` | 1048 |
