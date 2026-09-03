@@ -19,6 +19,7 @@ import type {
 } from './management-api-types';
 import { ConfigError, ProxyError, UserAbortError } from '../../errors/error-types';
 import {
+  CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
   parseModelPipelineInventory,
   type ModelPipelineInventory,
 } from '../../config/schemas/model-pipeline';
@@ -135,8 +136,10 @@ export function parseCLIProxyActivationReceipt(value: unknown): CLIProxyActivati
   );
   const routingSchema = readRecord(receipt.routing_schema, 'receipt.routing_schema');
   exactResponseKeys(routingSchema, ['version', 'digest'], 'receipt.routing_schema');
-  if (routingSchema.version !== 2) {
-    throw new ConfigError('receipt.routing_schema.version must equal 2');
+  if (routingSchema.version !== CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION) {
+    throw new ConfigError(
+      `receipt.routing_schema.version must equal ${CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION}`
+    );
   }
   const provenance = readRecord(receipt.binary_provenance, 'receipt.binary_provenance');
   exactResponseKeys(provenance, ['version', 'commit', 'built_at'], 'receipt.binary_provenance');
@@ -155,7 +158,7 @@ export function parseCLIProxyActivationReceipt(value: unknown): CLIProxyActivati
         : parseActiveIdentity(receipt.previous_active, 'receipt.previous_active'),
     active: parseActiveIdentity(receipt.active, 'receipt.active'),
     routing_schema: {
-      version: 2,
+      version: CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
       digest: readSha256Digest(routingSchema.digest, 'receipt.routing_schema.digest'),
     },
     binary_provenance: {

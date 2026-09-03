@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { generateYamlWithComments } from '../../loader/yaml-serializer';
-import { modelPipelineConfigFixture } from './fixtures/model-pipeline-v2-fixture';
+import { modelPipelineConfigFixture } from './fixtures/model-pipeline-v3-fixture';
 import { MODEL_PIPELINE_SCHEMA_VERSION, parseModelPipelineConfig } from '../model-pipeline';
 import { createEmptyUnifiedConfig, isUnifiedConfig } from '../unified-config';
 
@@ -19,14 +19,14 @@ function firstCandidate(snapshot: Record<string, unknown>): Record<string, unkno
   return candidates[0]!;
 }
 
-describe('model pipeline v2 config boundary', () => {
-  it('accepts and deeply freezes the canonical AI Hub v2 fixture', () => {
+describe('model pipeline v3 config boundary', () => {
+  it('accepts and deeply freezes the canonical AI Hub v3 fixture', () => {
     const parsed = parseModelPipelineConfig(cloneEnvelope());
 
     expect(parsed.schema_version).toBe(MODEL_PIPELINE_SCHEMA_VERSION);
     expect(parsed.snapshot.generation).toBe(1);
     expect(parsed.snapshot.snapshot_digest).toBe(
-      'sha256:869a91e29aa3d7a98f726bfd13e4ce7290394d60b98295da996015844d46c39d'
+      'sha256:e6ed1e4d265ddb01f7199c7a491f405a7db480cabd284295b8d4c7a5fe4bf52e'
     );
     expect(parsed.receipt.active.projection_digest).toBe(`sha256:${'b'.repeat(64)}`);
     expect(parsed.snapshot.agent_bindings).toEqual([
@@ -46,7 +46,7 @@ describe('model pipeline v2 config boundary', () => {
       ['request_timeout_seconds', undefined, 'must be a whole number 1 or greater'],
       ['request_timeout_seconds', 0, 'must be a whole number 1 or greater'],
       ['retained_snapshots', 0, 'must be a whole number 1 or greater'],
-      ['legacy_atomic_write', true, 'is not part of schema version 2'],
+      ['legacy_atomic_write', true, 'is not part of schema version 3'],
     ];
 
     for (const [key, value, message] of invalidCases) {
@@ -63,7 +63,7 @@ describe('model pipeline v2 config boundary', () => {
     snapshotOf(envelope).legacy_models = [];
 
     expect(() => parseModelPipelineConfig(envelope)).toThrow(
-      'model_pipeline.snapshot.legacy_models is not part of schema version 2'
+      'model_pipeline.snapshot.legacy_models is not part of schema version 3'
     );
   });
 
@@ -84,14 +84,14 @@ describe('model pipeline v2 config boundary', () => {
     const models = inventory.direct_models as Array<Record<string, unknown>>;
     models[0]!.catalog_provider_id = 'openai';
     expect(() => parseModelPipelineConfig(flattened)).toThrow(
-      'catalog_provider_id is not part of schema version 2'
+      'catalog_provider_id is not part of schema version 3'
     );
 
     const independentVariant = cloneEnvelope();
     const catalog = snapshotOf(independentVariant).catalog as Array<Record<string, unknown>>;
     catalog[0]!.variant_id = 'high';
     expect(() => parseModelPipelineConfig(independentVariant)).toThrow(
-      'model_pipeline.snapshot.catalog[0].variant_id is not part of schema version 2'
+      'model_pipeline.snapshot.catalog[0].variant_id is not part of schema version 3'
     );
   });
 
@@ -156,7 +156,6 @@ describe('model pipeline v2 config boundary', () => {
       ['mode', 'retry', 'must equal classified_candidate_failover'],
       ['automatic_retry', true, 'must be false'],
       ['automatic_failover', false, 'must be true'],
-      ['max_candidate_attempts', 1, 'must be a whole number 2 or greater'],
       ['serve_stale_on_error', true, 'must be false'],
       ['preserve_first_error', false, 'must be true'],
       ['terminate_owned_request_on_cancel', false, 'must be true'],
@@ -170,7 +169,7 @@ describe('model pipeline v2 config boundary', () => {
     }
   });
 
-  it('validates and serializes model_pipeline as the native CCS v2 section', () => {
+  it('validates and serializes model_pipeline as the native CCS v3 section', () => {
     const modelPipeline = parseModelPipelineConfig(cloneEnvelope());
     const config = { ...createEmptyUnifiedConfig(), model_pipeline: modelPipeline };
 
@@ -184,7 +183,7 @@ describe('model pipeline v2 config boundary', () => {
 
     const invalid = {
       ...config,
-      model_pipeline: { schema_version: 2, snapshot: modelPipeline.snapshot },
+      model_pipeline: { schema_version: 3, snapshot: modelPipeline.snapshot },
     };
     expect(isUnifiedConfig(invalid)).toBe(false);
   });

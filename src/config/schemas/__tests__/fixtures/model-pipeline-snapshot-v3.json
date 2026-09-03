@@ -751,7 +751,6 @@
         "rule_id": "pre-response-transient"
       }
     ],
-    "max_candidate_attempts": 3,
     "mode": "classified_candidate_failover",
     "preserve_first_error": true,
     "serve_stale_on_error": false,
@@ -894,7 +893,7 @@
     "generated_at": "2026-08-28T11:14:25.29090899Z",
     "routing_schema": {
       "digest": "sha256:95bef9d5d12f64dbd7d264e6b6e2eeacf08375072ccc80858f9b83b2409de2fe",
-      "version": 2
+      "version": 3
     },
     "schema_version": 2
   },
@@ -972,8 +971,8 @@
     ]
   },
   "rejections": [],
-  "schema_version": 2,
-  "snapshot_digest": "sha256:869a91e29aa3d7a98f726bfd13e4ce7290394d60b98295da996015844d46c39d",
+  "schema_version": 3,
+  "snapshot_digest": "sha256:e6ed1e4d265ddb01f7199c7a491f405a7db480cabd284295b8d4c7a5fe4bf52e",
   "source_digests": [
     {
       "digest": "sha256:0d5795107e9cd54571ad48c63cca39b21982ecdfd8c4a4204c5e3289d6172f03",

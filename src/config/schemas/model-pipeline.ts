@@ -41,6 +41,8 @@ import {
 } from './model-pipeline-sections';
 
 import {
+  CLIPROXY_INVENTORY_SCHEMA_VERSION,
+  CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
   MODEL_PIPELINE_SCHEMA_VERSION,
   type ModelPipelineAgentBinding,
   type ModelPipelineAssignment,
@@ -805,7 +807,6 @@ function parseFailurePolicy(value: unknown, path: string): ModelPipelineFailureP
       'credential_acquisition_timeout_seconds',
       'automatic_retry',
       'automatic_failover',
-      'max_candidate_attempts',
       'failover_rules',
       'serve_stale_on_error',
       'preserve_first_error',
@@ -864,11 +865,6 @@ function parseFailurePolicy(value: unknown, path: string): ModelPipelineFailureP
     ),
     automatic_retry: automaticRetry,
     automatic_failover: automaticFailover,
-    max_candidate_attempts: readInteger(
-      record.max_candidate_attempts,
-      `${path}.max_candidate_attempts`,
-      2
-    ),
     failover_rules: failoverRules,
     serve_stale_on_error: serveStaleOnError,
     preserve_first_error: preserveFirstError,
@@ -923,8 +919,8 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
     path
   );
   const schemaVersion = readInteger(record.schema_version, `${path}.schema_version`, 1);
-  if (schemaVersion !== MODEL_PIPELINE_SCHEMA_VERSION) {
-    fail(`${path}.schema_version`, `must equal ${MODEL_PIPELINE_SCHEMA_VERSION}`);
+  if (schemaVersion !== CLIPROXY_INVENTORY_SCHEMA_VERSION) {
+    fail(`${path}.schema_version`, `must equal ${CLIPROXY_INVENTORY_SCHEMA_VERSION}`);
   }
   let active: ModelPipelineInventoryActive | null = null;
   if (record.active !== null) {
@@ -961,10 +957,10 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
   const routingSchemaVersion = readInteger(
     routingSchema.version,
     `${routingSchemaPath}.version`,
-    MODEL_PIPELINE_SCHEMA_VERSION
+    CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION
   );
-  if (routingSchemaVersion !== MODEL_PIPELINE_SCHEMA_VERSION) {
-    fail(`${routingSchemaPath}.version`, `must equal ${MODEL_PIPELINE_SCHEMA_VERSION}`);
+  if (routingSchemaVersion !== CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION) {
+    fail(`${routingSchemaPath}.version`, `must equal ${CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION}`);
   }
   const directModels = readArray(record.direct_models, `${path}.direct_models`).map(
     (entry, index) => parseInventoryModel(entry, `${path}.direct_models[${index}]`)
@@ -991,7 +987,7 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
     fail(`${path}.aliases`, 'must contain unique alias names');
   }
   return {
-    schema_version: MODEL_PIPELINE_SCHEMA_VERSION,
+    schema_version: CLIPROXY_INVENTORY_SCHEMA_VERSION,
     generated_at: readUtcTimestamp(record.generated_at, `${path}.generated_at`),
     active,
     activation_loaded_at: activationLoadedAt,
@@ -1001,7 +997,7 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
       built_at: readUtcTimestamp(provenance.built_at, `${provenancePath}.built_at`),
     },
     routing_schema: {
-      version: MODEL_PIPELINE_SCHEMA_VERSION,
+      version: CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
       digest: readDigest(routingSchema.digest, `${routingSchemaPath}.digest`),
     },
     direct_models: directModels,
