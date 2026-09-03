@@ -1,12 +1,12 @@
 import { describe, expect, it, mock } from 'bun:test';
-import { modelPipelineRequestFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
+import { modelPipelineRequestFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
 import {
   parseModelPipelinePublicationRequest,
-  type ActiveIdentityV2,
+  type ActiveIdentityV3,
   type ModelPipelineConfig,
   type ModelPipelineInventory,
   type ModelPipelinePublicationRequest,
-  type PublicationReceiptV2,
+  type PublicationReceiptV3,
 } from '../../../config/schemas/model-pipeline';
 import {
   createEmptyUnifiedConfig,
@@ -34,13 +34,13 @@ const activeConfigYaml = 'port: 8317\n';
 const stagedConfigYaml = 'port: 8317\nmodel-routing:\n  schema-version: 2\n';
 const loadedAt = '2026-08-28T11:20:57Z';
 const snapshotSchemaDigest =
-  'sha256:de6a5b76c5b9529ddd894f331ff1754d514ff15efaba617c01047eb7191fdea9';
+  'sha256:eb4ad24d88c652f4f1da9d6cfc5c3a22380a0f7bf38cf1549b7fcee320074aa0';
 const ccsBinary = {
-  version: 'ccs-fixture-v2',
+  version: 'ccs-fixture-v3',
   commit: 'ccs-fixture-commit',
   built_at: '2026-08-28T11:15:00Z',
 };
-const proposedActive: ActiveIdentityV2 = {
+const proposedActive: ActiveIdentityV3 = {
   generation: request.snapshot.generation,
   snapshot_digest: request.snapshot.snapshot_digest,
   projection_digest: projectModelRouting(request.snapshot)['projection-digest'],
@@ -99,9 +99,9 @@ function activationReceipt(
   };
 }
 
-function publicationReceipt(): PublicationReceiptV2 {
+function publicationReceipt(): PublicationReceiptV3 {
   return {
-    schema_version: 2,
+    schema_version: 3,
     ok: true,
     previous_active: null,
     active: proposedActive,
@@ -114,7 +114,7 @@ function publicationReceipt(): PublicationReceiptV2 {
 }
 
 function persistedPipeline(): ModelPipelineConfig {
-  return { schema_version: 2, snapshot: request.snapshot, receipt: publicationReceipt() };
+  return { schema_version: 3, snapshot: request.snapshot, receipt: publicationReceipt() };
 }
 
 interface DependencyHarness {
@@ -181,7 +181,7 @@ function dependencyHarness(options?: {
         events.push(`yaml:${configReads}`);
         return configReads === 1 ? activeConfigYaml : stagedConfigYaml;
       },
-      async putConfigYaml(configYaml: string, expectedActive: ActiveIdentityV2 | null) {
+      async putConfigYaml(configYaml: string, expectedActive: ActiveIdentityV3 | null) {
         events.push('put');
         expect(configYaml).toBe(stagedConfigYaml);
         expect(expectedActive).toBeNull();
@@ -205,7 +205,7 @@ function dependencyHarness(options?: {
   };
 }
 
-describe('model pipeline v2 publisher', () => {
+describe('model pipeline v3 publisher', () => {
   it('durably stages, activates, reads exact bytes, and persists one bootstrap generation', async () => {
     const harness = dependencyHarness();
     const publisher = new ModelPipelinePublisher(harness.dependencies);

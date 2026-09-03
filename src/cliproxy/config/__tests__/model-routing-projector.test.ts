@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { modelPipelineConfigFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
+import { modelPipelineConfigFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
 import {
   parseModelPipelineConfig,
   type ModelPipelineSnapshot,
@@ -18,7 +18,7 @@ function snapshot(): ModelPipelineSnapshot {
   return parseModelPipelineConfig(modelPipelineConfigFixture()).snapshot;
 }
 
-describe('model-routing v2 projector', () => {
+describe('model-routing v3 projector', () => {
   it('translates nested keys, ordered members, candidates, direct routes, and failure policy', () => {
     const source = snapshot();
     const projected = projectModelRouting(source);
@@ -39,7 +39,11 @@ describe('model-routing v2 projector', () => {
     ]);
     expect(projected.generation).toBe(1);
     expect(projected['snapshot-digest']).toBe(source.snapshot_digest);
-    expect(alias).toMatchObject({ name: 'aihub-deep', 'tier-id': 'deep', selectable: true });
+    expect(alias).toMatchObject({
+      name: 'ai-hub-balanced',
+      'tier-id': 'balanced',
+      selectable: true,
+    });
     expect(member).toMatchObject({
       'model-key': {
         'catalog-provider-id': 'openai',
@@ -82,11 +86,11 @@ describe('model-routing v2 projector', () => {
       mode: 'classified_candidate_failover',
       'automatic-retry': false,
       'automatic-failover': true,
-      'max-candidate-attempts': 3,
       'serve-stale-on-error': false,
       'preserve-first-error': true,
       'terminate-owned-request-on-cancel': true,
     });
+    expect('max-candidate-attempts' in projected['failure-policy']).toBe(false);
     expect('pricing' in projected).toBe(false);
   });
 

@@ -2,7 +2,7 @@ import { render, screen, within } from '@tests/setup/test-utils';
 import { describe, expect, it } from 'vitest';
 import { ModelPipelineSnapshotCardView } from '@/components/monitoring/model-pipeline-snapshot-card';
 import type { ModelPipelineConfig } from '../../../../../../src/config/schemas/model-pipeline-types';
-import { modelPipelineConfigFixture } from '../../../../../../src/config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
+import { modelPipelineConfigFixture } from '../../../../../../src/config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
 
 function pipelineFixture(): ModelPipelineConfig {
   return modelPipelineConfigFixture() as unknown as ModelPipelineConfig;
@@ -43,7 +43,7 @@ describe('ModelPipelineSnapshotCardView', () => {
               route_channel: 'openai',
             },
             variant_id: 'thinking',
-            tier_id: 'deep',
+            tier_id: 'frontier',
             rule_id: 'quota_available',
             config_path: 'models.tiers.primary.eligibility.quota_available',
             reason: 'quota domain is blocked',
@@ -59,7 +59,7 @@ describe('ModelPipelineSnapshotCardView', () => {
     expect(screen.getByText('generation 1')).toBeInTheDocument();
     expect(screen.getByText(pipeline.snapshot.snapshot_digest)).toBeInTheDocument();
     expect(screen.getByText(pipeline.receipt.active.projection_digest)).toBeInTheDocument();
-    expect(screen.getByText('architect → aihub-deep (deep)')).toBeInTheDocument();
+    expect(screen.getByText('architect → ai-hub-balanced (balanced)')).toBeInTheDocument();
     expect(screen.getAllByText('not observed')).toHaveLength(2);
     expect(screen.getByText('runtime-failing')).toBeInTheDocument();
     expect(screen.getByText('runtime-success')).toBeInTheDocument();

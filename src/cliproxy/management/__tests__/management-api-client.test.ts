@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach, mock } from 'bun:test';
 import * as net from 'node:net';
-import { modelPipelineSnapshotFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
+import { modelPipelineSnapshotFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
 import {
   formatActiveIdentityEtag,
   ManagementApiClient,
