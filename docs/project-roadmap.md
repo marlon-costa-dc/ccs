@@ -6,8 +6,8 @@ copied backlog, milestone plan, or status snapshot.
 
 ## Current work
 
-- In a governed Gas Town lane, run `gt prime`, inspect `gt hook`, then read the
-  assigned bead with `bd show <id>`.
+- In a governed Gas City rig, run `gc prime`, inspect `gc hook --claim --json`,
+  then read the assigned bead with `bd show <id>`.
 - Outside a hooked lane, use `bd ready` to find unblocked work and `bd show
   <id>` before claiming it.
 - GitHub issues are the public intake and mirror. Pull requests are review
