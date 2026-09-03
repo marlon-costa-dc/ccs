@@ -5,6 +5,7 @@ const path = require('path');
 // Ensure executables have correct permissions (Unix only)
 if (process.platform !== 'win32') {
   const executables = [
+    path.join(__dirname, '..', 'bin', 'ccs'),
     path.join(__dirname, '..', 'bin', 'ccs.js'),
     path.join(__dirname, '..', 'lib', 'ccs'),
   ];
