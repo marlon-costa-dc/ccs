@@ -1,3 +1,17 @@
+## [8.9.0-fd.7](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.6...v8.9.0-fd.7) (2026-09-01)
+
+### Bug Fixes
+
+* **release:** assemble dependencies from frozen lock ([949785f](https://github.com/marlon-costa-dc/ccs/commit/949785f055b34c6ec791d7c13a8a9d7050dd7151))
+* **release:** isolate npm pack output ([8d784a6](https://github.com/marlon-costa-dc/ccs/commit/8d784a69ca3b2ffab3a8a45b7a50aa2218e3e2f8))
+* **release:** isolate production dependency assembly ([ec39897](https://github.com/marlon-costa-dc/ccs/commit/ec398973553828398466edeb65ac1adbea01a229))
+* **release:** keep pack metadata machine-readable ([e026b2d](https://github.com/marlon-costa-dc/ccs/commit/e026b2d29e4f23fab1b65bb598fcd2ff5461f7c5))
+* **review:** align explicit PR-Agent contract ([e06ee02](https://github.com/marlon-costa-dc/ccs/commit/e06ee02e3dc3d7bad5ce2740acbe743045f84ebe))
+
+### Documentation
+
+* **review:** clarify explicit lane contract ([9c279b4](https://github.com/marlon-costa-dc/ccs/commit/9c279b4ec6fedebdbf18f9ad950079243c855903))
+
 ## [8.9.0-fd.6](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.5...v8.9.0-fd.6) (2026-09-01)
 
 ### Bug Fixes
