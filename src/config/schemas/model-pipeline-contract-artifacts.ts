@@ -2,8 +2,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ConfigError } from '../../errors/error-types';
 import { canonicalJson, sha256Digest } from '../../utils/canonical-json';
+import { MODEL_PIPELINE_SCHEMA_VERSION } from './model-pipeline-types';
 
-const SNAPSHOT_SCHEMA_FILENAME = 'model-pipeline-snapshot-v2.json';
+const SNAPSHOT_SCHEMA_FILENAME = `model-pipeline-snapshot-v${MODEL_PIPELINE_SCHEMA_VERSION}.json`;
 
 function resolveSnapshotSchemaPath(): string {
   return path.resolve(__dirname, '..', '..', '..', 'schemas', SNAPSHOT_SCHEMA_FILENAME);

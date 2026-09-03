@@ -1,4 +1,22 @@
-export const MODEL_PIPELINE_SCHEMA_VERSION = 2 as const;
+export const MODEL_PIPELINE_SCHEMA_VERSION = 3 as const;
+
+/**
+ * CLIProxy `model-routing` schema version: the shape CCS writes to
+ * `PUT /v0/management/config.yaml`, the `routing_schema.version` CLIProxy
+ * publishes in its inventory and activation receipt, and the value the AI
+ * Hub v3 snapshot pins in `inventory.routing_schema.version`. Routing
+ * schema 3 is routing schema 2 without `failure-policy.max-candidate-attempts`
+ * (ADR-0023: no attempt ceiling; the bound is the ranked candidate count).
+ */
+export const CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION = 3 as const;
+
+/**
+ * CLIProxy Management API's inventory contract version (`GET
+ * /v0/management/model-inventory`, and the identical shape embedded in
+ * `ModelPipelineSnapshot.inventory`). Owned by CLIProxy; unchanged by the
+ * model-pipeline-snapshot v3 cutover.
+ */
+export const CLIPROXY_INVENTORY_SCHEMA_VERSION = 2 as const;
 
 export interface ModelPipelineModelKey {
   readonly catalog_provider_id: string;
@@ -119,13 +137,13 @@ export interface ModelPipelineBinaryProvenance {
 }
 
 export interface ModelPipelineInventory {
-  readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
+  readonly schema_version: typeof CLIPROXY_INVENTORY_SCHEMA_VERSION;
   readonly generated_at: string;
   readonly active: ModelPipelineInventoryActive | null;
   readonly activation_loaded_at: string | null;
   readonly binary_provenance: ModelPipelineBinaryProvenance;
   readonly routing_schema: {
-    readonly version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
+    readonly version: typeof CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION;
     readonly digest: string;
   };
   readonly direct_models: readonly ModelPipelineInventoryModel[];
@@ -394,7 +412,6 @@ export interface ModelPipelineFailurePolicy {
   readonly credential_acquisition_timeout_seconds: number;
   readonly automatic_retry: false;
   readonly automatic_failover: true;
-  readonly max_candidate_attempts: number;
   readonly failover_rules: readonly ModelPipelineFailoverRule[];
   readonly serve_stale_on_error: false;
   readonly preserve_first_error: true;

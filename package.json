@@ -38,7 +38,7 @@
     "dist/",
     "lib/",
     "scripts/",
-    "schemas/model-pipeline-snapshot-v2.json",
+    "schemas/model-pipeline-snapshot-v3.json",
     "config/",
     ".claude/",
     "README.md",

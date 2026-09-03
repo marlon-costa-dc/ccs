@@ -52,7 +52,7 @@ describe('release asset packaging workflow', () => {
     const manifest = JSON.parse(
       fs.readFileSync(resolvePath('../../../../package.json'), 'utf8')
     ) as { files: string[] };
-    expect(manifest.files).toContain('schemas/model-pipeline-snapshot-v2.json');
+    expect(manifest.files).toContain('schemas/model-pipeline-snapshot-v3.json');
     expect(manifest.files).not.toContain('schemas/');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from 'bun:test';
-import { modelPipelineRequestFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
+import { modelPipelineRequestFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
 import {
   parseModelPipelinePublicationRequest,
   type ActiveIdentityV2,
@@ -31,12 +31,12 @@ import type {
 
 const request = parseModelPipelinePublicationRequest(modelPipelineRequestFixture());
 const activeConfigYaml = 'port: 8317\n';
-const stagedConfigYaml = 'port: 8317\nmodel-routing:\n  schema-version: 2\n';
+const stagedConfigYaml = 'port: 8317\nmodel-routing:\n  schema-version: 3\n';
 const loadedAt = '2026-08-28T11:20:57Z';
 const snapshotSchemaDigest =
   'sha256:de6a5b76c5b9529ddd894f331ff1754d514ff15efaba617c01047eb7191fdea9';
 const ccsBinary = {
-  version: 'ccs-fixture-v2',
+  version: 'ccs-fixture-v3',
   commit: 'ccs-fixture-commit',
   built_at: '2026-08-28T11:15:00Z',
 };
@@ -101,7 +101,7 @@ function activationReceipt(
 
 function publicationReceipt(): PublicationReceiptV2 {
   return {
-    schema_version: 2,
+    schema_version: 3,
     ok: true,
     previous_active: null,
     active: proposedActive,
@@ -114,7 +114,7 @@ function publicationReceipt(): PublicationReceiptV2 {
 }
 
 function persistedPipeline(): ModelPipelineConfig {
-  return { schema_version: 2, snapshot: request.snapshot, receipt: publicationReceipt() };
+  return { schema_version: 3, snapshot: request.snapshot, receipt: publicationReceipt() };
 }
 
 interface DependencyHarness {
@@ -205,7 +205,7 @@ function dependencyHarness(options?: {
   };
 }
 
-describe('model pipeline v2 publisher', () => {
+describe('model pipeline v3 publisher', () => {
   it('durably stages, activates, reads exact bytes, and persists one bootstrap generation', async () => {
     const harness = dependencyHarness();
     const publisher = new ModelPipelinePublisher(harness.dependencies);
