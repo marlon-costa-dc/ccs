@@ -3,12 +3,12 @@ import { loadUnifiedConfig, mutateConfig } from '../../config/config-loader-faca
 import {
   MODEL_PIPELINE_SCHEMA_VERSION,
   parseModelPipelinePublicationRequest,
-  type ActiveIdentityV2,
+  type ActiveIdentityV3,
   type ModelPipelineConfig,
   type ModelPipelineInventory,
   type ModelPipelinePublicationRequest,
   type ModelPipelineSnapshot,
-  type PublicationReceiptV2,
+  type PublicationReceiptV3,
 } from '../../config/schemas/model-pipeline';
 import { getModelPipelineSnapshotSchemaDigest } from '../../config/schemas/model-pipeline-contract-artifacts';
 import { ConfigError, UserAbortError } from '../../errors/error-types';
@@ -29,7 +29,7 @@ export interface ModelPipelinePublicationClient {
   getConfigYaml(signal?: AbortSignal): Promise<string>;
   putConfigYaml(
     configYaml: string,
-    expectedActive: ActiveIdentityV2 | null,
+    expectedActive: ActiveIdentityV3 | null,
     signal?: AbortSignal
   ): Promise<CLIProxyActivationReceipt>;
   getModelInventory(signal?: AbortSignal): Promise<ModelPipelineInventory>;
@@ -39,7 +39,7 @@ export interface ModelPipelinePublisherDependencies {
   loadConfig(): UnifiedConfig;
   persistPipeline(
     pipeline: ModelPipelineConfig,
-    expectedActive: ActiveIdentityV2 | null
+    expectedActive: ActiveIdentityV3 | null
   ): UnifiedConfig;
   renderConfig(activeConfigYaml: string, snapshot: ModelPipelineSnapshot): string;
   resolveTarget(config: UnifiedConfig): ProxyTarget;
@@ -49,7 +49,7 @@ export interface ModelPipelinePublisherDependencies {
   withTransaction<T>(operation: (store: ModelPipelineTransactionStore) => Promise<T>): Promise<T>;
 }
 
-export type VerifiedModelPipelinePublication = PublicationReceiptV2;
+export type VerifiedModelPipelinePublication = PublicationReceiptV3;
 
 export class ModelPipelineGenerationConflictError extends ConfigError {
   constructor(message: string, cause?: unknown) {
@@ -66,8 +66,8 @@ export class ModelPipelineSnapshotNotFoundError extends ConfigError {
 }
 
 function identitiesEqual(
-  left: ActiveIdentityV2 | null | undefined,
-  right: ActiveIdentityV2 | null | undefined
+  left: ActiveIdentityV3 | null | undefined,
+  right: ActiveIdentityV3 | null | undefined
 ): boolean {
   return canonicalJson(left ?? null) === canonicalJson(right ?? null);
 }
@@ -86,7 +86,7 @@ function pipelineEqual(left: ModelPipelineConfig, right: ModelPipelineConfig): b
 export function replaceModelPipeline(
   config: UnifiedConfig,
   incoming: ModelPipelineConfig,
-  expectedActive: ActiveIdentityV2 | null
+  expectedActive: ActiveIdentityV3 | null
 ): void {
   const current = config.model_pipeline;
   if (current && identitiesEqual(current.receipt.active, incoming.receipt.active)) {
@@ -119,8 +119,8 @@ function assertNotCancelled(signal?: AbortSignal): void {
 }
 
 function assertIdentity(
-  actual: ActiveIdentityV2 | null,
-  expected: ActiveIdentityV2 | null,
+  actual: ActiveIdentityV3 | null,
+  expected: ActiveIdentityV3 | null,
   label: string
 ): void {
   if (!identitiesEqual(actual, expected)) {
@@ -255,7 +255,7 @@ const defaultDependencies: ModelPipelinePublisherDependencies = {
 function proposedIdentity(
   request: ModelPipelinePublicationRequest,
   configYaml: string
-): ActiveIdentityV2 {
+): ActiveIdentityV3 {
   const routing = projectModelRouting(request.snapshot);
   return {
     generation: request.snapshot.generation,
@@ -329,7 +329,7 @@ function assertActivatedReadback(
 function composeReceipt(
   intent: ModelPipelinePublicationIntent,
   inventory: ModelPipelineInventory
-): PublicationReceiptV2 {
+): PublicationReceiptV3 {
   if (inventory.activation_loaded_at === null) {
     throw new ConfigError('cannot compose publication receipt without activation_loaded_at');
   }
@@ -405,7 +405,7 @@ export class ModelPipelinePublisher {
     store: ModelPipelineTransactionStore,
     request: ModelPipelinePublicationRequest,
     signal?: AbortSignal
-  ): Promise<PublicationReceiptV2> {
+  ): Promise<PublicationReceiptV3> {
     assertNotCancelled(signal);
     const { config, client } = this.resolveCycle();
     const inventory = await client.getModelInventory(signal);
@@ -442,7 +442,7 @@ export class ModelPipelinePublisher {
     intent: ModelPipelinePublicationIntent,
     client: ModelPipelinePublicationClient,
     signal?: AbortSignal
-  ): Promise<PublicationReceiptV2> {
+  ): Promise<PublicationReceiptV3> {
     assertNotCancelled(signal);
     let inventory = await client.getModelInventory(signal);
     let activationReceipt: CLIProxyActivationReceipt | undefined;

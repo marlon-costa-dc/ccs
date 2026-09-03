@@ -2,13 +2,13 @@
   "agent_bindings": [
     {
       "agent": "architect",
-      "alias": "aihub-deep",
-      "tier_id": "deep"
+      "alias": "ai-hub-balanced",
+      "tier_id": "balanced"
     }
   ],
   "assignments": [
     {
-      "alias": "aihub-deep",
+      "alias": "ai-hub-balanced",
       "members": [
         {
           "candidates": [
@@ -190,9 +190,30 @@
           "selection_reason": "selected by configured global lexicographic allocation objectives"
         }
       ],
-      "reason": "exact configured cardinality allocated globally with exclusive ModelKeys",
+      "reason": "healthy eligible candidates allocated globally with exclusive ModelKeys",
       "selectable": true,
-      "tier_id": "deep"
+      "tier_id": "balanced"
+    },
+    {
+      "alias": "ai-hub-fast",
+      "members": [],
+      "reason": "no healthy eligible candidate satisfied the fast tier requirements",
+      "selectable": false,
+      "tier_id": "fast"
+    },
+    {
+      "alias": "ai-hub-frontier",
+      "members": [],
+      "reason": "no healthy eligible candidate satisfied the frontier tier requirements",
+      "selectable": false,
+      "tier_id": "frontier"
+    },
+    {
+      "alias": "ai-hub-most-capable",
+      "members": [],
+      "reason": "no healthy eligible candidate satisfied the most-capable tier requirements",
+      "selectable": false,
+      "tier_id": "most-capable"
     }
   ],
   "catalog": [
@@ -645,7 +666,7 @@
         }
       ],
       "score": "0.906250",
-      "tier_id": "deep",
+      "tier_id": "balanced",
       "variant_id": null
     },
     {
@@ -706,7 +727,7 @@
         }
       ],
       "score": "0.906250",
-      "tier_id": "deep",
+      "tier_id": "balanced",
       "variant_id": null
     }
   ],
@@ -751,7 +772,6 @@
         "rule_id": "pre-response-transient"
       }
     ],
-    "max_candidate_attempts": 3,
     "mode": "classified_candidate_failover",
     "preserve_first_error": true,
     "serve_stale_on_error": false,
@@ -959,21 +979,21 @@
       },
       {
         "format": "json",
-        "location": "/home/marlonsc/.local/state/ai-hub/runtime/model-pipeline-v2-stage/aihub/reports/ai-hub-models.json",
+        "location": "/home/marlonsc/.local/state/ai-hub/runtime/model-pipeline-v3-stage/aihub/reports/ai-hub-models.json",
         "required": true,
         "target_id": "report_json"
       },
       {
         "format": "markdown",
-        "location": "/home/marlonsc/.local/state/ai-hub/runtime/model-pipeline-v2-stage/aihub/reports/ai-hub-models.md",
+        "location": "/home/marlonsc/.local/state/ai-hub/runtime/model-pipeline-v3-stage/aihub/reports/ai-hub-models.md",
         "required": true,
         "target_id": "report_markdown"
       }
     ]
   },
   "rejections": [],
-  "schema_version": 2,
-  "snapshot_digest": "sha256:869a91e29aa3d7a98f726bfd13e4ce7290394d60b98295da996015844d46c39d",
+  "schema_version": 3,
+  "snapshot_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "source_digests": [
     {
       "digest": "sha256:0d5795107e9cd54571ad48c63cca39b21982ecdfd8c4a4204c5e3289d6172f03",

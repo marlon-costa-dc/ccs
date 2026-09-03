@@ -26,12 +26,17 @@ export function readRecord(value: unknown, path: string): Record<string, unknown
 export function exactKeys(
   record: Record<string, unknown>,
   keys: readonly string[],
-  path: string
+  path: string,
+  // The AI Hub <-> CCS snapshot envelope by default. Pass
+  // MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION explicitly for a record that
+  // lives entirely inside CLIProxy's own inventory contract, which is
+  // versioned independently of the outer snapshot.
+  schemaVersion: number = MODEL_PIPELINE_SCHEMA_VERSION
 ): void {
   const allowed = new Set(keys);
   for (const key of Object.keys(record)) {
     if (!allowed.has(key)) {
-      fail(`${path}.${key}`, `is not part of schema version ${MODEL_PIPELINE_SCHEMA_VERSION}`);
+      fail(`${path}.${key}`, `is not part of schema version ${schemaVersion}`);
     }
   }
 }
