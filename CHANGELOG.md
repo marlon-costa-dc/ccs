@@ -1,3 +1,9 @@
+## [8.9.0-fd.9](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.8...v8.9.0-fd.9) (2026-09-03)
+
+### Features
+
+* **model-pipeline:** consume AI Hub snapshot schema v3 and project routing schema 3 (ccs-4o2) ([d5ec44a](https://github.com/marlon-costa-dc/ccs/commit/d5ec44a220e1eeca96952b30b55e0cb8f3b9014d))
+
 ## [8.9.0-fd.8](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.7...v8.9.0-fd.8) (2026-09-03)
 
 ### Bug Fixes
