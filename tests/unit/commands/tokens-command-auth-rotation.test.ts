@@ -123,4 +123,20 @@ describe('tokens command auth rotation', () => {
       expect(fs.existsSync(path.join(tempHome, '.ccs', 'config.yaml'))).toBe(false);
     });
   });
+
+  it('prints only the API key for tool helpers', () => {
+    withScopedTokensHome((tempHome) => {
+      const setup = runTokensCommandInChild(tempHome, ['--api-key', 'ccs-helper-key-456']);
+      expect(setup.payload.exitCode).toBe(0);
+
+      const helper = runTokensCommandInChild(tempHome, ['--api-key-only']);
+      const firstOutputLine = helper.stdout
+        .split('\n')
+        .map((line) => line.trim())
+        .find(Boolean);
+
+      expect(helper.payload.exitCode).toBe(0);
+      expect(firstOutputLine).toBe('ccs-helper-key-456');
+    });
+  });
 });
