@@ -1,22 +1,10 @@
 export const MODEL_PIPELINE_SCHEMA_VERSION = 3 as const;
 
-/**
- * CLIProxy `model-routing` schema version: the shape CCS writes to
- * `PUT /v0/management/config.yaml`, the `routing_schema.version` CLIProxy
- * publishes in its inventory and activation receipt, and the value the AI
- * Hub v3 snapshot pins in `inventory.routing_schema.version`. Routing
- * schema 3 is routing schema 2 without `failure-policy.max-candidate-attempts`
- * (ADR-0023: no attempt ceiling; the bound is the ranked candidate count).
- */
-export const CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION = 3 as const;
-
-/**
- * CLIProxy Management API's inventory contract version (`GET
- * /v0/management/model-inventory`, and the identical shape embedded in
- * `ModelPipelineSnapshot.inventory`). Owned by CLIProxy; unchanged by the
- * model-pipeline-snapshot v3 cutover.
- */
-export const CLIPROXY_INVENTORY_SCHEMA_VERSION = 2 as const;
+// CLIProxy's own inventory/routing contract version. It is independent of the
+// AI Hub <-> CCS snapshot schema above and is not bumped by this migration;
+// ai-hub's ModelPipelineInventory and ModelInventoryRoutingSchema models pin
+// it at a literal 2 regardless of the outer snapshot schema_version.
+export const MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION = 2 as const;
 
 export interface ModelPipelineModelKey {
   readonly catalog_provider_id: string;
@@ -137,13 +125,13 @@ export interface ModelPipelineBinaryProvenance {
 }
 
 export interface ModelPipelineInventory {
-  readonly schema_version: typeof CLIPROXY_INVENTORY_SCHEMA_VERSION;
+  readonly schema_version: typeof MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION;
   readonly generated_at: string;
   readonly active: ModelPipelineInventoryActive | null;
   readonly activation_loaded_at: string | null;
   readonly binary_provenance: ModelPipelineBinaryProvenance;
   readonly routing_schema: {
-    readonly version: typeof CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION;
+    readonly version: typeof MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION;
     readonly digest: string;
   };
   readonly direct_models: readonly ModelPipelineInventoryModel[];
@@ -449,18 +437,18 @@ export interface ModelPipelineSnapshot {
   readonly snapshot_digest: string;
 }
 
-export interface ActiveIdentityV2 {
+export interface ActiveIdentityV3 {
   readonly generation: number;
   readonly snapshot_digest: string;
   readonly projection_digest: string;
   readonly config_digest: string;
 }
 
-export interface PublicationReceiptV2 {
+export interface PublicationReceiptV3 {
   readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
   readonly ok: true;
-  readonly previous_active: ActiveIdentityV2 | null;
-  readonly active: ActiveIdentityV2;
+  readonly previous_active: ActiveIdentityV3 | null;
+  readonly active: ActiveIdentityV3;
   readonly snapshot_schema_digest: string;
   readonly routing_schema_digest: string;
   readonly ccs_binary: ModelPipelineBinaryProvenance;
@@ -470,12 +458,12 @@ export interface PublicationReceiptV2 {
 
 export interface ModelPipelinePublicationRequest {
   readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
-  readonly expected_active: ActiveIdentityV2 | null;
+  readonly expected_active: ActiveIdentityV3 | null;
   readonly snapshot: ModelPipelineSnapshot;
 }
 
 export interface ModelPipelineConfig {
   readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
   readonly snapshot: ModelPipelineSnapshot;
-  readonly receipt: PublicationReceiptV2;
+  readonly receipt: PublicationReceiptV3;
 }

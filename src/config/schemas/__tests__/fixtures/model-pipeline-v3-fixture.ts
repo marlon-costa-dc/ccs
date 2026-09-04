@@ -1,12 +1,23 @@
 import snapshotFixture from './model-pipeline-snapshot-v3.json';
+import { canonicalJsonSha256Digest } from '../../../../utils/canonical-json';
 
+// The exact digest of schemas/model-pipeline-snapshot-v3.json, verified by
+// `getModelPipelineSnapshotSchemaDigest()` at runtime. Recompute with
+// `sha256sum schemas/model-pipeline-snapshot-v3.json` if that artifact changes.
 const SNAPSHOT_SCHEMA_DIGEST =
-  'sha256:2ea7574a8c69c227a1741acffa22d82ab48dd4715cfd4713f0c6d2ed5691a8d9';
+  'sha256:eb4ad24d88c652f4f1da9d6cfc5c3a22380a0f7bf38cf1549b7fcee320074aa0';
 const PROJECTION_DIGEST = `sha256:${'b'.repeat(64)}`;
 const CONFIG_DIGEST = `sha256:${'c'.repeat(64)}`;
 
+/**
+ * Return the fixture snapshot with its `snapshot_digest` recomputed over the
+ * exact semantic payload, mirroring `parseSnapshot`'s own digest derivation so
+ * the fixture never depends on a hand-maintained hash.
+ */
 export function modelPipelineSnapshotFixture(): Record<string, unknown> {
-  return structuredClone(snapshotFixture) as unknown as Record<string, unknown>;
+  const raw = structuredClone(snapshotFixture) as unknown as Record<string, unknown>;
+  const { snapshot_digest: _ignored, ...semantic } = raw;
+  return { ...semantic, snapshot_digest: canonicalJsonSha256Digest(semantic) };
 }
 
 export function modelPipelineConfigFixture(): Record<string, unknown> {
