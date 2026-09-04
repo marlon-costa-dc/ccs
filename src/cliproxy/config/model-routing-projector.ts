@@ -1,17 +1,16 @@
-import type {
-  ModelPipelineCatalogRoute,
-  ModelPipelineCredentialReference,
-  ModelPipelineHealth,
-  ModelPipelineModelKey,
-  ModelPipelinePricing,
-  ModelPipelineRestriction,
-  ModelPipelineRouteKey,
-  ModelPipelineSnapshot,
+import {
+  CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
+  type ModelPipelineCatalogRoute,
+  type ModelPipelineCredentialReference,
+  type ModelPipelineHealth,
+  type ModelPipelineModelKey,
+  type ModelPipelinePricing,
+  type ModelPipelineRestriction,
+  type ModelPipelineRouteKey,
+  type ModelPipelineSnapshot,
 } from '../../config/schemas/model-pipeline';
 import { ConfigError } from '../../errors/error-types';
 import { canonicalJsonSha256Digest } from '../../utils/canonical-json';
-
-export const CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION = 2 as const;
 
 export interface CLIProxyModelKey {
   readonly 'catalog-provider-id': string;

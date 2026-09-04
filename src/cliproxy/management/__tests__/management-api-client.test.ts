@@ -28,9 +28,9 @@ const activeIdentity = {
 const validActivationReceipt = {
   previous_active: null,
   active: activeIdentity,
-  routing_schema: { version: 2 as const, digest: digestA },
+  routing_schema: { version: 3 as const, digest: digestA },
   binary_provenance: {
-    version: 'cliproxy-fixture-v2',
+    version: 'cliproxy-fixture-v3',
     commit: 'cliproxy-fixture-commit',
     built_at: '2026-08-28T11:13:01Z',
   },
@@ -118,7 +118,7 @@ describe('management-api-client', () => {
     describe('atomic config publication', () => {
       it('sends raw YAML and validates the publication receipt', async () => {
         const client = new ManagementApiClient(config);
-        const configYaml = 'port: 8317\nmodel-routing:\n  schema-version: 2\n';
+        const configYaml = 'port: 8317\nmodel-routing:\n  schema-version: 3\n';
         const originalFetch = global.fetch;
         const fetchMock = mock(() =>
           Promise.resolve(
@@ -239,7 +239,7 @@ describe('management-api-client', () => {
 
         try {
           await expect(client.getModelInventory()).rejects.toThrow(
-            'model_inventory.routes is not part of schema version 2'
+            'model_inventory.routes is not part of schema version 3'
           );
         } finally {
           global.fetch = originalFetch;

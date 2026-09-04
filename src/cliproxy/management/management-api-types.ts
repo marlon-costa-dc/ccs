@@ -5,6 +5,8 @@
  * Used for syncing CCS API profiles to remote CLIProxy instance.
  */
 
+import type { CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION } from '../../config/schemas/model-pipeline';
+
 /**
  * Model alias within a ClaudeKey entry.
  * Maps Claude model names to provider-specific models.
@@ -137,7 +139,7 @@ export interface CLIProxyActivationReceipt {
     readonly config_digest: string;
   };
   readonly routing_schema: {
-    readonly version: 2;
+    readonly version: typeof CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION;
     readonly digest: string;
   };
   readonly binary_provenance: {
