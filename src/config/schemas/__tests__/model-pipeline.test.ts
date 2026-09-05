@@ -35,12 +35,10 @@ describe('model pipeline v3 config boundary', () => {
     expect(MODEL_PIPELINE_SCHEMA_VERSION).toBe(3);
     expect(parsed.snapshot.generation).toBe(1);
     expect(parsed.snapshot.snapshot_digest).toBe(
-      'sha256:389c56156f91b78bb99776a1de99dfe9482ead661c6c2c8cac56c864972a6ca2'
+      'sha256:0780565e95eba6d5fad04ed0fbfc146805aeb1fa3fd75b33625d83c7a85defc4'
     );
-    // CLIProxy's own inventory/routing contract stays pinned at 2, independent
-    // of the outer AI Hub <-> CCS snapshot schema version bump to 3.
-    expect(parsed.snapshot.inventory.schema_version).toBe(2);
-    expect(parsed.snapshot.inventory.routing_schema.version).toBe(2);
+    expect(parsed.snapshot.inventory.schema_version).toBe(3);
+    expect(parsed.snapshot.inventory.routing_schema.version).toBe(3);
     expect(parsed.receipt.active.projection_digest).toBe(`sha256:${'b'.repeat(64)}`);
     expect(parsed.snapshot.agent_bindings).toEqual([
       { agent: 'architect', tier_id: 'balanced', alias: 'ai-hub-balanced' },
@@ -107,6 +105,29 @@ describe('model pipeline v3 config boundary', () => {
     );
   });
 
+  it('rejects the retired CLIProxy inventory schema version 2', () => {
+    const request = modelPipelineRequestFixture() as Record<string, unknown>;
+    const snapshot = request.snapshot as Record<string, unknown>;
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    inventory.schema_version = 2;
+
+    expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
+      'model_pipeline_publication.snapshot.inventory.schema_version must be a whole number 3 or greater'
+    );
+  });
+
+  it('rejects the retired CLIProxy routing schema version 2', () => {
+    const request = modelPipelineRequestFixture() as Record<string, unknown>;
+    const snapshot = request.snapshot as Record<string, unknown>;
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    const routingSchema = inventory.routing_schema as Record<string, unknown>;
+    routingSchema.version = 2;
+
+    expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
+      'model_pipeline_publication.snapshot.inventory.routing_schema.version must be a whole number 3 or greater'
+    );
+  });
+
   it('requires positive publication ownership values and rejects v1 residue', () => {
     const invalidCases: ReadonlyArray<readonly [string, unknown, string]> = [
       ['request_timeout_seconds', undefined, 'must be a whole number 1 or greater'],
@@ -160,9 +181,7 @@ describe('model pipeline v3 config boundary', () => {
     const models = inventory.direct_models as Array<Record<string, unknown>>;
     models[0]!.catalog_provider_id = 'openai';
     expect(() => parseModelPipelineConfig(flattened)).toThrow(
-      // The mutated field lives inside inventory.direct_models, which is
-      // CLIProxy's own contract and stays pinned at schema version 2.
-      'catalog_provider_id is not part of schema version 2'
+      'catalog_provider_id is not part of schema version 3'
     );
 
     const independentVariant = cloneEnvelope();

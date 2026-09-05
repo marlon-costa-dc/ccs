@@ -62,12 +62,19 @@ afterEach(async () => {
 });
 
 describe('model pipeline config routes', () => {
-  it('publishes an exact section envelope and returns verified active digests', async () => {
+  it('publishes an exact 3/3/3 section envelope and returns verified active digests', async () => {
     const deps = dependencies();
     const publish = mock(deps.publishPipeline);
     deps.publishPipeline = publish;
 
     const publication = modelPipelineRequestFixture();
+    expect(publication).toMatchObject({
+      schema_version: 3,
+      snapshot: {
+        schema_version: 3,
+        inventory: { schema_version: 3, routing_schema: { version: 3 } },
+      },
+    });
     const response = await request(deps, 'PUT', publication);
     const result = (await response.json()) as Record<string, unknown>;
 
@@ -96,6 +103,49 @@ describe('model pipeline config routes', () => {
 
     expect(response.status).toBe(400);
     expect(result.error).toContain('model_pipeline_publication.schema_version');
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('rejects the retired nested inventory schema version 2 before publication', async () => {
+    const deps = dependencies();
+    const publish = mock(deps.publishPipeline);
+    deps.publishPipeline = publish;
+    const publication = modelPipelineRequestFixture() as Record<string, unknown>;
+    const snapshot = publication.snapshot as Record<string, unknown>;
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    inventory.schema_version = 2;
+
+    const response = await request(deps, 'PUT', publication);
+    const result = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(400);
+    expect(result).toEqual({
+      error:
+        'model_pipeline_publication.snapshot.inventory.schema_version must be a whole number 3 or greater',
+      stage: 'validation',
+    });
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('rejects the retired nested routing schema version 2 before publication', async () => {
+    const deps = dependencies();
+    const publish = mock(deps.publishPipeline);
+    deps.publishPipeline = publish;
+    const publication = modelPipelineRequestFixture() as Record<string, unknown>;
+    const snapshot = publication.snapshot as Record<string, unknown>;
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    const routingSchema = inventory.routing_schema as Record<string, unknown>;
+    routingSchema.version = 2;
+
+    const response = await request(deps, 'PUT', publication);
+    const result = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(400);
+    expect(result).toEqual({
+      error:
+        'model_pipeline_publication.snapshot.inventory.routing_schema.version must be a whole number 3 or greater',
+      stage: 'validation',
+    });
     expect(publish).not.toHaveBeenCalled();
   });
 

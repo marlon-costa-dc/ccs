@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
 import { modelPipelineRequestFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
+import { getModelPipelineSnapshotSchemaDigest } from '../../../config/schemas/model-pipeline-contract-artifacts';
 import {
   parseModelPipelinePublicationRequest,
   type ActiveIdentityV3,
@@ -33,8 +34,7 @@ const request = parseModelPipelinePublicationRequest(modelPipelineRequestFixture
 const activeConfigYaml = 'port: 8317\n';
 const stagedConfigYaml = 'port: 8317\nmodel-routing:\n  schema-version: 3\n';
 const loadedAt = '2026-08-28T11:20:57Z';
-const snapshotSchemaDigest =
-  'sha256:eb4ad24d88c652f4f1da9d6cfc5c3a22380a0f7bf38cf1549b7fcee320074aa0';
+const snapshotSchemaDigest = getModelPipelineSnapshotSchemaDigest();
 const ccsBinary = {
   version: 'ccs-fixture-v3',
   commit: 'ccs-fixture-commit',

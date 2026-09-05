@@ -41,7 +41,8 @@ import {
 } from './model-pipeline-sections';
 
 import {
-  MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION,
+  CLIPROXY_INVENTORY_SCHEMA_VERSION,
+  CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
   MODEL_PIPELINE_SCHEMA_VERSION,
   type ModelPipelineAgentBinding,
   type ModelPipelineAssignment,
@@ -736,12 +737,7 @@ function parseInventoryAlias(
   path: string
 ): ModelPipelineInventory['aliases'][number] {
   const record = readRecord(value, path);
-  exactKeys(
-    record,
-    ['name', 'tier_id', 'selectable', 'reason', 'members'],
-    path,
-    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
-  );
+  exactKeys(record, ['name', 'tier_id', 'selectable', 'reason', 'members'], path);
   const assignment = parseAssignment(
     {
       tier_id: record.tier_id,
@@ -920,12 +916,15 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
       'direct_models',
       'aliases',
     ],
-    path,
-    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
+    path
   );
-  const schemaVersion = readInteger(record.schema_version, `${path}.schema_version`, 1);
-  if (schemaVersion !== MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION) {
-    fail(`${path}.schema_version`, `must equal ${MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION}`);
+  const schemaVersion = readInteger(
+    record.schema_version,
+    `${path}.schema_version`,
+    CLIPROXY_INVENTORY_SCHEMA_VERSION
+  );
+  if (schemaVersion !== CLIPROXY_INVENTORY_SCHEMA_VERSION) {
+    fail(`${path}.schema_version`, `must equal ${CLIPROXY_INVENTORY_SCHEMA_VERSION}`);
   }
   let active: ModelPipelineInventoryActive | null = null;
   if (record.active !== null) {
@@ -958,19 +957,14 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
   exactKeys(provenance, ['version', 'commit', 'built_at'], provenancePath);
   const routingSchemaPath = `${path}.routing_schema`;
   const routingSchema = readRecord(record.routing_schema, routingSchemaPath);
-  exactKeys(
-    routingSchema,
-    ['version', 'digest'],
-    routingSchemaPath,
-    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
-  );
+  exactKeys(routingSchema, ['version', 'digest'], routingSchemaPath);
   const routingSchemaVersion = readInteger(
     routingSchema.version,
     `${routingSchemaPath}.version`,
-    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
+    CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION
   );
-  if (routingSchemaVersion !== MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION) {
-    fail(`${routingSchemaPath}.version`, `must equal ${MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION}`);
+  if (routingSchemaVersion !== CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION) {
+    fail(`${routingSchemaPath}.version`, `must equal ${CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION}`);
   }
   const directModels = readArray(record.direct_models, `${path}.direct_models`).map(
     (entry, index) => parseInventoryModel(entry, `${path}.direct_models[${index}]`)
@@ -997,7 +991,7 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
     fail(`${path}.aliases`, 'must contain unique alias names');
   }
   return {
-    schema_version: MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION,
+    schema_version: CLIPROXY_INVENTORY_SCHEMA_VERSION,
     generated_at: readUtcTimestamp(record.generated_at, `${path}.generated_at`),
     active,
     activation_loaded_at: activationLoadedAt,
@@ -1007,7 +1001,7 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
       built_at: readUtcTimestamp(provenance.built_at, `${provenancePath}.built_at`),
     },
     routing_schema: {
-      version: MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION,
+      version: CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
       digest: readDigest(routingSchema.digest, `${routingSchemaPath}.digest`),
     },
     direct_models: directModels,

@@ -1,11 +1,6 @@
 import snapshotFixture from './model-pipeline-snapshot-v3.json';
 import { canonicalJsonSha256Digest } from '../../../../utils/canonical-json';
-
-// The exact digest of schemas/model-pipeline-snapshot-v3.json, verified by
-// `getModelPipelineSnapshotSchemaDigest()` at runtime. Recompute with
-// `sha256sum schemas/model-pipeline-snapshot-v3.json` if that artifact changes.
-const SNAPSHOT_SCHEMA_DIGEST =
-  'sha256:eb4ad24d88c652f4f1da9d6cfc5c3a22380a0f7bf38cf1549b7fcee320074aa0';
+import { getModelPipelineSnapshotSchemaDigest } from '../../model-pipeline-contract-artifacts';
 const PROJECTION_DIGEST = `sha256:${'b'.repeat(64)}`;
 const CONFIG_DIGEST = `sha256:${'c'.repeat(64)}`;
 
@@ -36,7 +31,7 @@ export function modelPipelineConfigFixture(): Record<string, unknown> {
         projection_digest: PROJECTION_DIGEST,
         config_digest: CONFIG_DIGEST,
       },
-      snapshot_schema_digest: SNAPSHOT_SCHEMA_DIGEST,
+      snapshot_schema_digest: getModelPipelineSnapshotSchemaDigest(),
       routing_schema_digest: (inventory.routing_schema as Record<string, unknown>).digest,
       ccs_binary: {
         version: 'ccs-fixture-v3',
