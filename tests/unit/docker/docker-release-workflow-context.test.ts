@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -73,10 +72,10 @@ describe('docker release workflow context', () => {
   });
 
   test('passes collision-safe compose env through network-contract calls', () => {
-    const result = spawnSync('bash', ['tests/docker/network-contract-env.test.sh'], {
+    const result = Bun.spawnSync(['bash', 'tests/docker/network-contract-env.test.sh'], {
       cwd: repoRoot,
-      encoding: 'utf8',
     });
+    const output = result.stdout.toString() + result.stderr.toString();
 
     expect(result.status, result.stdout + result.stderr).toBe(0);
   }, 30_000);
