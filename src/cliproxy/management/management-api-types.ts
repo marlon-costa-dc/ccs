@@ -5,6 +5,8 @@
  * Used for syncing CCS API profiles to remote CLIProxy instance.
  */
 
+import type { CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION } from '../../config/schemas/model-pipeline';
+
 /**
  * Model alias within a ClaudeKey entry.
  * Maps Claude model names to provider-specific models.
@@ -43,16 +45,16 @@ export interface ClaudeKey {
 export interface ManagementClientConfig {
   /** Remote proxy host (IP or hostname) */
   host: string;
-  /** Remote proxy port (default: 8317 for HTTP, 443 for HTTPS) */
-  port?: number;
+  /** Remote proxy port, resolved by the typed CCS configuration owner. */
+  port: number;
   /** Protocol to use (http or https) */
   protocol: 'http' | 'https';
   /** Management key for authentication (sent as Bearer token) */
   managementKey: string;
-  /** Request timeout in milliseconds (default: 5000) */
-  timeout?: number;
-  /** Allow self-signed certificates for HTTPS (default: false) */
-  allowSelfSigned?: boolean;
+  /** Request timeout in milliseconds, resolved by cliproxy_server.management_timeout_ms. */
+  timeout: number;
+  /** Explicit self-signed certificate policy. */
+  allowSelfSigned: boolean;
 }
 
 /**
@@ -120,6 +122,32 @@ export interface SyncStatus {
   error?: string;
   /** Remote CLIProxy URL */
   remoteUrl?: string;
+}
+
+/** Receipt returned after CLIProxy validates, persists, and reloads a YAML config. */
+export interface CLIProxyActivationReceipt {
+  readonly previous_active: {
+    readonly generation: number;
+    readonly snapshot_digest: string;
+    readonly projection_digest: string;
+    readonly config_digest: string;
+  } | null;
+  readonly active: {
+    readonly generation: number;
+    readonly snapshot_digest: string;
+    readonly projection_digest: string;
+    readonly config_digest: string;
+  };
+  readonly routing_schema: {
+    readonly version: typeof CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION;
+    readonly digest: string;
+  };
+  readonly binary_provenance: {
+    readonly version: string;
+    readonly commit: string;
+    readonly built_at: string;
+  };
+  readonly loaded_at: string;
 }
 
 /**

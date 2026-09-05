@@ -11,6 +11,7 @@ import type {
 } from '../../../src/cliproxy/ai-providers';
 import type { ProviderEntitlementEvidence } from '../../../src/cliproxy/auth/provider-entitlement-types';
 import type { BrowserRuntimeEnv } from '../../../src/utils/browser/chrome-reuse';
+import type { ModelPipelineConfig } from '../../../src/config/schemas/model-pipeline-types';
 
 export const API_BASE_URL = '/api';
 export const API_CONFLICT_ERROR_CODE = 'CONFLICT';
@@ -1525,6 +1526,9 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ backupPath }),
       }),
+  },
+  modelPipeline: {
+    get: () => request<ModelPipelineConfig>('/config/model-pipeline'),
   },
   /** Model presets for quick model switching */
   presets: {

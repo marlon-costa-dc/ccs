@@ -75,6 +75,22 @@ export function generateYamlWithComments(config: UnifiedConfig): string {
   );
   lines.push('');
 
+  if (config.model_pipeline) {
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push('# Model Pipeline: immutable AI Hub snapshot; CCS validates and projects it');
+    lines.push('# Selection, ranking, pricing, and retry policy are not recalculated by CCS.');
+    lines.push('# ----------------------------------------------------------------------------');
+    lines.push(
+      yaml
+        .dump(
+          { model_pipeline: config.model_pipeline },
+          { indent: 2, lineWidth: -1, quotingType: '"', noRefs: true }
+        )
+        .trim()
+    );
+    lines.push('');
+  }
+
   if (config.proxy?.routing) {
     lines.push('# ----------------------------------------------------------------------------');
     lines.push('# Proxy Routing: OpenAI-compatible local proxy model selection rules');
@@ -106,7 +122,6 @@ export function generateYamlWithComments(config: UnifiedConfig): string {
     lines.push('# Configure via Dashboard (`ccs config`) > Proxy tab.');
     lines.push('#');
     lines.push('# remote: Connect to a remote CLIProxyAPI instance');
-    lines.push('# fallback: Use local proxy if remote is unreachable');
     lines.push('# local: Local proxy settings (port, auto-start)');
     lines.push('# ----------------------------------------------------------------------------');
     lines.push(

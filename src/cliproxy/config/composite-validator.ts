@@ -96,37 +96,6 @@ export function validateCompositeTiers(
     if (deniedTierModelReason) {
       return `Invalid model for tier '${tier}': ${deniedTierModelReason}`;
     }
-
-    if (tierValue.fallback !== undefined) {
-      const fallback = tierValue.fallback;
-      if (!isRecord(fallback)) {
-        return `Invalid fallback config for tier '${tier}': expected object with provider and model`;
-      }
-
-      if (typeof fallback.provider !== 'string' || typeof fallback.model !== 'string') {
-        return `Invalid fallback config for tier '${tier}': requires 'provider' and 'model' strings`;
-      }
-
-      if (!fallback.model.trim()) {
-        return `Invalid fallback model for tier '${tier}': model cannot be empty or whitespace`;
-      }
-
-      if (!isValidProvider(fallback.provider)) {
-        return `Invalid fallback provider '${fallback.provider}' for tier '${tier}': must be one of ${CLIPROXY_SUPPORTED_PROVIDERS.join(', ')}`;
-      }
-
-      const deniedFallbackReason = getDeniedModelIdReasonForProvider(
-        fallback.model,
-        fallback.provider
-      );
-      if (deniedFallbackReason) {
-        return `Invalid fallback model for tier '${tier}': ${deniedFallbackReason}`;
-      }
-
-      if (fallback.provider === provider && fallback.model === model) {
-        return `Circular fallback in tier '${tier}': fallback cannot point to same provider and model`;
-      }
-    }
   }
 
   return null;

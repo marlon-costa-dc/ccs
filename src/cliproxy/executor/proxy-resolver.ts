@@ -10,7 +10,7 @@
  */
 
 import { ProgressIndicator } from '../../utils/progress-indicator';
-import { ok, fail, info, warn } from '../../utils/ui';
+import { ok, fail } from '../../utils/ui';
 import {
   ensureCLIProxyBinary,
   getConfiguredBackend,
@@ -18,16 +18,16 @@ import {
 } from '../binary-manager';
 import { checkRemoteProxy } from '../services/remote-proxy-client';
 import { CLIProxyProvider, CLIProxyBackend, PLUS_ONLY_PROVIDERS, ExecutorConfig } from '../types';
-import { resolveProxyConfig } from '../proxy/proxy-config-resolver';
-import { CLIPROXY_DEFAULT_PORT, validatePort } from '../config/config-generator';
+import { resolveProxyTarget } from '../proxy/proxy-target-resolver';
 import type { ResolvedProxyConfig } from '../types';
 import type { UnifiedConfig } from '../../config/schemas/unified-config';
-import { isNetworkError, handleNetworkError } from './retry-handler';
+import { isNetworkError, handleNetworkError } from './failure-handler';
+import { BinaryError, NetworkError } from '../../errors/error-types';
 
 export interface ResolvedExecutorProxyConfig {
-  /** Resolved proxy config after merging CLI > ENV > config.yaml > defaults */
+  /** Proxy config resolved once from the validated CCS configuration snapshot. */
   proxyConfig: ResolvedProxyConfig;
-  /** Args after proxy-related flags are stripped out */
+  /** Original args; proxy connection overrides are not a supported CLI surface. */
   argsWithoutProxy: string[];
   /** Mutated executor config (port resolved and validated) */
   cfg: ExecutorConfig;
@@ -53,7 +53,7 @@ export interface ResolveExecutorProxyContext {
 }
 
 /**
- * Resolves side-effect-free proxy configuration and strips proxy flags.
+ * Resolves side-effect-free proxy configuration from the loaded CCS snapshot.
  *
  * Mutates `context.cfg.port` in-place (same as original orchestrator behaviour).
  */
@@ -63,37 +63,20 @@ export function resolveExecutorProxyConfig(
 ): ResolvedExecutorProxyConfig {
   const { unifiedConfig, cfg, log } = context;
 
-  // Resolve proxy config from CLI flags > ENV > config.yaml > defaults
-  const cliproxyServerConfig = unifiedConfig.cliproxy_server;
-  const { config: proxyConfig, remainingArgs: argsWithoutProxy } = resolveProxyConfig(args, {
-    remote: cliproxyServerConfig?.remote
-      ? {
-          enabled: cliproxyServerConfig.remote.enabled,
-          host: cliproxyServerConfig.remote.host,
-          port: cliproxyServerConfig.remote.port,
-          protocol: cliproxyServerConfig.remote.protocol,
-          auth_token: cliproxyServerConfig.remote.auth_token,
-          management_key: cliproxyServerConfig.remote.management_key,
-          timeout: cliproxyServerConfig.remote.timeout,
-        }
-      : undefined,
-    local: cliproxyServerConfig?.local
-      ? {
-          port: cliproxyServerConfig.local.port,
-          auto_start: cliproxyServerConfig.local.auto_start,
-        }
-      : undefined,
-  });
+  const target = resolveProxyTarget(unifiedConfig.cliproxy_server);
+  const proxyConfig: ResolvedProxyConfig = {
+    mode: target.isRemote ? 'remote' : 'local',
+    host: target.host,
+    port: target.port,
+    protocol: target.protocol,
+    authToken: target.authToken,
+    managementKey: target.managementKey,
+    timeout: target.managementTimeoutMs,
+    allowSelfSigned: target.allowSelfSigned,
+  };
+  const argsWithoutProxy = args;
 
-  // Port resolution and validation (mutates cfg in-place)
-  if (cfg.port && cfg.port !== CLIPROXY_DEFAULT_PORT) {
-    if (proxyConfig.port !== CLIPROXY_DEFAULT_PORT) {
-      cfg.port = proxyConfig.port;
-    }
-  } else if (proxyConfig.port !== CLIPROXY_DEFAULT_PORT) {
-    cfg.port = proxyConfig.port;
-  }
-  cfg.port = validatePort(cfg.port);
+  cfg.port = target.port;
 
   log(`Proxy mode: ${proxyConfig.mode}`);
   if (proxyConfig.mode === 'remote') {
@@ -118,14 +101,14 @@ export async function resolveExecutorProxy(
   let useRemoteProxy = false;
   let localBackend: CLIProxyBackend = 'original';
 
-  if (proxyConfig.mode === 'remote' && proxyConfig.host) {
+  if (proxyConfig.mode === 'remote') {
     const status = await checkRemoteProxy({
       host: proxyConfig.host,
       port: proxyConfig.port,
       protocol: proxyConfig.protocol,
       authToken: proxyConfig.authToken,
-      timeout: proxyConfig.timeout ?? 2000,
-      allowSelfSigned: proxyConfig.allowSelfSigned ?? false,
+      timeout: proxyConfig.timeout,
+      allowSelfSigned: proxyConfig.allowSelfSigned,
     });
 
     if (status.reachable) {
@@ -136,32 +119,10 @@ export async function resolveExecutorProxy(
         )
       );
     } else {
-      console.error(warn(`Remote proxy unreachable: ${status.error}`));
-
-      if (proxyConfig.remoteOnly) {
-        throw new Error('Remote proxy unreachable and --remote-only specified');
-      }
-
-      if (proxyConfig.fallbackEnabled) {
-        if (proxyConfig.autoStartLocal) {
-          console.log(info('Falling back to local proxy...'));
-        } else {
-          if (process.stdin.isTTY) {
-            const readline = await import('readline');
-            const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-            const answer = await new Promise<string>((resolve) => {
-              rl.question('Start local proxy instead? [Y/n] ', resolve);
-            });
-            rl.close();
-            if (answer.toLowerCase() === 'n') {
-              throw new Error('Remote proxy unreachable and user declined fallback');
-            }
-          }
-          console.log(info('Starting local proxy...'));
-        }
-      } else {
-        throw new Error('Remote proxy unreachable and fallback disabled');
-      }
+      throw new NetworkError(
+        `Remote proxy unreachable: ${status.error ?? 'unknown error'}`,
+        `${proxyConfig.protocol}://${proxyConfig.host}:${proxyConfig.port}`
+      );
     }
   }
 
@@ -174,7 +135,7 @@ export async function resolveExecutorProxy(
         console.error('');
         console.error(fail(getPlusBackendUnavailableMessage(p)));
         console.error('');
-        throw new Error(`Provider ${p} requires local CLIProxy Plus backend`);
+        throw new BinaryError(`Provider ${p} requires local CLIProxy Plus backend`);
       }
     }
   }

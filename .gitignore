@@ -26,6 +26,7 @@ yarn-error.log*
 # TypeScript build output
 dist/
 *.tsbuildinfo
+src/generated/build-provenance.ts
 
 # Package lock files (use bun.lock only)
 yarn.lock
@@ -74,6 +75,128 @@ _serve*.log
 .beads/proxieddb/
 *.gate.lock*
 
-# Gas Town runtime artifacts (not product WIP)
+# Gas Town legacy runtime artifacts (runtime retired 2026-08-24; rules kept)
 .opencode/
 .runtime/
+
+# Gas Town legacy (added by gt, retired 2026-08-24)
+.claude/
+.logs/
+__pycache__/
+state.json
+CLAUDE.md
+GEMINI.md
+
+# Local runtime/data symlinks and directories (auto-generated)
+$HOME
+mcb/
+invest/
+deacon/
+cliproxyapi/
+gmn/
+plugins/
+events/
+serena/
+gastown/
+aihub/
+flext/
+ccs/
+beads/
+beads_global/
+agents/
+owncloud/
+ops-cli/
+rig/
+rig/
+rigs.json
+settings/
+daemon/
+testdb/
+testrig/
+testrip/
+dftimewolf/
+forge/
+forge/
+forge-*/
+forge_*/
+forge-local*/
+ESTOP.aihub
+gt-p0-tmpfiles.conf.bak
+beads.bak-*/
+agents.backup-*/
+beads/
+.claude/
+.cursor/
+.mcp.json
+.runtime/
+.opencode/
+
+# Dolt backup directories
+.dolt-backup/
+.dolt-data.gt-retired-*/
+
+# Mise local config
+.envrc
+mise.toml
+
+# Runtime event logs
+.events.jsonl
+.events.jsonl.lock
+.local_version
+
+# Poolside
+.poolside/
+
+# Serena
+.serena/
+
+# Other runtime dirs
+cosmos/
+dcdoc/
+forkrig/
+rig/
+rig*/
+forge*/
+forge_*/
+forge-local*/
+forge-*/
+beads_global/
+owncloud/
+ops-cli/
+settings/
+daemon/
+testdb/
+testrig/
+testrip/
+dftimewolf/
+agents/
+gastown/
+aihub/
+flext/
+ccs/
+serena/
+plugins/
+plugin*/
+events/
+mcb/
+invest/
+deacon/
+cliproxyapi/
+gmn/
+ESTOP.aihub
+gt-p0-tmpfiles.conf.bak
+beads.bak-*/
+agents.backup-*/
+beads/
+.claude/
+.cursor/
+.mcp.json
+.runtime/
+.opencode/
+agents/
+agents
+agents/
+
+# Gas City
+.beads/*
+!.beads/identity.toml

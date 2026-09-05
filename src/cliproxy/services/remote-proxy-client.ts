@@ -6,7 +6,7 @@
  */
 
 import * as https from 'https';
-import { getRemoteDefaultPort, validateRemotePort } from '../config/config-generator';
+import { ConfigError } from '../../errors/error-types';
 
 /** Error codes for remote proxy status */
 export type RemoteProxyErrorCode =
@@ -33,25 +33,17 @@ export interface RemoteProxyStatus {
 export interface RemoteProxyClientConfig {
   /** Remote proxy host (IP or hostname) */
   host: string;
-  /**
-   * Remote proxy port.
-   * Optional - defaults based on protocol:
-   * - HTTPS: 443
-   * - HTTP: 8317 (CLIProxyAPI default)
-   */
-  port?: number;
+  /** Explicit remote proxy port. */
+  port: number;
   /** Protocol to use (http or https) */
   protocol: 'http' | 'https';
   /** Optional auth token for Authorization header */
   authToken?: string;
-  /** Request timeout in ms (default: 2000) */
-  timeout?: number;
-  /** Allow self-signed certificates (default: false) */
-  allowSelfSigned?: boolean;
+  /** Explicit CCS-owned request timeout in milliseconds. */
+  timeout: number;
+  /** Explicit TLS policy for self-signed certificates. */
+  allowSelfSigned: boolean;
 }
-
-/** Default timeout for remote proxy requests (aggressive for CLI UX) */
-const DEFAULT_TIMEOUT_MS = 2000;
 
 /**
  * Get standard web port for protocol (for URL display omission)
@@ -66,11 +58,6 @@ function getStandardWebPort(protocol: 'http' | 'https'): number {
  * Get effective port for CLIProxyAPI connection.
  * Validates port and uses protocol-based default for invalid/undefined values.
  */
-function getEffectivePort(port: number | undefined, protocol: 'http' | 'https'): number {
-  const validatedPort = validateRemotePort(port);
-  return validatedPort ?? getRemoteDefaultPort(protocol);
-}
-
 /**
  * Build URL for remote proxy
  * Only omits port from URL if it matches standard web ports (80/443),
@@ -78,19 +65,18 @@ function getEffectivePort(port: number | undefined, protocol: 'http' | 'https'):
  */
 function buildProxyUrl(
   host: string,
-  port: number | undefined,
+  port: number,
   protocol: 'http' | 'https',
   path: string
 ): string {
-  const effectivePort = getEffectivePort(port, protocol);
   const standardWebPort = getStandardWebPort(protocol);
 
   // Only omit port from URL if it matches the standard web port for the protocol
   // e.g., HTTP on port 80 or HTTPS on port 443
-  if (effectivePort === standardWebPort) {
+  if (port === standardWebPort) {
     return `${protocol}://${host}${path}`;
   }
-  return `${protocol}://${host}:${effectivePort}${path}`;
+  return `${protocol}://${host}:${port}${path}`;
 }
 
 /**
@@ -205,16 +191,22 @@ function createHttpsAgent(allowSelfSigned: boolean): https.Agent | undefined {
 export async function checkRemoteProxy(
   config: RemoteProxyClientConfig
 ): Promise<RemoteProxyStatus> {
-  const { host, port, protocol, authToken, allowSelfSigned = false } = config;
-  const timeout = config.timeout ?? DEFAULT_TIMEOUT_MS;
+  const { host, port, protocol, authToken, allowSelfSigned, timeout } = config;
 
-  // Validate host is provided
   if (!host || host.trim() === '') {
-    return {
-      reachable: false,
-      error: 'Host is required',
-      errorCode: 'UNKNOWN',
-    };
+    throw new ConfigError('Remote CLIProxy host is required');
+  }
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ConfigError('Remote CLIProxy port must be a whole number between 1 and 65535');
+  }
+  if (protocol !== 'http' && protocol !== 'https') {
+    throw new ConfigError('Remote CLIProxy protocol must equal http or https');
+  }
+  if (!Number.isInteger(timeout) || timeout < 1) {
+    throw new ConfigError('Remote CLIProxy timeout must be a positive whole number');
+  }
+  if (typeof allowSelfSigned !== 'boolean') {
+    throw new ConfigError('Remote CLIProxy allowSelfSigned policy is required');
   }
 
   // Use root endpoint for liveness check - cheap and available across deployments

@@ -99,22 +99,24 @@ describe('ai-provider service stable ids', () => {
     expect(persisted[0]?.id).toBe('gemini-b');
   });
 
-  it('keeps legacy numeric index updates working during the route transition', async () => {
+  it('rejects obsolete numeric entry indexes', async () => {
     const { updateAiProviderEntry } = await loadAiProviderService();
 
     writeCliproxyConfig(tempHome, {
       'gemini-api-key': [{ 'api-key': 'alpha', id: 'gemini-a' }],
     });
 
-    await updateAiProviderEntry('gemini-api-key', '0', {
-      apiKey: 'legacy-index-update',
-    });
+    await expect(
+      updateAiProviderEntry('gemini-api-key', '0', {
+        apiKey: 'obsolete-index-update',
+      })
+    ).rejects.toThrow('Entry not found');
 
     const persisted = readCliproxyConfig(tempHome)['gemini-api-key'] as Array<
       Record<string, unknown>
     >;
     expect(persisted[0]?.id).toBe('gemini-a');
-    expect(persisted[0]?.['api-key']).toBe('legacy-index-update');
+    expect(persisted[0]?.['api-key']).toBe('alpha');
   });
 
   it('backfills and preserves stable ids for openai-compatible connectors', async () => {

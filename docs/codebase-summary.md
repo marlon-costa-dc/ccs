@@ -154,9 +154,9 @@ evergreen documentation.
 | Semantic-release commit analysis | [`.releaserc.cjs`](../.releaserc.cjs) |
 | GitHub automation | [`.github/workflows/`](../.github/workflows/) |
 
-Semantic-release owns versions, changelog updates, tags, npm publication, and
-GitHub releases. Generated `dist/` contents and release artifacts are outputs,
-not architectural source.
+Semantic-release owns versions, changelog updates, tags, and GitHub releases.
+This fork does not publish the upstream-owned npm package. Generated `dist/`
+contents and release artifacts are outputs, not architectural source.
 
 ## Documentation Map
 

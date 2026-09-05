@@ -9,7 +9,27 @@ interface CliproxyUsageQueueRecord {
   auth_index?: string | number;
   request_id?: string;
   tokens?: Partial<CliproxyRequestDetail['tokens']>;
+  cost?: CliproxyRequestDetail['cost'];
   failed?: boolean;
+}
+
+function normalizeCost(rawCost: unknown): CliproxyRequestDetail['cost'] | undefined {
+  const cost = asRecord(rawCost);
+  if (!cost) return undefined;
+  const quality = cost.quality;
+  if (quality !== 'complete' && quality !== 'partial' && quality !== 'unavailable') {
+    return undefined;
+  }
+  return {
+    quality,
+    estimated_total: asNumber(cost.estimated_total),
+    currency: asString(cost.currency, ''),
+    input: asNumber(cost.input),
+    cache_read: asNumber(cost.cache_read),
+    output: asNumber(cost.output),
+    pricing_source: asString(cost.pricing_source, ''),
+    pricing_source_digest: asString(cost.pricing_source_digest, ''),
+  };
 }
 
 interface ApiKeyUsageEntry {
@@ -91,6 +111,7 @@ function normalizeQueueRecord(record: unknown): CliproxyUsageQueueRecord | null 
     auth_index: authIndex,
     request_id: asString(raw.request_id, ''),
     tokens: normalizeTokens(raw.tokens),
+    cost: normalizeCost(raw.cost),
     failed: asBoolean(raw.failed),
   };
 }
@@ -198,6 +219,7 @@ export function buildUsageResponseFromQueueRecords(records: unknown[]): Cliproxy
       auth_index: record.auth_index ?? record.source ?? 'unknown',
       request_id: record.request_id || undefined,
       tokens: normalizeTokens(record.tokens),
+      cost: record.cost,
       failed: record.failed === true,
     });
   }
@@ -212,7 +234,9 @@ export function mergeUsageResponses(
   const merged = buildUsageResponseFromQueueRecords([]);
   const seen = new Set<string>();
 
-  for (const entry of [...collectResponseDetails(base), ...collectResponseDetails(incoming)]) {
+  // Prefer the newest/enriched response when the same request exists in both
+  // snapshots; old management records may predate canonical cost metadata.
+  for (const entry of [...collectResponseDetails(incoming), ...collectResponseDetails(base)]) {
     const signature = createDetailSignature(entry.provider, entry.model, entry.detail);
     if (seen.has(signature)) {
       continue;

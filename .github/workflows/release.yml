@@ -114,20 +114,7 @@ jobs:
       - name: Pack release assets
         run: |
           set -euo pipefail
-          tar \
-            --sort=name \
-            --mtime='UTC 1970-01-01' \
-            --owner=0 \
-            --group=0 \
-            --numeric-owner \
-            -czf "$ASSET" \
-            package.json \
-            README.md \
-            LICENSE \
-            dist \
-            lib \
-            scripts \
-            config
+          bash scripts/build-release-asset.sh
           sha256sum "$ASSET" > "$CHECKSUMS"
 
       - name: Upload assets to existing release

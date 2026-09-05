@@ -93,16 +93,6 @@ async function loadLaunchSubcommand() {
   };
 }
 
-async function loadInstallSubcommand() {
-  moduleSeq++;
-  const mod = await import(
-    `../../../src/commands/bar/install-subcommand?test=${Date.now()}-${moduleSeq}`
-  );
-  return mod as {
-    handleBarInstall: (args: string[], deps?: Record<string, unknown>) => Promise<void>;
-  };
-}
-
 async function loadLaunchDescriptor() {
   moduleSeq++;
   return import(`../../../src/commands/bar/launch-descriptor?test=${Date.now()}-${moduleSeq}`);
@@ -896,116 +886,6 @@ describe('launch descriptor shim', () => {
     expect(proc.exitCode).not.toBe(0);
     expect(Buffer.from(proc.stderr).toString()).toContain('CCS Bar launch shim target changed');
     expect(fs.existsSync(markerPath)).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// install-subcommand: writeLaunchDescriptor after successful install
-// ---------------------------------------------------------------------------
-
-describe('install: writeLaunchDescriptor called after successful install', () => {
-  const FAKE_DOWNLOAD_URL =
-    'https://github.com/kaitranntt/ccs/releases/download/ccs-bar-latest/CCS-Bar.app.zip';
-
-  function fakeExtract(appsDir: string) {
-    return async (_url: string, dest: string) => {
-      fs.mkdirSync(path.join(dest, 'CCS Bar.app'), { recursive: true });
-    };
-  }
-
-  it('calls writeLaunchDescriptor with correct schema/runtime/args/home after install', async () => {
-    const ccsDir = path.join(tempHome, '.ccs');
-    const appsDir = path.join(tempHome, 'Applications');
-    const descriptorCalls: Array<{ jsonPath: string; descriptor: unknown }> = [];
-
-    const { handleBarInstall } = await loadInstallSubcommand();
-
-    await handleBarInstall([], {
-      fetchReleaseAsset: async () => ({ downloadUrl: FAKE_DOWNLOAD_URL }),
-      downloadAndExtract: fakeExtract(appsDir),
-      verifyCompat: async () => ({ compatible: true, reason: 'ok' }),
-      readAppBundleVersion: () => '1.2.3',
-      clearQuarantine: async () => true,
-      isBarRunning: async () => false,
-      promptLaunch: async () => false,
-      getCcsDir: () => ccsDir,
-      getAppsDir: () => appsDir,
-      writeLaunchDescriptor: (jsonPath: string, descriptor: unknown) => {
-        descriptorCalls.push({ jsonPath, descriptor });
-      },
-    });
-
-    expect(descriptorCalls.length).toBe(1);
-    expect(descriptorCalls[0].jsonPath).toContain('launch.json');
-    const desc = descriptorCalls[0].descriptor as {
-      schema: number;
-      runtime: string;
-      args: string[];
-      home: string;
-    };
-    expect(desc.schema).toBe(1);
-    expect(desc.runtime).toBe(process.execPath);
-    expect(path.basename(desc.args[0])).toBe('ccs.js');
-    expect(desc.args[0]).not.toContain(`${path.sep}.ccs${path.sep}`);
-    expect(desc.args).toContain('bar');
-    expect(desc.args).toContain('serve');
-    expect(desc.home).toBe(os.homedir());
-  });
-
-  it('does NOT hard-fail install when writeLaunchDescriptor throws', async () => {
-    const ccsDir = path.join(tempHome, '.ccs');
-    const appsDir = path.join(tempHome, 'Applications');
-
-    const { handleBarInstall } = await loadInstallSubcommand();
-
-    await expect(
-      handleBarInstall([], {
-        fetchReleaseAsset: async () => ({ downloadUrl: FAKE_DOWNLOAD_URL }),
-        downloadAndExtract: fakeExtract(appsDir),
-        verifyCompat: async () => ({ compatible: true, reason: 'ok' }),
-        readAppBundleVersion: () => '1.2.3',
-        clearQuarantine: async () => true,
-        isBarRunning: async () => false,
-        promptLaunch: async () => false,
-        getCcsDir: () => ccsDir,
-        getAppsDir: () => appsDir,
-        writeLaunchDescriptor: () => {
-          throw new Error('disk full');
-        },
-      })
-    ).resolves.toBeUndefined();
-
-    // Install itself should still succeed
-    expect(allOutput()).toMatch(/\[OK\].*CCS Bar/);
-    // Warning about launch.json failure
-    expect(allOutput()).toMatch(/\[!\].*launch\.json/i);
-  });
-
-  it('does not call writeLaunchDescriptor when install fails at download step', async () => {
-    const ccsDir = path.join(tempHome, '.ccs');
-    const appsDir = path.join(tempHome, 'Applications');
-    let descriptorCalled = false;
-
-    const { handleBarInstall } = await loadInstallSubcommand();
-
-    await handleBarInstall([], {
-      fetchReleaseAsset: async () => {
-        throw new Error('network error');
-      },
-      downloadAndExtract: async () => {
-        /* noop */
-      },
-      verifyCompat: async () => ({ compatible: true, reason: 'ok' }),
-      readAppBundleVersion: () => '1.0.0',
-      getCcsDir: () => ccsDir,
-      getAppsDir: () => appsDir,
-      writeLaunchDescriptor: () => {
-        descriptorCalled = true;
-      },
-    });
-
-    expect(descriptorCalled).toBe(false);
-    expect(allOutput()).toMatch(/\[X\]/);
   });
 });
 

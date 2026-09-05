@@ -1,11 +1,17 @@
 name: Semantic Release
 
-# Sole owner of CCS package versions, changelog entries, npm publication,
-# package tags, and package GitHub releases.
+# Sole owner of CCS package versions, changelog entries, tags, and GitHub
+# releases. This fork does not publish to npm.
 
 on:
   push:
     branches: [main]
+  # Manual trigger for recovery: when a run is cancelled or never starts (for
+  # example a queue stuck on an unavailable runner), the only way back was an
+  # empty commit on main. semantic-release is idempotent — it exits without
+  # publishing when no releasable commit exists since the last tag — so an
+  # operator-initiated run is safe.
+  workflow_dispatch:
 
 concurrency:
   group: semantic-release-${{ github.ref }}
@@ -14,7 +20,12 @@ concurrency:
 jobs:
   guard:
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: [self-hosted, linux, x64]
+    # GitHub-hosted, like every other active workflow. This fork registers no
+    # self-hosted runners (`/actions/runners` returns zero), so jobs pinned to
+    # that label never start: releases sat pending or were cancelled, and a
+    # merged change could not reach a published artifact. The job needs no
+    # machine-local state — it checks out, builds and calls semantic-release.
+    runs-on: ubuntu-latest
     outputs:
       should_release: ${{ steps.release-guard.outputs.should_release }}
 
@@ -38,13 +49,12 @@ jobs:
   release:
     needs: guard
     if: ${{ needs.guard.outputs.should_release == 'true' }}
-    runs-on: [self-hosted, linux, x64]
+    runs-on: ubuntu-latest
 
     permissions:
       contents: write
       issues: write
       pull-requests: write
-      id-token: write
 
     steps:
       - name: Checkout
@@ -52,7 +62,6 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
-          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -63,7 +72,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: bash scripts/ensure-deps.sh
@@ -77,17 +85,6 @@ jobs:
       - name: Semantic Release
         env:
           HUSKY: 0
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
-          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          auth_header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')
-          echo "::add-mask::${auth_header}"
-          export GIT_CONFIG_COUNT=2
-          export GIT_CONFIG_KEY_0=http.https://github.com/kaitranntt/ccs.extraheader
-          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth_header}"
-          export GIT_CONFIG_KEY_1=http.https://github.com/kaitranntt/ccs.git.extraheader
-          export GIT_CONFIG_VALUE_1="AUTHORIZATION: basic ${auth_header}"
-
-          npx semantic-release
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: npx semantic-release

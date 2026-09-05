@@ -29,11 +29,7 @@ import { exitWithError } from '../../errors';
 import { ExitCode } from '../../errors/exit-codes';
 import { CommandContext, parseArgs, rejectUnsupportedAuthOptions } from './types';
 import { stripAmbientProviderCredentials } from './create-command-env';
-import { isUnifiedMode, hasUnifiedConfig } from '../../config/config-loader-facade';
-import {
-  maybeShowPoolOnboardingHint,
-  countNativeClaudeProfiles,
-} from '../../cliproxy/routing/pool-onboarding-hint';
+import { isUnifiedMode } from '../../config/config-loader-facade';
 import { canOverwriteGrandfatheredReservedProfileName } from '../../config/reserved-names';
 
 function sanitizeProfileNameForInstance(name: string): string {
@@ -323,16 +319,6 @@ export async function handleCreate(ctx: CommandContext, args: string[]): Promise
           )
         );
         console.log('');
-        // Pool suggestion: shown only AFTER the profile creation fully
-        // succeeded (a pre-create hint would burn the once-per-install
-        // dismissal even when creation fails or rolls back).  Print-only,
-        // TTY-gated, never blocks.  Gated on hasUnifiedConfig() so legacy
-        // profiles.json-only installs receive the hint from ccs doctor only
-        // (where dismissal semantics are preserved).  The profile now exists,
-        // so the registry count is already post-create (no +1 needed).
-        if (!profileExistedBeforeCreate && hasUnifiedConfig()) {
-          maybeShowPoolOnboardingHint(countNativeClaudeProfiles());
-        }
         process.exit(0);
       } else {
         await rollbackFailedCreate();

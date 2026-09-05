@@ -1,3 +1,61 @@
+## [8.9.0-fd.8](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.7...v8.9.0-fd.8) (2026-09-03)
+
+### Bug Fixes
+
+* preserve ccs launcher executable mode ([1b4ce4c](https://github.com/marlon-costa-dc/ccs/commit/1b4ce4cc8f1a617d09a57e3009b31312a8a6aac0))
+* **runtime:** publish launcher mode and token helper ([6f01f22](https://github.com/marlon-costa-dc/ccs/commit/6f01f220c6830548c1ad93cdbd7ee59990c06ec2))
+
+### Documentation
+
+* point the current-work prime/hook example at Gas City (ag-cj6.16) ([e486baf](https://github.com/marlon-costa-dc/ccs/commit/e486baf958df084de4c391c1ffd7f511f29154d1))
+
+## [8.9.0-fd.7](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.6...v8.9.0-fd.7) (2026-09-01)
+
+### Bug Fixes
+
+* **release:** assemble dependencies from frozen lock ([949785f](https://github.com/marlon-costa-dc/ccs/commit/949785f055b34c6ec791d7c13a8a9d7050dd7151))
+* **release:** isolate npm pack output ([8d784a6](https://github.com/marlon-costa-dc/ccs/commit/8d784a69ca3b2ffab3a8a45b7a50aa2218e3e2f8))
+* **release:** isolate production dependency assembly ([ec39897](https://github.com/marlon-costa-dc/ccs/commit/ec398973553828398466edeb65ac1adbea01a229))
+* **release:** keep pack metadata machine-readable ([e026b2d](https://github.com/marlon-costa-dc/ccs/commit/e026b2d29e4f23fab1b65bb598fcd2ff5461f7c5))
+* **review:** align explicit PR-Agent contract ([e06ee02](https://github.com/marlon-costa-dc/ccs/commit/e06ee02e3dc3d7bad5ce2740acbe743045f84ebe))
+
+### Documentation
+
+* **review:** clarify explicit lane contract ([9c279b4](https://github.com/marlon-costa-dc/ccs/commit/9c279b4ec6fedebdbf18f9ad950079243c855903))
+
+## [8.9.0-fd.6](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.5...v8.9.0-fd.6) (2026-09-01)
+
+### Bug Fixes
+
+* **ci:** make AI review explicitly selected ([c23cd73](https://github.com/marlon-costa-dc/ccs/commit/c23cd738438dbcacc7bea4e0bb116f774e3be436))
+* **release:** confine asset output to portable basename ([4adffce](https://github.com/marlon-costa-dc/ccs/commit/4adffcedbaaacc56d8e5bf2255a218ecef6f10f9))
+* **release:** declare canonical schema artifact ([7e66c06](https://github.com/marlon-costa-dc/ccs/commit/7e66c06edd70bbb9e4ad3f87729c98e0f9584f2f))
+* **release:** package manifest-owned runtime assets ([ed9dfb8](https://github.com/marlon-costa-dc/ccs/commit/ed9dfb896a5656a8640c9b1223965df811618372))
+
+## [8.9.0-fd.5](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.4...v8.9.0-fd.5) (2026-09-01)
+
+### Bug Fixes
+
+* **config:** --no-open dashboard flag; mount pipeline card; drop npx-delegating launchers ([294750e](https://github.com/marlon-costa-dc/ccs/commit/294750e8fe8340f45040ec8b5f2df0fc2941887e))
+
+## [8.9.0-fd.4](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.3...v8.9.0-fd.4) (2026-08-31)
+
+### Bug Fixes
+
+* **release:** ship a launcher that runs this package, not npx upstream ([93c3ee9](https://github.com/marlon-costa-dc/ccs/commit/93c3ee97e79a2da4097406fa15c1658481afd9f7))
+
+## [8.9.0-fd.3](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.2...v8.9.0-fd.3) (2026-08-31)
+
+### Bug Fixes
+
+* **release:** ship the runtime dependencies the CLI needs ([591c6af](https://github.com/marlon-costa-dc/ccs/commit/591c6af5a25a993432b32e30f2b7212a134b90eb))
+
+## [8.9.0-fd.2](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.1...v8.9.0-fd.2) (2026-08-31)
+
+### Bug Fixes
+
+* **release:** publish this fork on its own fd prerelease channel (aihub-6k1.19) ([a3e0a5f](https://github.com/marlon-costa-dc/ccs/commit/a3e0a5f25b3b55b0aa8531b3322150a28bc00ee4))
+
 ## [8.9.0](https://github.com/kaitranntt/ccs/compare/v8.8.1...v8.9.0) (2026-08-09)
 
 ### Features

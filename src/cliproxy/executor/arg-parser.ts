@@ -24,7 +24,6 @@ import {
   normalizeKiroIDCFlow,
 } from '../auth/auth-types';
 import type { UnifiedConfig } from '../../config/unified-config-types';
-import { PROXY_CLI_FLAGS } from '../proxy/proxy-config-resolver';
 import { parseThinkingOverride } from './thinking-arg-parser';
 
 // Inlined from antigravity-responsibility.ts to avoid pulling in unified-config-loader
@@ -118,7 +117,6 @@ export const CCS_FLAGS: readonly string[] = [
   '--accept-agr-risk',
   '--accept-antigravity-risk',
   '--settings',
-  ...PROXY_CLI_FLAGS,
 ] as const;
 
 /**

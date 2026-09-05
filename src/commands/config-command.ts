@@ -234,17 +234,19 @@ export async function handleConfigCommand(
     console.log('');
 
     // Open browser
-    try {
-      await deps.openBrowser(urls.browserUrl, { wait: false });
-      logger.info('dashboard.browser_opened', 'Config dashboard browser launch attempted', {
-        browserUrl: urls.browserUrl,
-      });
-      console.log(deps.info('Browser opened automatically'));
-    } catch {
-      logger.warn('dashboard.browser_open_failed', 'Automatic browser launch failed', {
-        browserUrl: urls.browserUrl,
-      });
-      console.log(deps.info(`Open manually: ${urls.browserUrl}`));
+    if (!options.noOpen) {
+      try {
+        await deps.openBrowser(urls.browserUrl, { wait: false });
+        logger.info('dashboard.browser_opened', 'Config dashboard browser launch attempted', {
+          browserUrl: urls.browserUrl,
+        });
+        console.log(deps.info('Browser opened automatically'));
+      } catch {
+        logger.warn('dashboard.browser_open_failed', 'Automatic browser launch failed', {
+          browserUrl: urls.browserUrl,
+        });
+        console.log(deps.info(`Open manually: ${urls.browserUrl}`));
+      }
     }
 
     console.log('');

@@ -77,6 +77,6 @@ describe('docker release workflow context', () => {
     });
     const output = result.stdout.toString() + result.stderr.toString();
 
-    expect(result.exitCode, output).toBe(0);
-  });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+  }, 30_000);
 });

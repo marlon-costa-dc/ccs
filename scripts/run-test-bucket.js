@@ -6,6 +6,14 @@ const { spawnSync } = require('node:child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const candidateRoots = ['tests/unit', 'tests/integration', 'tests/npm', 'src'];
+const browserMcpSplitTests = [
+  'tests/unit/hooks/browser-mcp-advanced-interactions.test.ts',
+  'tests/unit/hooks/browser-mcp-downloads-and-files.test.ts',
+  'tests/unit/hooks/browser-mcp-navigation-and-query.test.ts',
+  'tests/unit/hooks/browser-mcp-orchestration-and-artifacts.test.ts',
+  'tests/unit/hooks/browser-mcp-recording-and-replay.test.ts',
+  'tests/unit/hooks/browser-mcp-session-and-intercepts.test.ts',
+];
 // Add a `.ts` test to `slowTests` when ANY of these apply:
 //   1. It spawns a child process (CLI, bun test, node, gh, etc.).
 //   2. It binds a port, starts a server, or talks to localhost.
@@ -19,17 +27,14 @@ const candidateRoots = ['tests/unit', 'tests/integration', 'tests/npm', 'src'];
 // (catches deletion drift) but CANNOT detect new undeclared slow tests.
 // Automated perf-budget enforcement tracked in issue #1071.
 const slowTests = [
+  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
   'tests/integration/logging-request-context.test.ts',
   'tests/integration/proxy/daemon-lifecycle.test.ts',
+  'tests/integration/update-command-install-origin.test.ts',
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
   'tests/unit/commands/persist-command-handler.test.ts',
   'tests/unit/utils/claudecode-env-stripping.test.ts',
-  'tests/unit/hooks/browser-mcp-advanced-interactions.test.ts',
-  'tests/unit/hooks/browser-mcp-downloads-and-files.test.ts',
-  'tests/unit/hooks/browser-mcp-navigation-and-query.test.ts',
-  'tests/unit/hooks/browser-mcp-orchestration-and-artifacts.test.ts',
-  'tests/unit/hooks/browser-mcp-recording-and-replay.test.ts',
-  'tests/unit/hooks/browser-mcp-session-and-intercepts.test.ts',
+  ...browserMcpSplitTests,
   'tests/unit/targets/codex-runtime-integration.test.ts',
   'tests/unit/targets/codex-settings-bridge-launch.test.ts',
   'tests/unit/targets/droid-command-routing-integration.test.ts',
@@ -48,6 +53,9 @@ const slowTests = [
 const fastJsTests = new Set(['tests/unit/flag-parsing-simple.test.js']);
 
 const isolatedTests = new Set([
+  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
+  'tests/integration/update-command-install-origin.test.ts',
+  ...browserMcpSplitTests,
   'tests/unit/commands/update-command-beta-channel.test.js',
   'tests/unit/commands/update-command-force-reinstall.test.js',
   'tests/unit/commands/bar-command.test.ts',
@@ -141,11 +149,11 @@ function toBunTestPath(relativePath) {
 function getBunArgs(name, selected = selectBucket(name)) {
   const testPaths = selected.map(toBunTestPath);
 
-  // Slow bucket forces sequential execution because it spawns subprocesses,
-  // binds ports, and touches shared state — parallelism causes flakes.
+  // Slow bucket forces sequential execution and allows the declared launch
+  // suites enough time for subprocess startup on loaded CI workers.
   // Fast bucket keeps bun's default parallelism for speed.
   return name === 'slow'
-    ? ['test', '--max-concurrency=1', '--timeout=10000', ...testPaths]
+    ? ['test', '--max-concurrency=1', '--timeout=30000', ...testPaths]
     : ['test', ...testPaths];
 }
 
@@ -256,16 +264,14 @@ function collectFilesByExtension(dir, extension, files = []) {
 
 function isTestSourcePath(sourcePath) {
   const normalized = sourcePath.split(path.sep).join('/');
-  return (
-    normalized.includes('/__tests__/') ||
-    /\.(?:test|spec)\.ts$/.test(normalized)
-  );
+  return normalized.includes('/__tests__/') || /\.(?:test|spec)\.ts$/.test(normalized);
 }
 
 function hasCompleteBuildArtifacts(baseDir = rootDir) {
   const requiredBuildArtifacts = getRequiredBuildArtifacts(baseDir);
-  return requiredBuildArtifacts.length > 0 && requiredBuildArtifacts.every((relativePath) =>
-    fs.existsSync(path.join(baseDir, relativePath))
+  return (
+    requiredBuildArtifacts.length > 0 &&
+    requiredBuildArtifacts.every((relativePath) => fs.existsSync(path.join(baseDir, relativePath)))
   );
 }
 
@@ -281,6 +287,28 @@ function ensureBuildForSlowBucket() {
   });
 
   return build.status ?? 1;
+}
+
+function generateBuildProvenance(run = spawnSync) {
+  const result = run(
+    process.execPath,
+    [path.join(rootDir, 'scripts/generate-build-provenance.js')],
+    {
+      cwd: rootDir,
+      stdio: 'inherit',
+    }
+  );
+
+  if (result.error) {
+    console.error(`[X] Failed to generate build provenance: ${result.error.message}`);
+    return 1;
+  }
+
+  const exitCode = result.status ?? 1;
+  if (exitCode !== 0) {
+    console.error(`[X] Build provenance generation exited with status ${exitCode}.`);
+  }
+  return exitCode;
 }
 
 function runBunTest(run) {
@@ -310,6 +338,7 @@ function runBunTest(run) {
   const exitCode = result.status ?? 1;
   if (exitCode !== 0) {
     writeOutput();
+    console.error(`[X] ${run.label} exited with status ${exitCode}.`);
     return exitCode;
   }
 
@@ -352,26 +381,22 @@ function runBucket(name) {
     console.log(`[i] Running ${isolatedCount} test file(s) in isolated Bun processes.`);
   }
 
-  let exitCode = 0;
   for (const run of runs) {
     if (name === 'slow') {
       const buildStatus = ensureBuildForSlowBucket();
       if (buildStatus !== 0) {
-        exitCode = buildStatus;
-        continue;
+        console.error(`[X] Runtime build prerequisite failed before ${run.label}.`);
+        return buildStatus;
       }
     }
     const status = runBunTest(run);
     if (status !== 0) {
-      exitCode = status;
+      return status;
     }
   }
 
-  if (exitCode === 0) {
-    console.log(`[OK] Bucket '${name}' ran ${selected.length} selected test files.`);
-  }
-
-  return exitCode;
+  console.log(`[OK] Bucket '${name}' ran ${selected.length} selected test files.`);
+  return 0;
 }
 
 function main(args = process.argv.slice(2)) {
@@ -382,24 +407,26 @@ function main(args = process.argv.slice(2)) {
     return 1;
   }
 
-  if (bucket === 'all') {
-    let exitCode = 0;
+  const provenanceStatus = generateBuildProvenance();
+  if (provenanceStatus !== 0) {
+    return provenanceStatus;
+  }
 
+  if (bucket === 'all') {
     for (const name of ['fast', 'slow']) {
       const status = runBucket(name);
       if (status !== 0) {
-        exitCode = status;
+        return status;
       }
     }
-
-    return exitCode;
+    return 0;
   }
 
   return runBucket(bucket);
 }
 
 if (require.main === module) {
-  process.exit(main());
+  process.exitCode = main();
 }
 
 module.exports = {
@@ -421,5 +448,6 @@ module.exports = {
   shouldVerifyRunFileCount,
   getRequiredBuildArtifacts,
   hasCompleteBuildArtifacts,
+  generateBuildProvenance,
   main,
 };

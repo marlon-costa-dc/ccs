@@ -32,10 +32,7 @@ import { stripBrowserEnv, stripClaudeCodeEnv } from '../../utils/shell-executor'
 import { CodexReasoningProxy } from '../ai-providers/codex-reasoning-proxy';
 import { ToolSanitizationProxy } from '../proxy/tool-sanitization-proxy';
 import { HttpsTunnelProxy } from '../proxy/https-tunnel-proxy';
-import {
-  MODEL_ENV_VAR_KEYS,
-  normalizeModelIdForProvider,
-} from '../ai-providers/model-id-normalizer';
+import { MODEL_ENV_VAR_KEYS } from '../ai-providers/model-id-normalizer';
 import type { ProxyTarget } from '../proxy/proxy-target-resolver';
 import { getEffectiveApiKey } from '../auth/auth-token-manager';
 import { isSettings, type Settings } from '../../types/config';
@@ -452,26 +449,4 @@ export function logEnvironment(
   if (env.DISABLE_TELEMETRY || env.DISABLE_ERROR_REPORTING || env.DISABLE_BUG_COMMAND) {
     log(`Claude env: Global env applied (telemetry/reporting disabled)`);
   }
-}
-
-/** Apply fallback provider config to env vars for a failed tier */
-export function applyFallback(
-  env: Record<string, string>,
-  failedTier: 'opus' | 'sonnet' | 'haiku',
-  fallback: { provider: string; model: string }
-): Record<string, string> {
-  const tierEnvMap = {
-    opus: 'ANTHROPIC_DEFAULT_OPUS_MODEL',
-    sonnet: 'ANTHROPIC_DEFAULT_SONNET_MODEL',
-    haiku: 'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-  } as const;
-  const result = { ...env };
-  const originalModel = result[tierEnvMap[failedTier]];
-  const normalizedFallbackModel = normalizeModelIdForProvider(fallback.model, fallback.provider);
-  result[tierEnvMap[failedTier]] = normalizedFallbackModel;
-  // If failed tier is default tier, also update ANTHROPIC_MODEL
-  if (result.ANTHROPIC_MODEL === originalModel) {
-    result.ANTHROPIC_MODEL = normalizedFallbackModel;
-  }
-  return result;
 }

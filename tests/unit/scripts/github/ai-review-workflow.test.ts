@@ -7,26 +7,27 @@ function resolvePath(relativePath: string) {
 }
 
 describe('PR-Agent review lane migration', () => {
-  test('keeps ai-review.yml as the PR-Agent workflow on the self-hosted cliproxy runner with trusted PR gating', () => {
+  test('keeps AI review explicit and fails on a hosted runner when unconfigured', () => {
     const workflowPath = resolvePath('../../../../.github/workflows/ai-review.yml');
     const prAgentConfigPath = resolvePath('../../../../.pr_agent.toml');
+    const contributingPath = resolvePath('../../../../CONTRIBUTING.md');
 
     expect(fs.existsSync(workflowPath)).toBe(true);
     expect(fs.existsSync(prAgentConfigPath)).toBe(true);
+    expect(fs.existsSync(contributingPath)).toBe(true);
 
     const workflow = fs.readFileSync(workflowPath, 'utf8');
     const config = fs.readFileSync(prAgentConfigPath, 'utf8');
+    const contributing = fs.readFileSync(contributingPath, 'utf8');
     const appTokenUsages = workflow.match(/uses: actions\/create-github-app-token@v1/g) ?? [];
 
     expect(workflow).toContain('name: AI Code Review');
-    expect(workflow).toContain('runs-on: [self-hosted, cliproxy]');
+    expect(workflow).toContain('runs-on: ubuntu-latest');
+    expect(workflow).not.toContain('self-hosted');
+    expect(workflow).not.toContain('pull_request_target');
     expect(workflow).toContain('uses: qodo-ai/pr-agent');
     expect(appTokenUsages).toHaveLength(2);
     expect(workflow).toContain('OPENAI.API_BASE');
-    expect(workflow).toContain("github.event_name == 'pull_request_target' &&");
-    expect(workflow).toContain(
-      'contains(fromJSON(\'["COLLABORATOR","MEMBER","OWNER"]\'), github.event.pull_request.author_association)'
-    );
     expect(workflow).toContain(
       'contains(fromJSON(\'["COLLABORATOR","MEMBER","OWNER"]\'), github.event.issue.author_association)'
     );
@@ -36,7 +37,7 @@ describe('PR-Agent review lane migration', () => {
     expect(workflow).toContain('vars.AI_REVIEW_MODEL');
     expect(workflow).toContain('vars.AI_REVIEW_REASONING_EFFORT');
     expect(workflow).toContain('secrets.AI_REVIEW_API_KEY');
-    expect(workflow).toContain('github_action_config.auto_review');
+    expect(workflow).not.toContain('github_action_config.auto_review');
     expect(workflow).toContain("github.event.comment.body == '/review'");
     expect(workflow).toContain('github.event.comment.author_association');
     expect(workflow).toContain('ccs-reviewer[bot]');
@@ -67,6 +68,10 @@ describe('PR-Agent review lane migration', () => {
     expect(config).toContain('enable_help_text = true');
     expect(config).toContain('[pr_reviewer]');
     expect(config).not.toContain('auto_review = true');
+    expect(config).not.toContain('[github_action_config]');
+    expect(config).not.toContain('pr_actions');
     expect(config).not.toContain('claude-code-action');
+    expect(contributing).toContain('runs PR-Agent on GitHub-hosted runners');
+    expect(contributing).not.toContain('self-hosted PR-Agent');
   });
 });

@@ -28,7 +28,7 @@ type ProbeResult = {
 };
 
 function resolveNodeBinary(version: 18 | 22 | 26): string {
-  const result = spawnSync('npx', ['-y', `node@${version}`, '-p', 'process.execPath'], {
+  const result = spawnSync('npx', ['--yes', `node@${version}`, '-p', 'process.execPath'], {
     encoding: 'utf8',
     env: Object.fromEntries(
       Object.entries(process.env).filter(([key]) => !proxyKeys.includes(key))
@@ -99,9 +99,11 @@ describe.skipIf(!matrixEnabled)('real runtime upstream transport matrix', () => 
   let sawProxyAuthorization = false;
 
   beforeAll(async () => {
-    node18 = resolveNodeBinary(18);
-    node22 = resolveNodeBinary(22);
-    node26 = resolveNodeBinary(26);
+    [node18, node22, node26] = [
+      resolveNodeBinary(18),
+      resolveNodeBinary(22),
+      resolveNodeBinary(26),
+    ];
     const payload = JSON.stringify({
       id: 'chatcmpl_matrix',
       model: 'sentinel-model',

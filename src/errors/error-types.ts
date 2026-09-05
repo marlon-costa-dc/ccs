@@ -20,15 +20,18 @@ import { ExitCode } from './exit-codes';
 export class CCSError extends Error {
   readonly code: ExitCode;
   readonly recoverable: boolean;
+  override readonly cause?: unknown;
 
   constructor(
     message: string,
     code: ExitCode = ExitCode.GENERAL_ERROR,
-    recoverable: boolean = false
+    recoverable: boolean = false,
+    cause?: unknown
   ) {
     super(message);
     this.code = code;
     this.recoverable = recoverable;
+    this.cause = cause;
     this.name = 'CCSError';
     // Maintain proper stack trace in V8 environments
     if (Error.captureStackTrace) {
@@ -44,8 +47,8 @@ export class CCSError extends Error {
 export class ConfigError extends CCSError {
   readonly configPath?: string;
 
-  constructor(message: string, configPath?: string) {
-    super(message, ExitCode.CONFIG_ERROR, false);
+  constructor(message: string, configPath?: string, cause?: unknown) {
+    super(message, ExitCode.CONFIG_ERROR, false, cause);
     this.name = 'ConfigError';
     this.configPath = configPath;
   }
@@ -134,8 +137,8 @@ export class ProfileError extends CCSError {
 export class ProxyError extends CCSError {
   readonly port?: number;
 
-  constructor(message: string, port?: number) {
-    super(message, ExitCode.PROXY_ERROR, false);
+  constructor(message: string, port?: number, cause?: unknown) {
+    super(message, ExitCode.PROXY_ERROR, false, cause);
     this.name = 'ProxyError';
     this.port = port;
   }

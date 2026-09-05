@@ -253,7 +253,6 @@ describe('skip-local-auth logic', () => {
         proxyPort: 443,
         proxyProtocol: 'https',
         proxyAuthToken: 'github-secret-token',
-        remoteOnly: true,
       };
 
       // Determine if this configuration should skip local OAuth

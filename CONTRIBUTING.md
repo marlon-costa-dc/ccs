@@ -108,11 +108,11 @@ drift quickly.
 
 ## AI Review Lane
 
-CCS PR review no longer depends on `anthropics/claude-code-action`. The repository review lane is self-hosted PR-Agent:
+CCS PR review no longer depends on `anthropics/claude-code-action`. The repository review lane runs PR-Agent on GitHub-hosted runners and is selected explicitly:
 
 - The retained `.github/workflows/ai-review.yml` runs PR-Agent in GitHub Actions.
 - Use `/review` on the PR when you need a fresh pass after follow-up commits.
-- Only the trusted `/review` comment path is enabled.
+- Only the trusted `/review` comment path or an explicit workflow dispatch is enabled; pushes and pull request events never start an automatic review.
 - Keep repository-level reviewer instructions in the root `.pr_agent.toml`.
 - Keep runtime wiring and defaults in `ai-review.yml`, which maps the existing `AI_REVIEW_BASE_URL`, `AI_REVIEW_MODEL`, `AI_REVIEW_REASONING_EFFORT`, and `AI_REVIEW_API_KEY` integrations onto PR-Agent's `OPENAI.*` and `config.*` settings.
 - If you change review defaults, update the workflow or `.pr_agent.toml` alongside the contributor or architecture docs in the same PR.
@@ -272,7 +272,8 @@ git commit -m "update file"
 Releases are automated with semantic-release.
 
 - Merges to `main` publish the `@latest` channel.
-- Do not manually bump versions, create tags, or run manual `npm publish`.
+- Do not manually bump versions or create tags. This fork publishes GitHub
+  releases only.
 - [`docs/release-process.md`](./docs/release-process.md) is the canonical
   release authority and documents downstream packaging and Docker promotion.
 

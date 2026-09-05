@@ -34,23 +34,14 @@ export interface ProxyRemoteConfig {
    * Management key for remote proxy management API endpoints.
    * CLIProxyAPI uses separate authentication for management endpoints
    * (/v0/management/*) via 'secret-key' config.
-   * If not set, falls back to auth_token for backwards compatibility.
    */
   management_key?: string;
   /** Connection timeout in milliseconds (default: 2000) */
   timeout?: number;
+  /** Explicit TLS policy for self-signed remote certificates. */
+  allow_self_signed: boolean;
   /** Enable auto-sync profiles to remote on settings change (default: false) */
   auto_sync?: boolean;
-}
-
-/**
- * Fallback configuration when remote proxy is unreachable.
- */
-export interface ProxyFallbackConfig {
-  /** Enable fallback to local proxy (default: true) */
-  enabled: boolean;
-  /** Auto-start local proxy without prompting (default: false = prompt user) */
-  auto_start: boolean;
 }
 
 /**
@@ -85,10 +76,10 @@ export interface OpenAICompatProxyConfig {
  * Controls whether CCS uses local or remote CLIProxyAPI instance.
  */
 export interface CliproxyServerConfig {
+  /** Required deadline for CCS-owned CLIProxy management calls. */
+  management_timeout_ms: number;
   /** Remote proxy settings */
   remote: ProxyRemoteConfig;
-  /** Fallback behavior when remote is unreachable */
-  fallback: ProxyFallbackConfig;
   /** Local proxy settings */
   local: ProxyLocalConfig;
 }
@@ -130,21 +121,52 @@ export const DEFAULT_GLOBAL_ENV: Record<string, string> = {
  * Port is optional for remote - defaults based on protocol.
  */
 export const DEFAULT_CLIPROXY_SERVER_CONFIG: CliproxyServerConfig = {
+  management_timeout_ms: 5_000,
   remote: {
     enabled: false,
     host: '',
     protocol: 'http',
     auth_token: '',
-  },
-  fallback: {
-    enabled: true,
-    auto_start: false,
+    allow_self_signed: false,
   },
   local: {
     port: 8317,
     auto_start: true,
   },
 };
+
+export interface CliproxyServerOverrides {
+  readonly management_timeout_ms?: number;
+  readonly remote?: Partial<ProxyRemoteConfig>;
+  readonly local?: Partial<ProxyLocalConfig>;
+}
+
+export function withCliproxyServerDefaults(
+  overrides: CliproxyServerOverrides = {}
+): CliproxyServerConfig {
+  const remote = overrides.remote;
+  const local = overrides.local;
+  return {
+    management_timeout_ms:
+      overrides.management_timeout_ms ?? DEFAULT_CLIPROXY_SERVER_CONFIG.management_timeout_ms,
+    remote: {
+      enabled: remote?.enabled ?? DEFAULT_CLIPROXY_SERVER_CONFIG.remote.enabled,
+      host: remote?.host ?? DEFAULT_CLIPROXY_SERVER_CONFIG.remote.host,
+      port: remote?.port,
+      protocol: remote?.protocol ?? DEFAULT_CLIPROXY_SERVER_CONFIG.remote.protocol,
+      auth_token: remote?.auth_token ?? DEFAULT_CLIPROXY_SERVER_CONFIG.remote.auth_token,
+      management_key: remote?.management_key,
+      timeout: remote?.timeout,
+      allow_self_signed:
+        remote?.allow_self_signed ?? DEFAULT_CLIPROXY_SERVER_CONFIG.remote.allow_self_signed,
+      auto_sync: remote?.auto_sync,
+    },
+    local: {
+      port: local?.port ?? DEFAULT_CLIPROXY_SERVER_CONFIG.local.port,
+      auto_start: local?.auto_start ?? DEFAULT_CLIPROXY_SERVER_CONFIG.local.auto_start,
+    },
+  };
+}
 
 export const DEFAULT_OPENAI_COMPAT_PROXY_CONFIG: OpenAICompatProxyConfig = {
   profile_ports: {},

@@ -159,7 +159,7 @@ jobs:
   # Mutable :latest / major / minor aliases are added by promote-mutable-tags
   # ONLY via explicit workflow_dispatch (promote_to_latest=true) after the
   # operator has verified the immutable image is stable. This keeps the rc.1
-  # soak window entirely in the Docker promotion path — npm @latest is always
+  # soak window entirely in the Docker promotion path — the GitHub release is
   # published immediately by semantic-release on the stable release.
   # ---------------------------------------------------------------------------
   publish-integrated:
@@ -438,7 +438,7 @@ jobs:
   # INTENTIONAL DESIGN (issue #1251 rc.1 soak — see docs/release-process.md):
   # GitHub release events publish ONLY the immutable :<ver> tag. The mutable
   # :latest / :<major> / :<minor> aliases STAY POINTED AT THE PRIOR STABLE
-  # RELEASE until an operator manually promotes after a soak window (~24h).
+  # RELEASE until an operator promotes after a soak window (~24h).
   # Trade-off: zero-install users (curl ccs.kaitran.ca/docker-compose.yaml &&
   # docker compose up -d) keep receiving last-known-good :latest during the
   # soak; operators wanting the new version pull :<ver> directly.

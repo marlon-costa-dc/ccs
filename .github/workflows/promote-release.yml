@@ -1,6 +1,6 @@
 name: Promote Stable Release to Docker Latest
 
-# Manual workflow to promote a stable vX.Y.Z release to Docker mutable tags
+# Operator-dispatched workflow to promote a stable vX.Y.Z release to Docker mutable tags
 # (:latest, :MAJOR, :MINOR) after the rc.1 soak window.
 #
 # Flow:

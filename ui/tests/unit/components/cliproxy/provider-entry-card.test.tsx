@@ -18,7 +18,7 @@ describe('ProviderEntryCard', () => {
           entries: [],
         }}
         entry={{
-          id: 'openai-compatibility:0',
+          id: 'openai-compatibility-entry-fixture',
           index: 0,
           name: 'openrouter',
           label: 'openrouter',

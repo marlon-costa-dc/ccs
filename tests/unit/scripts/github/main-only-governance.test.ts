@@ -19,7 +19,6 @@ describe('main-only repository governance', () => {
       '.github/ISSUE_TEMPLATE/bug-report.yml',
       '.husky/pre-push',
       'scripts/ci-parity-gate.sh',
-      '.beads/hooks/pre-push',
     ];
 
     for (const surface of surfaces) {
@@ -43,12 +42,6 @@ describe('main-only repository governance', () => {
     expect(ciParityGate).not.toContain('CCS_PR_BASE');
     expect(ciParityGate).not.toContain('CCS_SKIP_PREPUSH_GATE');
 
-    const beadsPrePush = read('.beads/hooks/pre-push');
-    expect(beadsPrePush).toContain('bd hooks run pre-push');
-    expect(beadsPrePush).not.toContain('bun run');
-    expect(beadsPrePush).not.toContain('CCS_PR_BASE');
-    expect(beadsPrePush).not.toContain('CCS_SKIP_PREPUSH_GATE');
-
     const pendingRelease = read('.github/workflows/label-pending-release.yml');
     expect(pendingRelease).toContain('branches: [main]');
     expect(pendingRelease).toContain('set -euo pipefail');
@@ -57,7 +50,7 @@ describe('main-only repository governance', () => {
     expect(pendingRelease).not.toContain('2>/dev/null');
   });
 
-  test('removes superseded dev and manual package release owners', () => {
+  test('removes superseded branch, package-release, and hook owners', () => {
     const removedPaths = [
       '.github/workflows/dev-release.yml',
       '.github/workflows/sync-dev-after-release.yml',
@@ -67,10 +60,20 @@ describe('main-only repository governance', () => {
       'scripts/github/stable-release-issue-cleanup.mjs',
       'scripts/github/stable-release-issue-cleanup-lib.mjs',
       'tests/unit/github/stable-release-issue-cleanup.test.mjs',
+      '.beads/README.md',
+      '.beads/hooks',
     ];
 
     for (const relativePath of removedPaths) {
       expect(fs.existsSync(path.join(repoRoot, relativePath))).toBe(false);
     }
+  });
+
+  test('keeps public issue intake subordinate to Beads execution', () => {
+    const agentGuide = read('CLAUDE.md');
+
+    expect(agentGuide).toContain('GitHub Issues are the public intake');
+    expect(agentGuide).toContain('the assigned Bead remains the execution');
+    expect(agentGuide).not.toContain('Issue triage is GitHub-only');
   });
 });
