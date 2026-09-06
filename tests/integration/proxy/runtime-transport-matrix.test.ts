@@ -5,7 +5,6 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-const matrixEnabled = process.env.CCS_RUNTIME_MATRIX === '1';
 const fixturePath = path.join(process.cwd(), 'tests/integration/proxy/fixtures/runtime-probe.cjs');
 const runtimeSetupTimeoutMs = 3 * 60_000;
 const proxyKeys = [
@@ -87,7 +86,7 @@ function runProbe(
   });
 }
 
-describe.skipIf(!matrixEnabled)('real runtime upstream transport matrix', () => {
+describe('real runtime upstream transport matrix', () => {
   let node18 = '';
   let node22 = '';
   let node26 = '';

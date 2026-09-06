@@ -28,7 +28,9 @@ const browserMcpSplitTests = [
 // Automated perf-budget enforcement tracked in issue #1071.
 const slowTests = [
   'tests/unit/cliproxy/concurrent-state-locks.test.ts',
+  'tests/integration/image-analyzer-hook.test.ts',
   'tests/integration/logging-request-context.test.ts',
+  'tests/integration/proxy/messages-edge-cases.test.ts',
   'tests/integration/proxy/daemon-lifecycle.test.ts',
   'tests/integration/update-command-install-origin.test.ts',
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
@@ -44,6 +46,7 @@ const slowTests = [
   'tests/unit/targets/settings-profile-image-analysis-launch.test.ts',
   'tests/unit/targets/settings-profile-websearch-launch.test.ts',
   'tests/unit/web-server/websearch-routes.test.ts',
+  'tests/unit/web-server/usage-aggregator-cliproxy-integration.test.ts',
   'src/cliproxy/auth/__tests__/oauth-handler-gemini-backend-guidance.test.ts',
   'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
 ];
@@ -54,10 +57,10 @@ const fastJsTests = new Set(['tests/unit/flag-parsing-simple.test.js']);
 
 const isolatedTests = new Set([
   'tests/unit/cliproxy/concurrent-state-locks.test.ts',
+  'tests/integration/image-analyzer-hook.test.ts',
+  'tests/integration/proxy/messages-edge-cases.test.ts',
   'tests/integration/update-command-install-origin.test.ts',
   ...browserMcpSplitTests,
-  'tests/unit/commands/update-command-beta-channel.test.js',
-  'tests/unit/commands/update-command-force-reinstall.test.js',
   'tests/unit/commands/bar-command.test.ts',
   'tests/unit/utils/claudecode-env-stripping.test.ts',
   'tests/npm/cli.test.js',
@@ -72,6 +75,7 @@ const isolatedTests = new Set([
   'tests/unit/targets/target-registry.test.ts',
   'tests/unit/utils/fetch-proxy-setup.test.ts',
   'tests/unit/web-server/usage/account-attribution.test.ts',
+  'tests/unit/web-server/usage-aggregator-cliproxy-integration.test.ts',
   'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
 ]);
 
@@ -199,6 +203,37 @@ function stripAnsi(value) {
 function parseBunFileCount(output) {
   const match = stripAnsi(output).match(/Ran\s+\d+\s+tests?\s+across\s+(\d+)\s+files?/i);
   return match ? Number(match[1]) : null;
+}
+
+function parseBunTestCount(output) {
+  const match = stripAnsi(output).match(/Ran\s+(\d+)\s+tests?\s+across\s+\d+\s+files?/i);
+  return match ? Number(match[1]) : null;
+}
+
+function parseBunSkipCount(output) {
+  const match = stripAnsi(output).match(/(?:^|\n)\s*(\d+)\s+tests?\s+skipped:/i);
+  return match ? Number(match[1]) : 0;
+}
+
+function verifyBunExecution(output) {
+  const testCount = parseBunTestCount(output);
+  const skipCount = parseBunSkipCount(output);
+
+  if (testCount === null) {
+    return { ok: false, message: '[X] Could not find Bun test count in output.', testCount, skipCount };
+  }
+  if (testCount === 0) {
+    return { ok: false, message: '[X] Bun executed zero tests.', testCount, skipCount };
+  }
+  if (skipCount > 0) {
+    return {
+      ok: false,
+      message: `[X] Bun reported ${skipCount} skipped test(s).`,
+      testCount,
+      skipCount,
+    };
+  }
+  return { ok: true, testCount, skipCount };
 }
 
 function verifyReportedFileCount(selectedCount, output) {
@@ -343,6 +378,12 @@ function runBunTest(run) {
   }
 
   if (shouldVerifyRunFileCount(run)) {
+    const executionCheck = verifyBunExecution(output);
+    if (!executionCheck.ok) {
+      writeOutput();
+      console.error(executionCheck.message);
+      return 1;
+    }
     const countCheck = verifyReportedFileCount(run.selected.length, output);
     if (!countCheck.ok) {
       writeOutput();
@@ -444,6 +485,9 @@ module.exports = {
   shouldRunIsolated,
   getBunRuns,
   parseBunFileCount,
+  parseBunTestCount,
+  parseBunSkipCount,
+  verifyBunExecution,
   verifyReportedFileCount,
   shouldVerifyRunFileCount,
   getRequiredBuildArtifacts,
