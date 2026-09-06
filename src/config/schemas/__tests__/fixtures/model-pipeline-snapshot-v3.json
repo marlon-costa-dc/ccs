@@ -979,13 +979,13 @@
       },
       {
         "format": "json",
-        "location": "/home/marlonsc/.local/state/ai-hub/runtime/model-pipeline-v3-stage/aihub/reports/ai-hub-models.json",
+        "location": "/var/lib/ai-hub/state/runtime/model-pipeline-v3-stage/aihub/reports/ai-hub-models.json",
         "required": true,
         "target_id": "report_json"
       },
       {
         "format": "markdown",
-        "location": "/home/marlonsc/.local/state/ai-hub/runtime/model-pipeline-v3-stage/aihub/reports/ai-hub-models.md",
+        "location": "/var/lib/ai-hub/state/runtime/model-pipeline-v3-stage/aihub/reports/ai-hub-models.md",
         "required": true,
         "target_id": "report_markdown"
       }
