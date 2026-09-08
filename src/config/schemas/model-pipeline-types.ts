@@ -1,10 +1,11 @@
 export const MODEL_PIPELINE_SCHEMA_VERSION = 3 as const;
 
-// CLIProxy's own inventory/routing contract version. It is independent of the
-// AI Hub <-> CCS snapshot schema above and is not bumped by this migration;
-// ai-hub's ModelPipelineInventory and ModelInventoryRoutingSchema models pin
-// it at a literal 2 regardless of the outer snapshot schema_version.
-export const MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION = 2 as const;
+// CLIProxy owns one `modelrouting.SchemaVersion` and publishes it in both the
+// routing projection and the model-inventory envelope. This fork pins it at 3
+// to accept the inventory v3 publications that CLIProxy's producer side
+// (PRs #44/#45) and ai-hub's model pipeline already serve.
+export const CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION = 3 as const;
+export const MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION = CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION;
 
 export interface ModelPipelineModelKey {
   readonly catalog_provider_id: string;

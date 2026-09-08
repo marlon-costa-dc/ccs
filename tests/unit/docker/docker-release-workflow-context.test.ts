@@ -77,6 +77,8 @@ describe('docker release workflow context', () => {
     });
     const output = result.stdout.toString() + result.stderr.toString();
 
-    expect(result.status, result.stdout + result.stderr).toBe(0);
+    // Bun.spawnSync exposes exitCode (Node's spawnSync uses status); this
+    // suite always runs under bun:test, so exitCode is the contract.
+    expect(result.exitCode, result.stdout + result.stderr).toBe(0);
   }, 30_000);
 });
