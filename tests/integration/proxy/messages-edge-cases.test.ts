@@ -275,39 +275,21 @@ describe('openai proxy message edge cases', () => {
     expect(body).toContain('"message":"Failed to translate OpenAI-compatible SSE response"');
   });
 
-  it.skipIf(typeof Bun !== 'undefined')(
-    'aborts the upstream request when the client disconnects mid-flight (Node.js only)',
+  it(
+    'aborts the upstream request when the client disconnects mid-flight',
     async () => {
       await startProxyWithHandler(() => {});
 
-      await new Promise<void>((resolve) => {
-        const request = http.request(
-          {
-            hostname: '127.0.0.1',
-            port: proxyPort,
-            path: '/v1/messages',
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': 'test-proxy-token',
-            },
-          },
-          () => resolve()
-        );
-
-        request.write(
-          JSON.stringify({
-            model: 'hf-model',
-            messages: [{ role: 'user', content: 'hello' }],
-          })
-        );
-        request.end();
-
-        setTimeout(() => {
-          request.socket?.destroy();
-          resolve();
-        }, 50);
-      });
+      const controller = new AbortController();
+      const response = requestProxy(
+        {
+          model: 'hf-model',
+          messages: [{ role: 'user', content: 'hello' }],
+        },
+        controller.signal
+      );
+      setTimeout(() => controller.abort(), 50);
+      await expect(response).rejects.toThrow();
 
       const logPath = path.join(tempDir, '.ccs', 'logs', 'current.jsonl');
       await Promise.race([
