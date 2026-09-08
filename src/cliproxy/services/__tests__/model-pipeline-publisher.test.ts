@@ -17,6 +17,7 @@ import { sha256Digest } from '../../../utils/canonical-json';
 import type { CLIProxyActivationReceipt } from '../../management/management-api-types';
 import type { ProxyTarget } from '../../proxy/proxy-target-resolver';
 import { projectModelRouting } from '../../config/model-routing-projector';
+import { getModelPipelineSnapshotSchemaDigest } from '../../../config/schemas/model-pipeline-contract-artifacts';
 import {
   ModelPipelineGenerationConflictError,
   ModelPipelinePublisher,
@@ -33,8 +34,8 @@ const request = parseModelPipelinePublicationRequest(modelPipelineRequestFixture
 const activeConfigYaml = 'port: 8317\n';
 const stagedConfigYaml = 'port: 8317\nmodel-routing:\n  schema-version: 3\n';
 const loadedAt = '2026-08-28T11:20:57Z';
-const snapshotSchemaDigest =
-  'sha256:eb4ad24d88c652f4f1da9d6cfc5c3a22380a0f7bf38cf1549b7fcee320074aa0';
+// Derived from the shipped artifact at runtime — never a hand-maintained literal.
+const snapshotSchemaDigest = getModelPipelineSnapshotSchemaDigest();
 const ccsBinary = {
   version: 'ccs-fixture-v3',
   commit: 'ccs-fixture-commit',

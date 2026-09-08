@@ -914,9 +914,9 @@
     "generated_at": "2026-08-28T11:14:25.29090899Z",
     "routing_schema": {
       "digest": "sha256:95bef9d5d12f64dbd7d264e6b6e2eeacf08375072ccc80858f9b83b2409de2fe",
-      "version": 2
+      "version": 3
     },
-    "schema_version": 2
+    "schema_version": 3
   },
   "observations": [
     {

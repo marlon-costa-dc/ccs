@@ -34,13 +34,11 @@ describe('model pipeline v3 config boundary', () => {
     expect(parsed.schema_version).toBe(MODEL_PIPELINE_SCHEMA_VERSION);
     expect(MODEL_PIPELINE_SCHEMA_VERSION).toBe(3);
     expect(parsed.snapshot.generation).toBe(1);
-    expect(parsed.snapshot.snapshot_digest).toBe(
-      'sha256:389c56156f91b78bb99776a1de99dfe9482ead661c6c2c8cac56c864972a6ca2'
-    );
-    // CLIProxy's own inventory/routing contract stays pinned at 2, independent
-    // of the outer AI Hub <-> CCS snapshot schema version bump to 3.
-    expect(parsed.snapshot.inventory.schema_version).toBe(2);
-    expect(parsed.snapshot.inventory.routing_schema.version).toBe(2);
+    expect(parsed.snapshot.snapshot_digest).toBe(modelPipelineSnapshotFixture().snapshot_digest);
+    // CLIProxy's own inventory/routing contract moved to 3 together with the
+    // CLIProxy producer (PRs #44/#45) and the outer AI Hub <-> CCS snapshot.
+    expect(parsed.snapshot.inventory.schema_version).toBe(3);
+    expect(parsed.snapshot.inventory.routing_schema.version).toBe(3);
     expect(parsed.receipt.active.projection_digest).toBe(`sha256:${'b'.repeat(64)}`);
     expect(parsed.snapshot.agent_bindings).toEqual([
       { agent: 'architect', tier_id: 'balanced', alias: 'ai-hub-balanced' },
@@ -161,8 +159,8 @@ describe('model pipeline v3 config boundary', () => {
     models[0]!.catalog_provider_id = 'openai';
     expect(() => parseModelPipelineConfig(flattened)).toThrow(
       // The mutated field lives inside inventory.direct_models, which is
-      // CLIProxy's own contract and stays pinned at schema version 2.
-      'catalog_provider_id is not part of schema version 2'
+      // CLIProxy's own contract, now pinned at schema version 3.
+      'catalog_provider_id is not part of schema version 3'
     );
 
     const independentVariant = cloneEnvelope();
