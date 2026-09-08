@@ -42,6 +42,21 @@ describe('run-test-bucket', () => {
     expect(slowSet.has('tests/integration/web-server/codex-profiles-endpoint.test.ts')).toBe(true);
   });
 
+  test('keeps stateful integration suites slow and isolated', () => {
+    const statefulSuites = [
+      'tests/integration/image-analyzer-hook.test.ts',
+      'tests/integration/proxy/messages-edge-cases.test.ts',
+      'tests/unit/web-server/usage-aggregator-cliproxy-integration.test.ts',
+    ];
+    const slowSet = bucket.getSlowSet();
+    const runs = bucket.getBunRuns('slow', statefulSuites);
+
+    for (const relativePath of statefulSuites) {
+      expect(slowSet.has(relativePath)).toBe(true);
+    }
+    expect(runs.map((run) => run.label)).toEqual(statefulSuites);
+  });
+
   test('keeps daemon-launch suites slow and isolated', () => {
     const daemonSuites = [
       'tests/unit/utils/claudecode-env-stripping.test.ts',
@@ -205,6 +220,28 @@ describe('run-test-bucket', () => {
     expect(bucket.parseBunFileCount('\u001b[32mRan 2559 tests across 272 files\u001b[0m')).toBe(
       272
     );
+  });
+
+  test('rejects zero execution and skipped tests in Bun summaries', () => {
+    expect(bucket.verifyBunExecution('Ran 0 tests across 1 file')).toEqual({
+      ok: false,
+      message: '[X] Bun executed zero tests.',
+      testCount: 0,
+      skipCount: 0,
+    });
+    expect(
+      bucket.verifyBunExecution('2 tests skipped:\n(skip) one\n(skip) two\nRan 7 tests across 1 file')
+    ).toEqual({
+      ok: false,
+      message: '[X] Bun reported 2 skipped test(s).',
+      testCount: 7,
+      skipCount: 2,
+    });
+    expect(bucket.verifyBunExecution('7 pass\nRan 7 tests across 1 file')).toEqual({
+      ok: true,
+      testCount: 7,
+      skipCount: 0,
+    });
   });
 
   test('detects when Bun reports fewer files than the bucket selected', () => {
