@@ -41,6 +41,7 @@ import {
 } from './model-pipeline-sections';
 
 import {
+  MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION,
   MODEL_PIPELINE_SCHEMA_VERSION,
   type ModelPipelineAgentBinding,
   type ModelPipelineAssignment,
@@ -71,9 +72,9 @@ import {
   type ModelPipelineRouteKey,
   type ModelPipelineRuleEvaluation,
   type ModelPipelineSnapshot,
-  type ActiveIdentityV2,
+  type ActiveIdentityV3,
   type ModelPipelinePublicationRequest,
-  type PublicationReceiptV2,
+  type PublicationReceiptV3,
 } from './model-pipeline-types';
 
 export * from './model-pipeline-types';
@@ -735,7 +736,12 @@ function parseInventoryAlias(
   path: string
 ): ModelPipelineInventory['aliases'][number] {
   const record = readRecord(value, path);
-  exactKeys(record, ['name', 'tier_id', 'selectable', 'reason', 'members'], path);
+  exactKeys(
+    record,
+    ['name', 'tier_id', 'selectable', 'reason', 'members'],
+    path,
+    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
+  );
   const assignment = parseAssignment(
     {
       tier_id: record.tier_id,
@@ -805,7 +811,6 @@ function parseFailurePolicy(value: unknown, path: string): ModelPipelineFailureP
       'credential_acquisition_timeout_seconds',
       'automatic_retry',
       'automatic_failover',
-      'max_candidate_attempts',
       'failover_rules',
       'serve_stale_on_error',
       'preserve_first_error',
@@ -864,11 +869,6 @@ function parseFailurePolicy(value: unknown, path: string): ModelPipelineFailureP
     ),
     automatic_retry: automaticRetry,
     automatic_failover: automaticFailover,
-    max_candidate_attempts: readInteger(
-      record.max_candidate_attempts,
-      `${path}.max_candidate_attempts`,
-      2
-    ),
     failover_rules: failoverRules,
     serve_stale_on_error: serveStaleOnError,
     preserve_first_error: preserveFirstError,
@@ -920,11 +920,12 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
       'direct_models',
       'aliases',
     ],
-    path
+    path,
+    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
   );
   const schemaVersion = readInteger(record.schema_version, `${path}.schema_version`, 1);
-  if (schemaVersion !== MODEL_PIPELINE_SCHEMA_VERSION) {
-    fail(`${path}.schema_version`, `must equal ${MODEL_PIPELINE_SCHEMA_VERSION}`);
+  if (schemaVersion !== MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION) {
+    fail(`${path}.schema_version`, `must equal ${MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION}`);
   }
   let active: ModelPipelineInventoryActive | null = null;
   if (record.active !== null) {
@@ -957,14 +958,19 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
   exactKeys(provenance, ['version', 'commit', 'built_at'], provenancePath);
   const routingSchemaPath = `${path}.routing_schema`;
   const routingSchema = readRecord(record.routing_schema, routingSchemaPath);
-  exactKeys(routingSchema, ['version', 'digest'], routingSchemaPath);
+  exactKeys(
+    routingSchema,
+    ['version', 'digest'],
+    routingSchemaPath,
+    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
+  );
   const routingSchemaVersion = readInteger(
     routingSchema.version,
     `${routingSchemaPath}.version`,
-    MODEL_PIPELINE_SCHEMA_VERSION
+    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
   );
-  if (routingSchemaVersion !== MODEL_PIPELINE_SCHEMA_VERSION) {
-    fail(`${routingSchemaPath}.version`, `must equal ${MODEL_PIPELINE_SCHEMA_VERSION}`);
+  if (routingSchemaVersion !== MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION) {
+    fail(`${routingSchemaPath}.version`, `must equal ${MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION}`);
   }
   const directModels = readArray(record.direct_models, `${path}.direct_models`).map(
     (entry, index) => parseInventoryModel(entry, `${path}.direct_models[${index}]`)
@@ -991,7 +997,7 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
     fail(`${path}.aliases`, 'must contain unique alias names');
   }
   return {
-    schema_version: MODEL_PIPELINE_SCHEMA_VERSION,
+    schema_version: MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION,
     generated_at: readUtcTimestamp(record.generated_at, `${path}.generated_at`),
     active,
     activation_loaded_at: activationLoadedAt,
@@ -1001,7 +1007,7 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
       built_at: readUtcTimestamp(provenance.built_at, `${provenancePath}.built_at`),
     },
     routing_schema: {
-      version: MODEL_PIPELINE_SCHEMA_VERSION,
+      version: MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION,
       digest: readDigest(routingSchema.digest, `${routingSchemaPath}.digest`),
     },
     direct_models: directModels,
@@ -1311,7 +1317,7 @@ function deepFreeze<T>(value: T): Readonly<T> {
   return Object.freeze(value);
 }
 
-export function parseActiveIdentityV2(value: unknown, path = 'active_identity'): ActiveIdentityV2 {
+export function parseActiveIdentityV3(value: unknown, path = 'active_identity'): ActiveIdentityV3 {
   const record = readRecord(value, path);
   exactKeys(record, ['generation', 'snapshot_digest', 'projection_digest', 'config_digest'], path);
   return {
@@ -1338,7 +1344,7 @@ export function parseModelPipelineBinaryProvenance(
 export function parsePublicationReceipt(
   value: unknown,
   path = 'publication_receipt'
-): PublicationReceiptV2 {
+): PublicationReceiptV3 {
   const record = readRecord(value, path);
   exactKeys(
     record,
@@ -1355,7 +1361,7 @@ export function parsePublicationReceipt(
     ],
     path
   );
-  const schemaVersion = readInteger(record.schema_version, `${path}.schema_version`, 2);
+  const schemaVersion = readInteger(record.schema_version, `${path}.schema_version`, 3);
   if (schemaVersion !== MODEL_PIPELINE_SCHEMA_VERSION) {
     fail(`${path}.schema_version`, `must equal ${MODEL_PIPELINE_SCHEMA_VERSION}`);
   }
@@ -1366,8 +1372,8 @@ export function parsePublicationReceipt(
     previous_active:
       record.previous_active === null
         ? null
-        : parseActiveIdentityV2(record.previous_active, `${path}.previous_active`),
-    active: parseActiveIdentityV2(record.active, `${path}.active`),
+        : parseActiveIdentityV3(record.previous_active, `${path}.previous_active`),
+    active: parseActiveIdentityV3(record.active, `${path}.active`),
     snapshot_schema_digest: readDigest(
       record.snapshot_schema_digest,
       `${path}.snapshot_schema_digest`
@@ -1391,7 +1397,7 @@ export function parseModelPipelinePublicationRequest(
   const path = 'model_pipeline_publication';
   const record = readRecord(value, path);
   exactKeys(record, ['schema_version', 'expected_active', 'snapshot'], path);
-  const schemaVersion = readInteger(record.schema_version, `${path}.schema_version`, 2);
+  const schemaVersion = readInteger(record.schema_version, `${path}.schema_version`, 3);
   if (schemaVersion !== MODEL_PIPELINE_SCHEMA_VERSION) {
     fail(`${path}.schema_version`, `must equal ${MODEL_PIPELINE_SCHEMA_VERSION}`);
   }
@@ -1399,7 +1405,7 @@ export function parseModelPipelinePublicationRequest(
   const expectedActive =
     record.expected_active === null
       ? null
-      : parseActiveIdentityV2(record.expected_active, `${path}.expected_active`);
+      : parseActiveIdentityV3(record.expected_active, `${path}.expected_active`);
   if (canonicalJson(expectedActive) !== canonicalJson(snapshot.inventory.active)) {
     fail(`${path}.expected_active`, 'must equal snapshot.inventory.active');
   }
@@ -1420,7 +1426,7 @@ export function parseModelPipelineConfig(value: unknown): ModelPipelineConfig {
   const path = 'model_pipeline';
   const record = readRecord(value, path);
   exactKeys(record, ['schema_version', 'snapshot', 'receipt'], path);
-  const schemaVersion = readInteger(record.schema_version, `${path}.schema_version`, 2);
+  const schemaVersion = readInteger(record.schema_version, `${path}.schema_version`, 3);
   if (schemaVersion !== MODEL_PIPELINE_SCHEMA_VERSION) {
     fail(`${path}.schema_version`, `must equal ${MODEL_PIPELINE_SCHEMA_VERSION}`);
   }

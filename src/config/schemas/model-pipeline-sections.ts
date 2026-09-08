@@ -23,6 +23,7 @@ import {
   readStringSet,
   readUtcTimestamp,
 } from './model-pipeline-codec';
+import { MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION } from './model-pipeline-types';
 import type {
   ModelPipelineCapabilities,
   ModelPipelineCatalogBenchmark,
@@ -40,18 +41,29 @@ function parseInventoryCredential(value: unknown, path: string): ModelPipelineIn
   exactKeys(
     record,
     ['credential_ref', 'quota_domain', 'health', 'quota', 'suspension', 'restrictions'],
-    path
+    path,
+    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
   );
   const credentialPath = `${path}.credential_ref`;
   const quotaPath = `${path}.quota`;
   const quota = readRecord(record.quota, quotaPath);
-  exactKeys(quota, ['status', 'remaining', 'resets_at', 'reason'], quotaPath);
+  exactKeys(
+    quota,
+    ['status', 'remaining', 'resets_at', 'reason'],
+    quotaPath,
+    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
+  );
   if (quota.status !== 'available' && quota.status !== 'blocked' && quota.status !== 'unknown') {
     fail(`${quotaPath}.status`, 'must be available, blocked, or unknown');
   }
   const suspensionPath = `${path}.suspension`;
   const suspension = readRecord(record.suspension, suspensionPath);
-  exactKeys(suspension, ['active', 'reason', 'resumes_at'], suspensionPath);
+  exactKeys(
+    suspension,
+    ['active', 'reason', 'resumes_at'],
+    suspensionPath,
+    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
+  );
   const suspensionActive = readBoolean(suspension.active, `${suspensionPath}.active`);
   const suspensionReason = readNullableString(suspension.reason, `${suspensionPath}.reason`);
   if (suspensionActive && suspensionReason === null) {
@@ -100,7 +112,8 @@ function parseInventoryRoute(value: unknown, path: string): ModelPipelineInvento
       'selection_reason',
       'credentials',
     ],
-    path
+    path,
+    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
   );
   const quotaDomains = readStringSet(record.quota_domains, `${path}.quota_domains`);
   const credentials = readArray(record.credentials, `${path}.credentials`).map((entry, index) =>
@@ -158,12 +171,22 @@ function parseInventoryRoute(value: unknown, path: string): ModelPipelineInvento
 
 export function parseInventoryModel(value: unknown, path: string): ModelPipelineInventoryModel {
   const record = readRecord(value, path);
-  exactKeys(record, ['model_key', 'display_name', 'active', 'variants', 'routes'], path);
+  exactKeys(
+    record,
+    ['model_key', 'display_name', 'active', 'variants', 'routes'],
+    path,
+    MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
+  );
   const modelIdentity = parseNestedModelKey(record.model_key, `${path}.model_key`);
   const variants = readArray(record.variants, `${path}.variants`).map((entry, index) => {
     const variantPath = `${path}.variants[${index}]`;
     const variant = readRecord(entry, variantPath);
-    exactKeys(variant, ['variant_key', 'display_name', 'protocols'], variantPath);
+    exactKeys(
+      variant,
+      ['variant_key', 'display_name', 'protocols'],
+      variantPath,
+      MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION
+    );
     return {
       variant_key: parseNestedVariantKey(variant.variant_key, `${variantPath}.variant_key`),
       display_name: readNullableString(variant.display_name, `${variantPath}.display_name`),

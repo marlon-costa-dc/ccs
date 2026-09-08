@@ -1,4 +1,11 @@
-export const MODEL_PIPELINE_SCHEMA_VERSION = 2 as const;
+export const MODEL_PIPELINE_SCHEMA_VERSION = 3 as const;
+
+// CLIProxy owns one `modelrouting.SchemaVersion` and publishes it in both the
+// routing projection and the model-inventory envelope. This fork pins it at 3
+// to accept the inventory v3 publications that CLIProxy's producer side
+// (PRs #44/#45) and ai-hub's model pipeline already serve.
+export const CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION = 3 as const;
+export const MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION = CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION;
 
 export interface ModelPipelineModelKey {
   readonly catalog_provider_id: string;
@@ -119,13 +126,13 @@ export interface ModelPipelineBinaryProvenance {
 }
 
 export interface ModelPipelineInventory {
-  readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
+  readonly schema_version: typeof MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION;
   readonly generated_at: string;
   readonly active: ModelPipelineInventoryActive | null;
   readonly activation_loaded_at: string | null;
   readonly binary_provenance: ModelPipelineBinaryProvenance;
   readonly routing_schema: {
-    readonly version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
+    readonly version: typeof MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION;
     readonly digest: string;
   };
   readonly direct_models: readonly ModelPipelineInventoryModel[];
@@ -394,7 +401,6 @@ export interface ModelPipelineFailurePolicy {
   readonly credential_acquisition_timeout_seconds: number;
   readonly automatic_retry: false;
   readonly automatic_failover: true;
-  readonly max_candidate_attempts: number;
   readonly failover_rules: readonly ModelPipelineFailoverRule[];
   readonly serve_stale_on_error: false;
   readonly preserve_first_error: true;
@@ -432,18 +438,18 @@ export interface ModelPipelineSnapshot {
   readonly snapshot_digest: string;
 }
 
-export interface ActiveIdentityV2 {
+export interface ActiveIdentityV3 {
   readonly generation: number;
   readonly snapshot_digest: string;
   readonly projection_digest: string;
   readonly config_digest: string;
 }
 
-export interface PublicationReceiptV2 {
+export interface PublicationReceiptV3 {
   readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
   readonly ok: true;
-  readonly previous_active: ActiveIdentityV2 | null;
-  readonly active: ActiveIdentityV2;
+  readonly previous_active: ActiveIdentityV3 | null;
+  readonly active: ActiveIdentityV3;
   readonly snapshot_schema_digest: string;
   readonly routing_schema_digest: string;
   readonly ccs_binary: ModelPipelineBinaryProvenance;
@@ -453,12 +459,12 @@ export interface PublicationReceiptV2 {
 
 export interface ModelPipelinePublicationRequest {
   readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
-  readonly expected_active: ActiveIdentityV2 | null;
+  readonly expected_active: ActiveIdentityV3 | null;
   readonly snapshot: ModelPipelineSnapshot;
 }
 
 export interface ModelPipelineConfig {
   readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
   readonly snapshot: ModelPipelineSnapshot;
-  readonly receipt: PublicationReceiptV2;
+  readonly receipt: PublicationReceiptV3;
 }

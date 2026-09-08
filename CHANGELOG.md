@@ -1,3 +1,14 @@
+## [8.9.0-fd.8](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.7...v8.9.0-fd.8) (2026-09-03)
+
+### Bug Fixes
+
+* preserve ccs launcher executable mode ([1b4ce4c](https://github.com/marlon-costa-dc/ccs/commit/1b4ce4cc8f1a617d09a57e3009b31312a8a6aac0))
+* **runtime:** publish launcher mode and token helper ([6f01f22](https://github.com/marlon-costa-dc/ccs/commit/6f01f220c6830548c1ad93cdbd7ee59990c06ec2))
+
+### Documentation
+
+* point the current-work prime/hook example at Gas City (ag-cj6.16) ([e486baf](https://github.com/marlon-costa-dc/ccs/commit/e486baf958df084de4c391c1ffd7f511f29154d1))
+
 ## [8.9.0-fd.7](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.6...v8.9.0-fd.7) (2026-09-01)
 
 ### Bug Fixes

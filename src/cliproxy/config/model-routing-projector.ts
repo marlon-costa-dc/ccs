@@ -1,17 +1,16 @@
-import type {
-  ModelPipelineCatalogRoute,
-  ModelPipelineCredentialReference,
-  ModelPipelineHealth,
-  ModelPipelineModelKey,
-  ModelPipelinePricing,
-  ModelPipelineRestriction,
-  ModelPipelineRouteKey,
-  ModelPipelineSnapshot,
+import {
+  CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
+  type ModelPipelineCatalogRoute,
+  type ModelPipelineCredentialReference,
+  type ModelPipelineHealth,
+  type ModelPipelineModelKey,
+  type ModelPipelinePricing,
+  type ModelPipelineRestriction,
+  type ModelPipelineRouteKey,
+  type ModelPipelineSnapshot,
 } from '../../config/schemas/model-pipeline';
 import { ConfigError } from '../../errors/error-types';
 import { canonicalJsonSha256Digest } from '../../utils/canonical-json';
-
-export const CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION = 2 as const;
 
 export interface CLIProxyModelKey {
   readonly 'catalog-provider-id': string;
@@ -136,7 +135,6 @@ export interface CLIProxyModelRouting {
     readonly 'credential-acquisition-timeout-seconds': number;
     readonly 'automatic-retry': false;
     readonly 'automatic-failover': true;
-    readonly 'max-candidate-attempts': number;
     readonly 'failover-rules': readonly {
       readonly 'rule-id': string;
       readonly 'http-statuses': readonly number[];
@@ -390,7 +388,6 @@ export function projectModelRoutingPayload(
         snapshot.failure_policy.credential_acquisition_timeout_seconds,
       'automatic-retry': snapshot.failure_policy.automatic_retry,
       'automatic-failover': snapshot.failure_policy.automatic_failover,
-      'max-candidate-attempts': snapshot.failure_policy.max_candidate_attempts,
       'failover-rules': snapshot.failure_policy.failover_rules.map((rule) => ({
         'rule-id': rule.rule_id,
         'http-statuses': rule.http_statuses,

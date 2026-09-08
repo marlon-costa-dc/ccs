@@ -3,10 +3,10 @@ import * as path from 'node:path';
 import * as lockfile from 'proper-lockfile';
 import {
   MODEL_PIPELINE_SCHEMA_VERSION,
-  parseActiveIdentityV2,
+  parseActiveIdentityV3,
   parseModelPipelineBinaryProvenance,
   parseModelPipelinePublicationRequest,
-  type ActiveIdentityV2,
+  type ActiveIdentityV3,
   type ModelPipelineBinaryProvenance,
   type ModelPipelinePublicationRequest,
 } from '../../config/schemas/model-pipeline';
@@ -14,12 +14,12 @@ import { getCcsDir } from '../../config/config-loader-facade';
 import { ConfigError } from '../../errors/error-types';
 
 const TRANSACTION_DIRECTORY = 'model-pipeline-publication';
-const INTENT_FILENAME = 'intent-v2.json';
+const INTENT_FILENAME = 'intent-v3.json';
 
 export interface ModelPipelinePublicationIntent {
   readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
   readonly request: ModelPipelinePublicationRequest;
-  readonly proposed_active: ActiveIdentityV2;
+  readonly proposed_active: ActiveIdentityV3;
   readonly snapshot_schema_digest: string;
   readonly routing_schema_digest: string;
   readonly ccs_binary: ModelPipelineBinaryProvenance;
@@ -41,7 +41,7 @@ function exactKeys(
   const allowed = new Set(allowedKeys);
   for (const key of Object.keys(record)) {
     if (!allowed.has(key)) {
-      throw new ConfigError(`${pathLabel}.${key} is not part of the v2 transaction contract`);
+      throw new ConfigError(`${pathLabel}.${key} is not part of the v3 transaction contract`);
     }
   }
   for (const key of allowedKeys) {
@@ -82,7 +82,7 @@ function parseIntent(value: unknown): ModelPipelinePublicationIntent {
   return {
     schema_version: MODEL_PIPELINE_SCHEMA_VERSION,
     request: parseModelPipelinePublicationRequest(record.request),
-    proposed_active: parseActiveIdentityV2(
+    proposed_active: parseActiveIdentityV3(
       record.proposed_active,
       'model pipeline publication intent.proposed_active'
     ),

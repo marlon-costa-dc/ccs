@@ -4,7 +4,7 @@ import * as http from 'node:http';
 import {
   modelPipelineConfigFixture,
   modelPipelineRequestFixture,
-} from '../../../config/schemas/__tests__/fixtures/model-pipeline-v2-fixture';
+} from '../../../config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
 import { parseModelPipelineConfig } from '../../../config/schemas/model-pipeline';
 import { ConfigError } from '../../../errors/error-types';
 import {
@@ -73,7 +73,7 @@ describe('model pipeline config routes', () => {
 
     expect(response.status).toBe(200);
     expect(result).toMatchObject({
-      schema_version: 2,
+      schema_version: 3,
       ok: true,
       active: {
         generation: 1,

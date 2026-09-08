@@ -67,9 +67,12 @@ jobs:
             exit 1
           fi
 
-          git fetch origin main --no-tags
-          if ! git merge-base --is-ancestor "$tag_commit" origin/main; then
-            echo "[X] Tag $TAG does not identify a commit on origin/main"
+          # A release tag must sit on a declared release lane: main carries the
+          # semantic-release line; dc-use carries the fd fork-integration line.
+          git fetch origin main dc-use --no-tags
+          if ! git merge-base --is-ancestor "$tag_commit" origin/main \
+            && ! git merge-base --is-ancestor "$tag_commit" origin/dc-use; then
+            echo "[X] Tag $TAG does not identify a commit on origin/main or origin/dc-use"
             exit 1
           fi
 

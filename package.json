@@ -1,6 +1,6 @@
 {
   "name": "@kaitranntt/ccs",
-  "version": "8.9.0-fd.7",
+  "version": "8.9.0-fd.11",
   "description": "Claude Codex Switch - Instant profile switching between Claude, GLM, Kimi, and more",
   "keywords": [
     "cli",
@@ -38,7 +38,7 @@
     "dist/",
     "lib/",
     "scripts/",
-    "schemas/model-pipeline-snapshot-v2.json",
+    "schemas/model-pipeline-snapshot-v3.json",
     "config/",
     ".claude/",
     "README.md",

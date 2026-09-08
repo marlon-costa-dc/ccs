@@ -1,22 +1,32 @@
-import snapshotFixture from './model-pipeline-snapshot-v2.json';
+import snapshotFixture from './model-pipeline-snapshot-v3.json';
+import { canonicalJsonSha256Digest } from '../../../../utils/canonical-json';
+import { getModelPipelineSnapshotSchemaDigest } from '../../model-pipeline-contract-artifacts';
 
-const SNAPSHOT_SCHEMA_DIGEST =
-  'sha256:de6a5b76c5b9529ddd894f331ff1754d514ff15efaba617c01047eb7191fdea9';
+// Derived from the shipped artifact at runtime — never a hand-maintained
+// literal, so artifact updates cannot strand this fixture behind the contract.
+const SNAPSHOT_SCHEMA_DIGEST = getModelPipelineSnapshotSchemaDigest();
 const PROJECTION_DIGEST = `sha256:${'b'.repeat(64)}`;
 const CONFIG_DIGEST = `sha256:${'c'.repeat(64)}`;
 
+/**
+ * Return the fixture snapshot with its `snapshot_digest` recomputed over the
+ * exact semantic payload, mirroring `parseSnapshot`'s own digest derivation so
+ * the fixture never depends on a hand-maintained hash.
+ */
 export function modelPipelineSnapshotFixture(): Record<string, unknown> {
-  return structuredClone(snapshotFixture) as unknown as Record<string, unknown>;
+  const raw = structuredClone(snapshotFixture) as unknown as Record<string, unknown>;
+  const { snapshot_digest: _ignored, ...semantic } = raw;
+  return { ...semantic, snapshot_digest: canonicalJsonSha256Digest(semantic) };
 }
 
 export function modelPipelineConfigFixture(): Record<string, unknown> {
   const snapshot = modelPipelineSnapshotFixture();
   const inventory = snapshot.inventory as Record<string, unknown>;
   return {
-    schema_version: 2,
+    schema_version: 3,
     snapshot,
     receipt: {
-      schema_version: 2,
+      schema_version: 3,
       ok: true,
       previous_active: null,
       active: {
@@ -28,7 +38,7 @@ export function modelPipelineConfigFixture(): Record<string, unknown> {
       snapshot_schema_digest: SNAPSHOT_SCHEMA_DIGEST,
       routing_schema_digest: (inventory.routing_schema as Record<string, unknown>).digest,
       ccs_binary: {
-        version: 'ccs-fixture-v2',
+        version: 'ccs-fixture-v3',
         commit: 'ccs-fixture-commit',
         built_at: '2026-08-28T11:15:00Z',
       },
@@ -40,7 +50,7 @@ export function modelPipelineConfigFixture(): Record<string, unknown> {
 
 export function modelPipelineRequestFixture(): Record<string, unknown> {
   return {
-    schema_version: 2,
+    schema_version: 3,
     expected_active: null,
     snapshot: modelPipelineSnapshotFixture(),
   };

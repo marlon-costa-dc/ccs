@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { ConfigError } from '../../errors/error-types';
 import { canonicalJson, sha256Digest } from '../../utils/canonical-json';
 
-const SNAPSHOT_SCHEMA_FILENAME = 'model-pipeline-snapshot-v2.json';
+const SNAPSHOT_SCHEMA_FILENAME = 'model-pipeline-snapshot-v3.json';
 
 function resolveSnapshotSchemaPath(): string {
   return path.resolve(__dirname, '..', '..', '..', 'schemas', SNAPSHOT_SCHEMA_FILENAME);
