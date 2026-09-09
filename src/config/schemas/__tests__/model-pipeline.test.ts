@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 import { generateYamlWithComments } from '../../loader/yaml-serializer';
-import { modelPipelineConfigFixture } from './fixtures/model-pipeline-v3-fixture';
-import { MODEL_PIPELINE_SCHEMA_VERSION, parseModelPipelineConfig } from '../model-pipeline';
+import {
+  modelPipelineConfigFixture,
+  modelPipelineRequestFixture,
+  modelPipelineSnapshotFixture,
+  sharedModelPipelineSnapshotFixture,
+} from './fixtures/model-pipeline-v3-fixture';
+import {
+  MODEL_PIPELINE_SCHEMA_VERSION,
+  parseModelPipelineConfig,
+  parseModelPipelinePublicationRequest,
+} from '../model-pipeline';
 import { createEmptyUnifiedConfig, isUnifiedConfig } from '../unified-config';
 
 function cloneEnvelope(): Record<string, unknown> {
@@ -24,13 +33,16 @@ describe('model pipeline v3 config boundary', () => {
     const parsed = parseModelPipelineConfig(cloneEnvelope());
 
     expect(parsed.schema_version).toBe(MODEL_PIPELINE_SCHEMA_VERSION);
+    expect(MODEL_PIPELINE_SCHEMA_VERSION).toBe(3);
     expect(parsed.snapshot.generation).toBe(1);
-    expect(parsed.snapshot.snapshot_digest).toBe(
-      'sha256:e6ed1e4d265ddb01f7199c7a491f405a7db480cabd284295b8d4c7a5fe4bf52e'
-    );
+    expect(parsed.snapshot.snapshot_digest).toBe(modelPipelineSnapshotFixture().snapshot_digest);
+    // CLIProxy's own inventory/routing contract moved to 3 together with the
+    // CLIProxy producer (PRs #44/#45) and the outer AI Hub <-> CCS snapshot.
+    expect(parsed.snapshot.inventory.schema_version).toBe(3);
+    expect(parsed.snapshot.inventory.routing_schema.version).toBe(3);
     expect(parsed.receipt.active.projection_digest).toBe(`sha256:${'b'.repeat(64)}`);
     expect(parsed.snapshot.agent_bindings).toEqual([
-      { agent: 'architect', tier_id: 'deep', alias: 'aihub-deep' },
+      { agent: 'architect', tier_id: 'balanced', alias: 'ai-hub-balanced' },
     ]);
     expect(parsed.snapshot.assignments[0]?.members[0]?.candidates).toHaveLength(2);
     expect(Object.isFrozen(parsed)).toBe(true);
@@ -39,6 +51,105 @@ describe('model pipeline v3 config boundary', () => {
       Object.isFrozen(parsed.snapshot.inventory.direct_models[0]?.routes[0]?.credentials)
     ).toBe(true);
     expect(Object.isFrozen(parsed.snapshot.catalog[0]?.provider_request?.body)).toBe(true);
+  });
+
+  it('accepts every configured lane and preserves its tier_id and alias unchanged', () => {
+    const parsed = parseModelPipelineConfig(cloneEnvelope());
+    const byTier = new Map(parsed.snapshot.assignments.map((item) => [item.tier_id, item]));
+
+    expect([...byTier.keys()]).toEqual(['balanced', 'fast', 'frontier', 'most-capable']);
+    expect(byTier.get('balanced')).toMatchObject({ alias: 'ai-hub-balanced', selectable: true });
+    expect(byTier.get('fast')).toMatchObject({ alias: 'ai-hub-fast', selectable: false });
+    expect(byTier.get('frontier')).toMatchObject({ alias: 'ai-hub-frontier', selectable: false });
+    expect(byTier.get('most-capable')).toMatchObject({
+      alias: 'ai-hub-most-capable',
+      selectable: false,
+    });
+  });
+
+  it('publishes an empty lane as unavailable without borrowing another lane member', () => {
+    const parsed = parseModelPipelineConfig(cloneEnvelope());
+    const empty = parsed.snapshot.assignments.filter((item) => item.tier_id !== 'balanced');
+
+    expect(empty).toHaveLength(3);
+    for (const assignment of empty) {
+      expect(assignment.selectable).toBe(false);
+      expect(assignment.members).toEqual([]);
+    }
+    // No agent is bound to an unavailable lane; there is no cross-lane fallback.
+    const boundTiers = new Set(parsed.snapshot.agent_bindings.map((item) => item.tier_id));
+    expect(boundTiers).toEqual(new Set(['balanced']));
+  });
+
+  it('accepts one canonical ModelKey independently eligible in all four v3 lanes', () => {
+    const request = {
+      ...modelPipelineRequestFixture(),
+      snapshot: sharedModelPipelineSnapshotFixture(),
+    };
+    const parsed = parseModelPipelinePublicationRequest(request);
+    const assignments = parsed.snapshot.assignments;
+    expect(assignments).toHaveLength(4);
+    expect(new Set(assignments.map((assignment) => assignment.alias)).size).toBe(4);
+    for (const assignment of assignments) {
+      expect(assignment.selectable).toBe(true);
+      expect(assignment.members[0]!.model_key).toEqual(assignments[0]!.members[0]!.model_key);
+    }
+  });
+
+  it('still rejects duplicate ModelKeys within one lane', () => {
+    const snapshot = sharedModelPipelineSnapshotFixture();
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    const members = assignments[0]!.members as Array<Record<string, unknown>>;
+    members.push({ ...structuredClone(members[0]!), member_rank: members.length + 1 });
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('must contain unique ModelKey values');
+  });
+
+  it('does not borrow another lane eligibility when the same ModelKey is shared', () => {
+    const snapshot = sharedModelPipelineSnapshotFixture();
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    const evaluations = snapshot.evaluations as Array<Record<string, unknown>>;
+    snapshot.evaluations = evaluations.filter(
+      (evaluation) => evaluation.tier_id !== assignments[1]!.tier_id
+    );
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('contains a candidate without an eligible evaluation');
+  });
+
+  it('still rejects repeated aliases when lanes share a ModelKey', () => {
+    const snapshot = sharedModelPipelineSnapshotFixture();
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    assignments[1]!.alias = assignments[0]!.alias;
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('must contain unique aliases');
+  });
+
+  it('rejects schema_version 2 with the exact ccs_stage=validation error', () => {
+    const request = modelPipelineRequestFixture() as Record<string, unknown>;
+    request.schema_version = 2;
+    expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
+      'model_pipeline_publication.schema_version must be a whole number 3 or greater'
+    );
+  });
+
+  it('rejects schema_version 4 with the exact ccs_stage=validation error', () => {
+    const request = modelPipelineRequestFixture() as Record<string, unknown>;
+    request.schema_version = 4;
+    expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
+      'model_pipeline_publication.schema_version must equal 3'
+    );
+  });
+
+  it('rejects a nested snapshot.schema_version of 2 inside an otherwise valid v3 envelope', () => {
+    const request = modelPipelineRequestFixture() as Record<string, unknown>;
+    const snapshot = request.snapshot as Record<string, unknown>;
+    snapshot.schema_version = 2;
+    expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
+      'model_pipeline_publication.snapshot.schema_version must equal 3'
+    );
   });
 
   it('requires positive publication ownership values and rejects v1 residue', () => {
@@ -58,12 +169,22 @@ describe('model pipeline v3 config boundary', () => {
     }
   });
 
-  it('rejects fields outside the exact v2 contract', () => {
+  it('rejects fields outside the exact v3 contract', () => {
     const envelope = cloneEnvelope();
     snapshotOf(envelope).legacy_models = [];
 
     expect(() => parseModelPipelineConfig(envelope)).toThrow(
       'model_pipeline.snapshot.legacy_models is not part of schema version 3'
+    );
+  });
+
+  it('rejects the retired max_candidate_attempts field as v2 residue', () => {
+    const envelope = cloneEnvelope();
+    const failurePolicy = snapshotOf(envelope).failure_policy as Record<string, unknown>;
+    failurePolicy.max_candidate_attempts = 3;
+
+    expect(() => parseModelPipelineConfig(envelope)).toThrow(
+      'model_pipeline.snapshot.failure_policy.max_candidate_attempts is not part of schema version 3'
     );
   });
 
@@ -84,6 +205,8 @@ describe('model pipeline v3 config boundary', () => {
     const models = inventory.direct_models as Array<Record<string, unknown>>;
     models[0]!.catalog_provider_id = 'openai';
     expect(() => parseModelPipelineConfig(flattened)).toThrow(
+      // The mutated field lives inside inventory.direct_models, which is
+      // CLIProxy's own contract, now pinned at schema version 3.
       'catalog_provider_id is not part of schema version 3'
     );
 
@@ -104,8 +227,8 @@ describe('model pipeline v3 config boundary', () => {
 
     const duplicate = cloneEnvelope();
     snapshotOf(duplicate).agent_bindings = [
-      { agent: 'architect', tier_id: 'deep', alias: 'aihub-deep' },
-      { agent: 'architect', tier_id: 'deep', alias: 'aihub-deep' },
+      { agent: 'architect', tier_id: 'balanced', alias: 'ai-hub-balanced' },
+      { agent: 'architect', tier_id: 'balanced', alias: 'ai-hub-balanced' },
     ];
     expect(() => parseModelPipelineConfig(duplicate)).toThrow(
       'model_pipeline.snapshot.agent_bindings must be unique and sorted'
@@ -113,7 +236,7 @@ describe('model pipeline v3 config boundary', () => {
 
     const dangling = cloneEnvelope();
     snapshotOf(dangling).agent_bindings = [
-      { agent: 'architect', tier_id: 'deep', alias: 'aihub-fast' },
+      { agent: 'architect', tier_id: 'balanced', alias: 'ai-hub-fast' },
     ];
     expect(() => parseModelPipelineConfig(dangling)).toThrow(
       'must reference the alias allocated to each bound tier'
@@ -186,5 +309,13 @@ describe('model pipeline v3 config boundary', () => {
       model_pipeline: { schema_version: 3, snapshot: modelPipeline.snapshot },
     };
     expect(isUnifiedConfig(invalid)).toBe(false);
+  });
+
+  it('recomputes the fixture digest identically to the production parser', () => {
+    // Guards the fixture wrapper itself: its self-computed digest must equal
+    // what parseModelPipelineConfig independently derives from the same bytes.
+    const snapshot = modelPipelineSnapshotFixture();
+    const parsed = parseModelPipelineConfig(modelPipelineConfigFixture());
+    expect(parsed.snapshot.snapshot_digest).toBe(snapshot.snapshot_digest);
   });
 });

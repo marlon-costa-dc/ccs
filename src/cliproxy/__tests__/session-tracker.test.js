@@ -9,6 +9,9 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const http = require('node:http');
+const { spawnSync } = require('node:child_process');
+const { afterAll, afterEach, beforeAll, beforeEach, describe, it, spyOn } = require('bun:test');
 
 // Set test isolation environment before importing
 const testHome = path.join(
@@ -33,11 +36,60 @@ const {
 const { setGlobalConfigDir } = require('../../../dist/utils/config-manager');
 
 describe('Session Tracker', function () {
-  const testPort = 18317;
+  let testPort;
+  let unrelatedPort;
+  let deadPid;
+  let killGuard;
+  const originalKill = process.kill;
+  const listeners = ['owned-session-port', 'unrelated-listener'].map((body) =>
+    http.createServer((_request, response) => response.end(body))
+  );
   let sessionLockPath;
   let cliproxyDir;
 
+  function readListener(port) {
+    return new Promise((resolve, reject) => {
+      const request = http.get({ host: '127.0.0.1', port, agent: false }, (response) => {
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => (body += chunk));
+        response.once('error', reject);
+        response.once('end', () => resolve(body));
+      });
+      request.once('error', reject);
+    });
+  }
+
+  beforeAll(async function () {
+    // Keep the reservations open: finding a free port and releasing it would
+    // let another service bind before stopProxy performs real port discovery.
+    await Promise.all(
+      listeners.map(
+        (server) =>
+          new Promise((resolve, reject) => {
+            server.once('error', reject);
+            server.listen(0, '127.0.0.1', resolve);
+          })
+      )
+    );
+    testPort = listeners[0].address().port;
+    unrelatedPort = listeners[1].address().port;
+    const exited = spawnSync(process.execPath, ['-e', 'process.exitCode = 0']);
+    assert.strictEqual(exited.status, 0);
+    assert.strictEqual(exited.signal, null);
+    deadPid = exited.pid;
+    assert.ok(deadPid > 0 && deadPid !== process.pid);
+    assert.throws(() => originalKill.call(process, deadPid, 0), { code: 'ESRCH' });
+  });
+
   beforeEach(function () {
+    // Delegate real liveness checks, but fail before any destructive signal.
+    // A regression must fail this test, never terminate a host-owned service.
+    killGuard = spyOn(process, 'kill').mockImplementation((pid, signal) => {
+      assert.strictEqual(signal, 0, 'session fixture must not send destructive signals');
+      assert.ok(pid === process.pid || pid === deadPid, 'PID must belong to this fixture');
+      return originalKill.call(process, pid, signal);
+    });
     // Reassert test isolation because other files mutate CCS_DIR/CCS_HOME in the same Bun process.
     process.env.CCS_HOME = testHome;
     delete process.env.CCS_DIR;
@@ -63,6 +115,12 @@ describe('Session Tracker', function () {
   });
 
   afterEach(function () {
+    const signals = killGuard.mock.calls;
+    killGuard.mockRestore();
+    for (const [pid, signal] of signals) {
+      assert.strictEqual(signal, 0);
+      assert.ok(pid === process.pid || pid === deadPid);
+    }
     setGlobalConfigDir(undefined);
 
     // Clean up lock files
@@ -78,7 +136,17 @@ describe('Session Tracker', function () {
     }
   });
 
-  afterAll(function () {
+  afterAll(async function () {
+    await Promise.all(
+      listeners
+        .filter((server) => server.listening)
+        .map(
+          (server) =>
+            new Promise((resolve, reject) => {
+              server.close((error) => (error ? reject(error) : resolve()));
+            })
+        )
+    );
     // Clean up test directory
     try {
       fs.rmSync(testHome, { recursive: true, force: true });
@@ -101,7 +169,7 @@ describe('Session Tracker', function () {
     it('should return null when port does not match', function () {
       // Create lock with different port
       const lock = {
-        port: 9999,
+        port: unrelatedPort,
         pid: process.pid, // Use current process as it's definitely running
         sessions: ['session1'],
         startedAt: new Date().toISOString(),
@@ -130,10 +198,10 @@ describe('Session Tracker', function () {
     });
 
     it('should return null and cleanup when proxy is dead', function () {
-      // Create lock with non-existent PID
+      // Create lock with the exited fixture child's PID.
       const lock = {
         port: testPort,
-        pid: 999999999, // Very unlikely to exist
+        pid: deadPid,
         sessions: ['session1'],
         startedAt: new Date().toISOString(),
       };
@@ -180,7 +248,7 @@ describe('Session Tracker', function () {
       // Create lock with different PID
       const oldLock = {
         port: testPort,
-        pid: 12345,
+        pid: deadPid,
         sessions: ['old-session'],
         startedAt: new Date().toISOString(),
       };
@@ -273,7 +341,7 @@ describe('Session Tracker', function () {
       // Create lock with dead PID
       const lock = {
         port: testPort,
-        pid: 999999999,
+        pid: deadPid,
         sessions: ['session1'],
         startedAt: new Date().toISOString(),
       };
@@ -294,8 +362,8 @@ describe('Session Tracker', function () {
 
     it('should not cleanup when port differs', function () {
       const lock = {
-        port: 9999,
-        pid: 999999999, // Dead PID
+        port: unrelatedPort,
+        pid: deadPid,
         sessions: ['session1'],
         startedAt: new Date().toISOString(),
       };
@@ -310,7 +378,7 @@ describe('Session Tracker', function () {
     it('should cleanup when proxy is dead', function () {
       const lock = {
         port: testPort,
-        pid: 999999999, // Dead PID
+        pid: deadPid,
         sessions: ['session1'],
         startedAt: new Date().toISOString(),
       };
@@ -338,16 +406,24 @@ describe('Session Tracker', function () {
 
   describe('stopProxy', function () {
     it('should return error when no lock exists', async function () {
+      assert.strictEqual(fs.existsSync(sessionLockPath), false);
+      assert.strictEqual(await readListener(testPort), 'owned-session-port');
+      assert.strictEqual(await readListener(unrelatedPort), 'unrelated-listener');
       const result = await stopProxy(testPort);
       assert.strictEqual(result.stopped, false);
-      assert.strictEqual(result.error, 'No active CLIProxy session found');
+      // This reserved port has a real non-CLIProxy listener, not a free port.
+      assert.match(result.error, new RegExp(`^Port ${testPort} is in use by .+, not CLIProxy$`));
+      assert.deepStrictEqual(killGuard.mock.calls, [], 'no-lock lookup must not signal any PID');
+      assert.strictEqual(fs.existsSync(sessionLockPath), false);
+      assert.strictEqual(await readListener(testPort), 'owned-session-port');
+      assert.strictEqual(await readListener(unrelatedPort), 'unrelated-listener');
     });
 
     it('should cleanup stale lock when proxy is not running', async function () {
       // Create lock with dead PID
       const lock = {
         port: testPort,
-        pid: 999999999, // Very unlikely to exist
+        pid: deadPid,
         sessions: ['session1'],
         startedAt: new Date().toISOString(),
       };
@@ -401,7 +477,7 @@ describe('Session Tracker', function () {
     it('should cleanup and return not running when proxy is dead', function () {
       const lock = {
         port: testPort,
-        pid: 999999999, // Dead PID
+        pid: deadPid,
         sessions: ['session1'],
         startedAt: new Date().toISOString(),
       };

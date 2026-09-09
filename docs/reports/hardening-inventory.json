@@ -1,8 +1,8 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2181,
-    "filesAffected": 245,
+    "totalOccurrences": 2179,
+    "filesAffected": 244,
     "hotpathOccurrences": 1148,
     "hotpathFilesAffected": 152,
     "topHotpathFiles": [
@@ -249,6 +249,20 @@
         "markers": []
       },
       {
+        "file": "src/cliproxy/__tests__/session-tracker.test.js",
+        "count": 33,
+        "calls": [
+          "existsSync",
+          "mkdirSync",
+          "readdirSync",
+          "readFileSync",
+          "rmSync",
+          "unlinkSync",
+          "writeFileSync"
+        ],
+        "markers": []
+      },
+      {
         "file": "src/cliproxy/executor/__tests__/variant-port-edge-cases.test.js",
         "count": 33,
         "calls": [
@@ -285,20 +299,6 @@
           "readFileSync",
           "renameSync",
           "statSync",
-          "unlinkSync",
-          "writeFileSync"
-        ],
-        "markers": []
-      },
-      {
-        "file": "src/cliproxy/__tests__/session-tracker-port.test.js",
-        "count": 31,
-        "calls": [
-          "existsSync",
-          "mkdirSync",
-          "readdirSync",
-          "readFileSync",
-          "rmSync",
           "unlinkSync",
           "writeFileSync"
         ],
@@ -723,7 +723,7 @@
         },
         {
           "file": "src/config/schemas/model-pipeline.ts",
-          "loc": 1476
+          "loc": 1479
         },
         {
           "file": "src/cliproxy/model-catalog.ts",

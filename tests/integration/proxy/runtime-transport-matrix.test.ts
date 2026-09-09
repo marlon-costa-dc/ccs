@@ -70,10 +70,10 @@ function runProbe(
       fs.rmSync(ccsHome, { recursive: true, force: true });
       reject(error);
     });
-    child.once('close', (code) => {
+    child.once('close', (code, signal) => {
       fs.rmSync(ccsHome, { recursive: true, force: true });
       if (code !== 0) {
-        reject(new Error(`Probe exited ${code}: ${stderr || stdout}`));
+        reject(new Error(`Probe ${binary} exited ${code} (${signal}): ${stderr || stdout}`));
         return;
       }
       const lastLine = stdout.trim().split('\n').pop();

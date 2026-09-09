@@ -1,12 +1,43 @@
 import snapshotFixture from './model-pipeline-snapshot-v3.json';
+import { canonicalJsonSha256Digest } from '../../../../utils/canonical-json';
+import { getModelPipelineSnapshotSchemaDigest } from '../../model-pipeline-contract-artifacts';
 
-const SNAPSHOT_SCHEMA_DIGEST =
-  'sha256:2ea7574a8c69c227a1741acffa22d82ab48dd4715cfd4713f0c6d2ed5691a8d9';
+// Derived from the shipped artifact at runtime — never a hand-maintained
+// literal, so artifact updates cannot strand this fixture behind the contract.
+const SNAPSHOT_SCHEMA_DIGEST = getModelPipelineSnapshotSchemaDigest();
 const PROJECTION_DIGEST = `sha256:${'b'.repeat(64)}`;
 const CONFIG_DIGEST = `sha256:${'c'.repeat(64)}`;
 
+/**
+ * Return the fixture snapshot with its `snapshot_digest` recomputed over the
+ * exact semantic payload, mirroring `parseSnapshot`'s own digest derivation so
+ * the fixture never depends on a hand-maintained hash.
+ */
 export function modelPipelineSnapshotFixture(): Record<string, unknown> {
-  return structuredClone(snapshotFixture) as unknown as Record<string, unknown>;
+  const raw = structuredClone(snapshotFixture) as unknown as Record<string, unknown>;
+  const { snapshot_digest: _ignored, ...semantic } = raw;
+  return { ...semantic, snapshot_digest: canonicalJsonSha256Digest(semantic) };
+}
+
+export function sharedModelPipelineSnapshotFixture(): Record<string, unknown> {
+  const snapshot = modelPipelineSnapshotFixture();
+  const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+  const evaluations = snapshot.evaluations as Array<Record<string, unknown>>;
+  const members = assignments[0]!.members;
+  const eligible = evaluations.filter((evaluation) => evaluation.eligible);
+  for (const assignment of assignments) {
+    assignment.members = structuredClone(members);
+    assignment.selectable = true;
+    assignment.reason = 'independently eligible in this lane';
+  }
+  snapshot.evaluations = assignments.flatMap((assignment) =>
+    eligible.map((evaluation) => ({
+      ...structuredClone(evaluation),
+      tier_id: assignment.tier_id,
+    }))
+  );
+  const { snapshot_digest: _ignored, ...semantic } = snapshot;
+  return { ...semantic, snapshot_digest: canonicalJsonSha256Digest(semantic) };
 }
 
 export function modelPipelineConfigFixture(): Record<string, unknown> {

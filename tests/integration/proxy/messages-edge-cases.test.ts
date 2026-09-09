@@ -1,22 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as fs from 'fs';
 import * as http from 'http';
+import * as net from 'net';
 import * as os from 'os';
 import * as path from 'path';
 import * as zlib from 'zlib';
-import { startOpenAICompatProxyServer } from '../../../src/proxy/server/proxy-server';
+import {
+  closeOpenAICompatProxyServer,
+  startOpenAICompatProxyServer,
+} from '../../../src/proxy/server/proxy-server';
 import type { OpenAICompatProfileConfig } from '../../../src/proxy/profile-router';
+import { getCurrentLogPath } from '../../../src/services/logging';
 
 let proxyServer: http.Server;
-let upstreamServer: http.Server;
-let upstreamSockets = new Set<import('net').Socket>();
+let upstreamServer: net.Server;
+let upstreamSockets = new Set<net.Socket>();
 let upstreamPort: number;
 let proxyPort: number;
 let tempDir: string;
 let originalTimeoutEnv: string | undefined;
 let originalCcsHome: string | undefined;
 
-function resolveListeningPort(server: http.Server): number {
+function resolveListeningPort(server: net.Server): number {
   const address = server.address();
   if (!address || typeof address === 'string') {
     throw new Error('Failed to resolve server port');
@@ -24,7 +29,7 @@ function resolveListeningPort(server: http.Server): number {
   return address.port;
 }
 
-async function waitForServerListening(server: http.Server): Promise<number> {
+async function waitForServerListening(server: net.Server): Promise<number> {
   if (server.listening) {
     return resolveListeningPort(server);
   }
@@ -45,6 +50,10 @@ async function startUpstream(
   upstreamServer = http.createServer((req, res) => {
     void Promise.resolve(handler(req, res));
   });
+  await listenUpstream();
+}
+
+async function listenUpstream(): Promise<void> {
   upstreamServer.on('connection', (socket) => {
     upstreamSockets.add(socket);
     socket.on('close', () => {
@@ -55,7 +64,7 @@ async function startUpstream(
   upstreamPort = await waitForServerListening(upstreamServer);
 }
 
-async function requestProxy(payload: unknown, signal?: AbortSignal): Promise<Response> {
+async function requestProxy(payload: unknown): Promise<Response> {
   return fetch(`http://127.0.0.1:${proxyPort}/v1/messages`, {
     method: 'POST',
     headers: {
@@ -63,7 +72,6 @@ async function requestProxy(payload: unknown, signal?: AbortSignal): Promise<Res
       'x-api-key': 'test-proxy-token',
     },
     body: JSON.stringify(payload),
-    signal,
   });
 }
 
@@ -75,6 +83,21 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  const closing: Promise<void>[] = [];
+  if (proxyServer) {
+    closing.push(closeOpenAICompatProxyServer(proxyServer));
+  }
+  if (upstreamServer) {
+    for (const socket of upstreamSockets) {
+      socket.destroy();
+    }
+    upstreamSockets = new Set();
+    closing.push(new Promise<void>((resolve) => upstreamServer.close(() => resolve())));
+  }
+  // Stop intake first, but release owned upstreams before waiting for the
+  // proxy's in-flight fetches to drain, including on an assertion failure.
+  await Promise.all(closing);
+
   if (originalTimeoutEnv !== undefined) {
     process.env.CCS_OPENAI_PROXY_REQUEST_TIMEOUT_MS = originalTimeoutEnv;
   } else {
@@ -86,16 +109,6 @@ afterEach(async () => {
     delete process.env.CCS_HOME;
   }
 
-  if (proxyServer) {
-    await new Promise<void>((resolve) => proxyServer.close(() => resolve()));
-  }
-  if (upstreamServer) {
-    for (const socket of upstreamSockets) {
-      socket.destroy();
-    }
-    upstreamSockets = new Set();
-    await new Promise<void>((resolve) => upstreamServer.close(() => resolve()));
-  }
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
@@ -104,6 +117,10 @@ describe('openai proxy message edge cases', () => {
     handler: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void> | void
   ) {
     await startUpstream(handler);
+    await startProxy();
+  }
+
+  async function startProxy(): Promise<void> {
     const profile: OpenAICompatProfileConfig = {
       profileName: 'hf',
       settingsPath: '/tmp/hf.settings.json',
@@ -278,40 +295,87 @@ describe('openai proxy message edge cases', () => {
   it(
     'aborts the upstream request when the client disconnects mid-flight',
     async () => {
-      await startProxyWithHandler(() => {});
+      let markUpstreamStarted!: () => void;
+      let markUpstreamClosed!: () => void;
+      const upstreamStarted = new Promise<void>((resolve) => {
+        markUpstreamStarted = resolve;
+      });
+      const upstreamClosed = new Promise<void>((resolve) => {
+        markUpstreamClosed = resolve;
+      });
+      let upstreamResponseBytes: number | undefined;
+      // Observe actual transport closure, not Bun's node:http wrapper events.
+      upstreamServer = net.createServer((socket) => {
+        socket.once('data', markUpstreamStarted);
+        socket.once('close', () => {
+          upstreamResponseBytes = socket.bytesWritten;
+          markUpstreamClosed();
+        });
+      });
+      await listenUpstream();
+      await startProxy();
+      const logPath = getCurrentLogPath();
+      expect(logPath).toBe(path.join(tempDir, '.ccs', 'logs', 'current.jsonl'));
+      let downstreamRequest: http.IncomingMessage | undefined;
+      proxyServer.once('request', (req) => {
+        downstreamRequest = req;
+      });
 
-      const controller = new AbortController();
-      const response = requestProxy(
-        {
-          model: 'hf-model',
-          messages: [{ role: 'user', content: 'hello' }],
-        },
-        controller.signal
-      );
-      setTimeout(() => controller.abort(), 50);
-      await expect(response).rejects.toThrow();
-
-      const logPath = path.join(tempDir, '.ccs', 'logs', 'current.jsonl');
-      await Promise.race([
-        new Promise<void>((resolve, reject) => {
-          const startedAt = Date.now();
-          const timer = setInterval(() => {
-            if (fs.existsSync(logPath)) {
-              const content = fs.readFileSync(logPath, 'utf8');
-              if (content.includes('"event":"request.disconnect"')) {
-                clearInterval(timer);
-                resolve();
-                return;
-              }
-            }
-
-            if (Date.now() - startedAt > 1500) {
-              clearInterval(timer);
-              reject(new Error('proxy did not log disconnect cleanup'));
-            }
-          }, 50);
-        }),
-      ]);
+      // A fetch promise rejecting on abort does not prove TCP disconnection.
+      // Own the client socket and destroy it only after real upstream intake.
+      const client = net.createConnection({ host: '127.0.0.1', port: proxyPort });
+      let clientDidClose = false;
+      const clientClosed = new Promise<void>((resolve, reject) => {
+        client.once('error', reject);
+        client.once('close', () => {
+          clientDidClose = true;
+          resolve();
+        });
+      });
+      let responseBytes = 0;
+      client.on('data', (chunk) => (responseBytes += chunk.length));
+      const payload = JSON.stringify({
+        model: 'hf-model',
+        messages: [{ role: 'user', content: 'hello' }],
+      });
+      client.write([
+        'POST /v1/messages HTTP/1.1',
+        `Host: 127.0.0.1:${proxyPort}`,
+        'Content-Type: application/json',
+        'x-api-key: test-proxy-token',
+        `Content-Length: ${Buffer.byteLength(payload)}`,
+        'Connection: close',
+        '',
+        payload,
+      ].join('\r\n'));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          upstreamStarted,
+          clientClosed.then(() => {
+            throw new Error('client closed before upstream intake');
+          }),
+        ]);
+        expect(downstreamRequest?.socket.remoteAddress).toBe('127.0.0.1');
+        client.destroy();
+        await Promise.race([
+          Promise.all([clientClosed, upstreamClosed]),
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(
+              () => reject(new Error('proxy did not cancel the upstream connection')),
+              1500
+            );
+          }),
+        ]);
+        expect(clientDidClose).toBe(true);
+        expect(downstreamRequest?.socket.remoteAddress).toBeUndefined();
+        expect(upstreamResponseBytes).toBe(0);
+        expect(responseBytes).toBe(0);
+        expect(fs.readFileSync(logPath, 'utf8')).toContain('"event":"request.disconnect"');
+      } finally {
+        clearTimeout(timer);
+        client.destroy();
+      }
     }
   );
 });

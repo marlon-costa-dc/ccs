@@ -291,6 +291,7 @@ describe('HttpsTunnelProxy', () => {
         path: '/v1/messages',
         method: 'POST',
       });
+      req.on('error', () => undefined);
 
       // Contain the expected abort error: without a listener the 'error'
       // event escapes as an unhandled process error and kills the test file.

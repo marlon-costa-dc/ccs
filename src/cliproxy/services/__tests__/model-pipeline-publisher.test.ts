@@ -2,11 +2,11 @@ import { describe, expect, it, mock } from 'bun:test';
 import { modelPipelineRequestFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
 import {
   parseModelPipelinePublicationRequest,
-  type ActiveIdentityV2,
+  type ActiveIdentityV3,
   type ModelPipelineConfig,
   type ModelPipelineInventory,
   type ModelPipelinePublicationRequest,
-  type PublicationReceiptV2,
+  type PublicationReceiptV3,
 } from '../../../config/schemas/model-pipeline';
 import {
   createEmptyUnifiedConfig,
@@ -17,6 +17,7 @@ import { sha256Digest } from '../../../utils/canonical-json';
 import type { CLIProxyActivationReceipt } from '../../management/management-api-types';
 import type { ProxyTarget } from '../../proxy/proxy-target-resolver';
 import { projectModelRouting } from '../../config/model-routing-projector';
+import { getModelPipelineSnapshotSchemaDigest } from '../../../config/schemas/model-pipeline-contract-artifacts';
 import {
   ModelPipelineGenerationConflictError,
   ModelPipelinePublisher,
@@ -33,14 +34,14 @@ const request = parseModelPipelinePublicationRequest(modelPipelineRequestFixture
 const activeConfigYaml = 'port: 8317\n';
 const stagedConfigYaml = 'port: 8317\nmodel-routing:\n  schema-version: 3\n';
 const loadedAt = '2026-08-28T11:20:57Z';
-const snapshotSchemaDigest =
-  'sha256:de6a5b76c5b9529ddd894f331ff1754d514ff15efaba617c01047eb7191fdea9';
+// Derived from the shipped artifact at runtime — never a hand-maintained literal.
+const snapshotSchemaDigest = getModelPipelineSnapshotSchemaDigest();
 const ccsBinary = {
   version: 'ccs-fixture-v3',
   commit: 'ccs-fixture-commit',
   built_at: '2026-08-28T11:15:00Z',
 };
-const proposedActive: ActiveIdentityV2 = {
+const proposedActive: ActiveIdentityV3 = {
   generation: request.snapshot.generation,
   snapshot_digest: request.snapshot.snapshot_digest,
   projection_digest: projectModelRouting(request.snapshot)['projection-digest'],
@@ -99,7 +100,7 @@ function activationReceipt(
   };
 }
 
-function publicationReceipt(): PublicationReceiptV2 {
+function publicationReceipt(): PublicationReceiptV3 {
   return {
     schema_version: 3,
     ok: true,
@@ -181,7 +182,7 @@ function dependencyHarness(options?: {
         events.push(`yaml:${configReads}`);
         return configReads === 1 ? activeConfigYaml : stagedConfigYaml;
       },
-      async putConfigYaml(configYaml: string, expectedActive: ActiveIdentityV2 | null) {
+      async putConfigYaml(configYaml: string, expectedActive: ActiveIdentityV3 | null) {
         events.push('put');
         expect(configYaml).toBe(stagedConfigYaml);
         expect(expectedActive).toBeNull();

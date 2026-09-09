@@ -461,9 +461,14 @@ export function attachDisconnectAbortHandlers(
     registerOnceListener(res.socket, 'close', () => abortOnDisconnect('res.socket.close')),
   ];
 
+  const peerWasConnected = req.socket?.remoteAddress !== undefined;
   const disconnectPoll = setInterval(() => {
     if (req.socket?.destroyed === true) {
       abortOnDisconnect('poll.socket.destroyed');
+    } else if (peerWasConnected && req.socket?.remoteAddress === undefined) {
+      // Bun can clear the native peer after close without destroying its
+      // node:http Socket wrapper once the request body has been consumed.
+      abortOnDisconnect('poll.socket.disconnected');
     }
   }, 50);
 
