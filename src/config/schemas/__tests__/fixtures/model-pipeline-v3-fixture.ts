@@ -19,6 +19,27 @@ export function modelPipelineSnapshotFixture(): Record<string, unknown> {
   return { ...semantic, snapshot_digest: canonicalJsonSha256Digest(semantic) };
 }
 
+export function sharedModelPipelineSnapshotFixture(): Record<string, unknown> {
+  const snapshot = modelPipelineSnapshotFixture();
+  const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+  const evaluations = snapshot.evaluations as Array<Record<string, unknown>>;
+  const members = assignments[0]!.members;
+  const eligible = evaluations.filter((evaluation) => evaluation.eligible);
+  for (const assignment of assignments) {
+    assignment.members = structuredClone(members);
+    assignment.selectable = true;
+    assignment.reason = 'independently eligible in this lane';
+  }
+  snapshot.evaluations = assignments.flatMap((assignment) =>
+    eligible.map((evaluation) => ({
+      ...structuredClone(evaluation),
+      tier_id: assignment.tier_id,
+    }))
+  );
+  const { snapshot_digest: _ignored, ...semantic } = snapshot;
+  return { ...semantic, snapshot_digest: canonicalJsonSha256Digest(semantic) };
+}
+
 export function modelPipelineConfigFixture(): Record<string, unknown> {
   const snapshot = modelPipelineSnapshotFixture();
   const inventory = snapshot.inventory as Record<string, unknown>;

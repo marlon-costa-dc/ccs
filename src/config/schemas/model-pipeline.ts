@@ -1193,17 +1193,10 @@ function parseSnapshot(value: unknown, path: string): ModelPipelineSnapshot {
       .filter((item) => item.eligible)
       .map((item) => `${item.tier_id}\u0000${candidateKey(item)}`)
   );
-  const tierByModel = new Map<string, string>();
   const candidateRoute = (candidate: ModelPipelineCandidate): ModelPipelineRouteKey =>
     candidate.route_key;
   for (const assignment of assignments) {
     for (const member of assignment.members) {
-      const key = modelKey(member.model_key);
-      const previousTier = tierByModel.get(key);
-      if (previousTier && previousTier !== assignment.tier_id) {
-        fail(`${path}.assignments`, 'assigns one ModelKey to more than one tier');
-      }
-      tierByModel.set(key, assignment.tier_id);
       for (const candidate of member.candidates) {
         if (!eligible.has(`${assignment.tier_id}\u0000${candidateKey(candidate)}`)) {
           fail(`${path}.assignments`, 'contains a candidate without an eligible evaluation');
