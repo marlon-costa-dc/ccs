@@ -42,6 +42,21 @@ describe('run-test-bucket', () => {
     expect(slowSet.has('tests/integration/web-server/codex-profiles-endpoint.test.ts')).toBe(true);
   });
 
+  test('keeps the cross-runtime transport fixture slow and isolated', () => {
+    const relativePath = 'tests/integration/proxy/runtime-transport-matrix.test.ts';
+
+    // Its built-dist dependency is loaded by the CJS child fixture, not by the
+    // test source scanned by readsBuiltDist. Real runtimes and servers still
+    // require the declared subprocess bucket, not shared unit-test scheduling.
+    expect(bucket.slowTests).toContain(relativePath);
+    expect(bucket.selectBucket('fast')).not.toContain(relativePath);
+    expect(bucket.selectBucket('slow')).toContain(relativePath);
+    const runs = bucket.getBunRuns('slow', [relativePath]);
+    expect(runs.map((run) => run.label)).toEqual([relativePath]);
+    expect(runs[0].selected).toEqual([relativePath]);
+    expect(runs[0].quietOnPass).toBe(true);
+  });
+
   test('keeps stateful integration suites slow and isolated', () => {
     const statefulSuites = [
       'tests/integration/image-analyzer-hook.test.ts',
@@ -69,6 +84,32 @@ describe('run-test-bucket', () => {
       expect(slowSet.has(relativePath)).toBe(true);
     }
     expect(runs.map((run) => run.label)).toEqual(daemonSuites);
+  });
+
+  test('isolates every target suite that launches the real CCS entrypoint', () => {
+    const launchSuites = bucket.getDiscoveredTests().filter((relativePath) => {
+      if (!relativePath.startsWith('tests/unit/targets/')) return false;
+      const source = fs.readFileSync(path.resolve(__dirname, '../../../', relativePath), 'utf8');
+      return source.includes('const ccsEntry =') && source.includes('spawnSync(');
+    });
+    expect(launchSuites.length).toBeGreaterThan(0);
+    const fast = bucket.selectBucket('fast');
+    const slow = bucket.selectBucket('slow');
+    for (const relativePath of launchSuites) {
+      expect(bucket.slowTests).toContain(relativePath);
+      expect(fast).not.toContain(relativePath);
+      expect(slow).toContain(relativePath);
+    }
+    const runs = bucket.getBunRuns('slow', launchSuites);
+    expect(runs.map((run) => run.label)).toEqual(launchSuites);
+    expect(runs.every((run) => run.selected.length === 1 && run.quietOnPass)).toBe(true);
+  });
+
+  test('preserves every discovered test exactly once across the native buckets', () => {
+    const discovered = bucket.getDiscoveredTests();
+    const selected = [...bucket.selectBucket('fast'), ...bucket.selectBucket('slow')];
+    expect(selected.sort()).toEqual(discovered);
+    expect(new Set(selected).size).toBe(discovered.length);
   });
 
   test('keeps update install-origin integration slow and isolated', () => {
