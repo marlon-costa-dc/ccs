@@ -307,8 +307,8 @@
     ]
   },
   "legacyShim": {
-    "totalMarkers": 382,
-    "filesAffected": 160,
+    "totalMarkers": 384,
+    "filesAffected": 161,
     "topFiles": [
       {
         "file": "src/web-server/usage/native-quota-collector.ts",
@@ -483,11 +483,11 @@
   },
   "maintainability": {
     "typedErrors": {
-      "totalThrows": 551,
-      "typedThrows": 226,
+      "totalThrows": 552,
+      "typedThrows": 227,
       "plainThrows": 247,
       "otherThrows": 78,
-      "adoptionRatio": 0.4102,
+      "adoptionRatio": 0.4112,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
