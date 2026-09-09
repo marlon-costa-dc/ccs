@@ -4,6 +4,7 @@ import {
   modelPipelineConfigFixture,
   modelPipelineRequestFixture,
   modelPipelineSnapshotFixture,
+  sharedModelPipelineSnapshotFixture,
 } from './fixtures/model-pipeline-v3-fixture';
 import {
   MODEL_PIPELINE_SCHEMA_VERSION,
@@ -78,6 +79,52 @@ describe('model pipeline v3 config boundary', () => {
     // No agent is bound to an unavailable lane; there is no cross-lane fallback.
     const boundTiers = new Set(parsed.snapshot.agent_bindings.map((item) => item.tier_id));
     expect(boundTiers).toEqual(new Set(['balanced']));
+  });
+
+  it('accepts one canonical ModelKey independently eligible in all four v3 lanes', () => {
+    const request = {
+      ...modelPipelineRequestFixture(),
+      snapshot: sharedModelPipelineSnapshotFixture(),
+    };
+    const parsed = parseModelPipelinePublicationRequest(request);
+    const assignments = parsed.snapshot.assignments;
+    expect(assignments).toHaveLength(4);
+    expect(new Set(assignments.map((assignment) => assignment.alias)).size).toBe(4);
+    for (const assignment of assignments) {
+      expect(assignment.selectable).toBe(true);
+      expect(assignment.members[0]!.model_key).toEqual(assignments[0]!.members[0]!.model_key);
+    }
+  });
+
+  it('still rejects duplicate ModelKeys within one lane', () => {
+    const snapshot = sharedModelPipelineSnapshotFixture();
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    const members = assignments[0]!.members as Array<Record<string, unknown>>;
+    members.push({ ...structuredClone(members[0]!), member_rank: members.length + 1 });
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('must contain unique ModelKey values');
+  });
+
+  it('does not borrow another lane eligibility when the same ModelKey is shared', () => {
+    const snapshot = sharedModelPipelineSnapshotFixture();
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    const evaluations = snapshot.evaluations as Array<Record<string, unknown>>;
+    snapshot.evaluations = evaluations.filter(
+      (evaluation) => evaluation.tier_id !== assignments[1]!.tier_id
+    );
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('contains a candidate without an eligible evaluation');
+  });
+
+  it('still rejects repeated aliases when lanes share a ModelKey', () => {
+    const snapshot = sharedModelPipelineSnapshotFixture();
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    assignments[1]!.alias = assignments[0]!.alias;
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('must contain unique aliases');
   });
 
   it('rejects schema_version 2 with the exact ccs_stage=validation error', () => {
