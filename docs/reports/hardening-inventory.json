@@ -307,8 +307,8 @@
     ]
   },
   "legacyShim": {
-    "totalMarkers": 382,
-    "filesAffected": 160,
+    "totalMarkers": 384,
+    "filesAffected": 161,
     "topFiles": [
       {
         "file": "src/web-server/usage/native-quota-collector.ts",

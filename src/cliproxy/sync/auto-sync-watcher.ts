@@ -9,9 +9,11 @@ import * as chokidar from 'chokidar';
 import * as path from 'path';
 
 import { syncToLocalConfig } from './local-config-sync';
-import { regenerateConfig } from '../config/config-generator';
+import { regenerateConfig } from '../config';
 import { getCcsDir, loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
 import { ConfigError } from '../../errors/error-types';
+import type { UnifiedConfig } from '../../config/unified-config-types';
+import { isDeepStrictEqual } from 'node:util';
 
 /** Debounce delay in milliseconds */
 const DEBOUNCE_MS = 3000;
@@ -20,6 +22,15 @@ const DEBOUNCE_MS = 3000;
 let watcherInstance: chokidar.FSWatcher | null = null;
 let syncTimeout: NodeJS.Timeout | null = null;
 let isSyncing = false;
+let profileConfigBaseline: Omit<UnifiedConfig, 'model_pipeline'> | null = null;
+let pipelineWasActive = false;
+let configChangePending = false;
+let settingsChangePending = false;
+
+function nonPublicationView(config: UnifiedConfig): Omit<UnifiedConfig, 'model_pipeline'> {
+  const { model_pipeline: _publication, ...profileConfig } = config;
+  return structuredClone(profileConfig);
+}
 
 /**
  * Check if auto-sync is enabled in config.
@@ -78,6 +89,19 @@ async function triggerSync(): Promise<void> {
 }
 
 async function triggerRegeneration(): Promise<void> {
+  // The loader validates the publication too, before it is excluded from the
+  // legacy view. Invalid or mixed edits must still reach their existing errors.
+  const config = loadOrCreateUnifiedConfig();
+  const profileConfig = nonPublicationView(config);
+  const pipelineIsActive = config.model_pipeline !== undefined;
+  if (
+    isDeepStrictEqual(profileConfig, profileConfigBaseline) &&
+    (!pipelineWasActive || pipelineIsActive)
+  ) {
+    pipelineWasActive = pipelineIsActive;
+    log('No profile config changes to regenerate');
+    return;
+  }
   if (isSyncing) {
     throw new ConfigError('Auto-sync received overlapping regeneration work');
   }
@@ -88,6 +112,8 @@ async function triggerRegeneration(): Promise<void> {
   isSyncing = true;
   try {
     const configPath = regenerateConfig(resolveConfiguredLocalPort());
+    profileConfigBaseline = profileConfig;
+    pipelineWasActive = pipelineIsActive;
     log(`Success: regenerated ${configPath}`);
   } finally {
     isSyncing = false;
@@ -106,6 +132,8 @@ function terminateOnBackgroundFailure(error: unknown): void {
  */
 function onFileChange(filePath: string): void {
   const fileName = path.basename(filePath);
+  if (fileName === 'config.yaml') configChangePending = true;
+  else settingsChangePending = true;
   log(`Profile change detected: ${fileName}`);
 
   // Clear existing timeout
@@ -118,8 +146,16 @@ function onFileChange(filePath: string): void {
   // Set new debounced timeout
   syncTimeout = setTimeout(() => {
     syncTimeout = null;
-    const operation = fileName === 'config.yaml' ? triggerRegeneration() : triggerSync();
-    operation.catch(terminateOnBackgroundFailure);
+    const regenerate = configChangePending;
+    const syncProfiles = settingsChangePending;
+    configChangePending = false;
+    settingsChangePending = false;
+    // A receipt write must not replace a pending settings sync. Conversely,
+    // mixed config edits must encounter the regeneration guard first.
+    void (async () => {
+      if (regenerate) await triggerRegeneration();
+      if (syncProfiles) await triggerSync();
+    })().catch(terminateOnBackgroundFailure);
   }, DEBOUNCE_MS);
 }
 
@@ -138,6 +174,10 @@ export function startAutoSyncWatcher(): void {
     return;
   }
 
+  const config = loadOrCreateUnifiedConfig();
+  profileConfigBaseline = nonPublicationView(config);
+  pipelineWasActive = config.model_pipeline !== undefined;
+
   const ccsDir = getCcsDir();
   const watchPatterns = [path.join(ccsDir, 'config.yaml'), path.join(ccsDir, '*.settings.json')];
 
@@ -155,6 +195,7 @@ export function startAutoSyncWatcher(): void {
   watcherInstance.on('change', onFileChange);
   watcherInstance.on('add', onFileChange);
   watcherInstance.on('unlink', onFileChange);
+  watcherInstance.on('ready', () => log('Watcher ready'));
 
   watcherInstance.on('error', (error) => {
     terminateOnBackgroundFailure(error);
@@ -174,16 +215,25 @@ export async function stopAutoSyncWatcher(): Promise<void> {
 
   if (watcherInstance) {
     const closePromise = watcherInstance.close();
-    const timeoutPromise = new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new ConfigError('Auto-sync watcher close timed out')), 5000)
-    );
-    await Promise.race([closePromise, timeoutPromise]);
+    let timer: NodeJS.Timeout | undefined;
+    const timeoutPromise = new Promise<void>((_, reject) => {
+      timer = setTimeout(() => reject(new ConfigError('Auto-sync watcher close timed out')), 5000);
+    });
+    try {
+      await Promise.race([closePromise, timeoutPromise]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
     watcherInstance = null;
     log('Watcher stopped');
   }
 
   // Reset flag to prevent stale state
   isSyncing = false;
+  profileConfigBaseline = null;
+  pipelineWasActive = false;
+  configChangePending = false;
+  settingsChangePending = false;
 }
 
 /**

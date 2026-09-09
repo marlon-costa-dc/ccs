@@ -172,6 +172,15 @@ function generateOAuthModelAliasSection(configuredAliases?: CLIProxyOAuthModelAl
   return body ? `oauth-model-alias:\n${body}` : '';
 }
 
+/** Enforce the mutation owner before any legacy raw-config write. */
+export function assertLegacyConfigMutationAllowed(config: UnifiedConfig): void {
+  if (config.model_pipeline) {
+    throw new ConfigError(
+      'model_pipeline is active; CLIProxy config may only be changed through the canonical publication transaction'
+    );
+  }
+}
+
 /**
  * Generate UNIFIED config.yaml content for ALL providers
  * This enables concurrent usage of gemini/codex/agy without config conflicts.
@@ -187,11 +196,7 @@ function generateUnifiedConfigContent(
   existingPayload?: string,
   unifiedConfig: UnifiedConfig = loadOrCreateUnifiedConfig()
 ): string {
-  if (unifiedConfig.model_pipeline) {
-    throw new ConfigError(
-      'model_pipeline is active; CLIProxy config may only be changed through the canonical publication transaction'
-    );
-  }
+  assertLegacyConfigMutationAllowed(unifiedConfig);
   const authDir = getAuthDir(); // Base auth dir - CLIProxyAPI scans subdirectories
   // Convert Windows backslashes to forward slashes for YAML compatibility
   const authDirNormalized = authDir.split(path.sep).join('/');
