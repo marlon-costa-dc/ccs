@@ -46,6 +46,7 @@ const slowTests = [
   'tests/integration/proxy/messages-edge-cases.test.ts',
   'tests/integration/proxy/daemon-lifecycle.test.ts',
   'tests/integration/proxy/runtime-transport-matrix.test.ts',
+  'tests/integration/proxy/auto-sync-publication.test.ts',
   'tests/integration/update-command-install-origin.test.ts',
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
   'tests/unit/commands/persist-command-handler.test.ts',
@@ -68,6 +69,7 @@ const isolatedTests = new Set([
   'tests/integration/image-analyzer-hook.test.ts',
   'tests/integration/proxy/messages-edge-cases.test.ts',
   'tests/integration/proxy/runtime-transport-matrix.test.ts',
+  'tests/integration/proxy/auto-sync-publication.test.ts',
   'tests/integration/update-command-install-origin.test.ts',
   ...browserMcpSplitTests,
   'tests/unit/commands/bar-command.test.ts',
@@ -226,7 +228,12 @@ function verifyBunExecution(output) {
   const skipCount = parseBunSkipCount(output);
 
   if (testCount === null) {
-    return { ok: false, message: '[X] Could not find Bun test count in output.', testCount, skipCount };
+    return {
+      ok: false,
+      message: '[X] Could not find Bun test count in output.',
+      testCount,
+      skipCount,
+    };
   }
   if (testCount === 0) {
     return { ok: false, message: '[X] Bun executed zero tests.', testCount, skipCount };

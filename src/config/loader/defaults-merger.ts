@@ -35,6 +35,7 @@ import { normalizeSearxngBaseUrl } from '../../utils/websearch/types';
 import { parseModelPipelineConfig } from '../schemas/model-pipeline';
 import { withCliproxyServerDefaults } from '../schemas/proxy-server';
 import type { CliproxyServerOverrides } from '../schemas/proxy-server';
+import { ConfigError } from '../../errors/error-types';
 
 // ---------------------------------------------------------------------------
 // mergeWithDefaults
@@ -58,6 +59,10 @@ export type UnifiedConfigDefaultsInput = Omit<Partial<UnifiedConfig>, 'cliproxy_
 };
 
 export function mergeWithDefaults(partial: UnifiedConfigDefaultsInput): UnifiedConfig {
+  const backend = partial.cliproxy?.backend;
+  if (backend !== undefined && backend !== 'original' && backend !== 'plus') {
+    throw new ConfigError('cliproxy.backend must be original or plus');
+  }
   const defaults = createEmptyUnifiedConfig();
   const continuity = normalizeContinuityConfig(partial);
   return {
@@ -87,11 +92,7 @@ export function mergeWithDefaults(partial: UnifiedConfigDefaultsInput): UnifiedC
       auth: partial.cliproxy?.auth,
       // Background token refresh config (optional)
       token_refresh: partial.cliproxy?.token_refresh,
-      // Backend selection - validate and preserve user choice (original vs plus)
-      backend:
-        partial.cliproxy?.backend === 'original' || partial.cliproxy?.backend === 'plus'
-          ? partial.cliproxy.backend
-          : undefined, // Invalid values become undefined (defaults to 'original' at runtime)
+      backend,
       management_panel_repository: normalizeOptionalString(
         partial.cliproxy?.management_panel_repository
       ),

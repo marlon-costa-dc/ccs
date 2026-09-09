@@ -29,7 +29,7 @@ describe('main-only repository governance', () => {
       expect(source).not.toContain('CURRENT_BRANCH" == "dev"');
     }
 
-    expect(read('.github/workflows/ci.yml')).toContain('branches: [main]');
+    expect(read('.github/workflows/ci.yml')).toContain('branches: [main, dc-use]');
     expect(read('.github/workflows/push-ci.yml')).toContain('branches: [main]');
     expect(read('.github/workflows/semantic-release.yml')).toContain('branches: [main]');
     const prePush = read('.husky/pre-push');

@@ -7,7 +7,8 @@
 
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-import { getCliproxyConfigPath } from '../config/config-generator';
+import { assertLegacyConfigMutationAllowed, getCliproxyConfigPath } from '../config';
+import { loadOrCreateUnifiedConfig } from '../../config/config-loader-facade';
 import { generateSyncPayload } from './profile-mapper';
 import type { ClaudeKey } from '../management/management-api-types';
 
@@ -37,6 +38,7 @@ export function syncToLocalConfig(): {
       };
     }
 
+    assertLegacyConfigMutationAllowed(loadOrCreateUnifiedConfig());
     // Read existing config
     if (!fs.existsSync(configPath)) {
       return {
