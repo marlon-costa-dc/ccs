@@ -130,7 +130,7 @@ async function main() {
       : undefined
   );
   initialBytes = fs.readFileSync(rawConfigPath, 'utf8');
-  if (['receipt', 'mixed', 'invalid', 'active-settings', 'unrelated-settings'].includes(scenario)) {
+  if (['receipt', 'mixed', 'invalid', 'invalid-backend', 'active-settings', 'unrelated-settings'].includes(scenario)) {
     mutateConfig(publish);
   }
   dashboard = await startServer({ port: 0, host: '127.0.0.1' });
@@ -152,7 +152,11 @@ process.on('message', async (command) => {
       process.send({ kind: 'settings-written' });
       return;
     }
-    if (scenario === 'invalid') {
+    if (scenario === 'invalid-backend') {
+      const current = structuredClone(loadOrCreateUnifiedConfig());
+      current.cliproxy.backend = 'invalid-backend';
+      fs.writeFileSync(configPath, yaml.dump(current));
+    } else if (scenario === 'invalid') {
       const current = structuredClone(loadOrCreateUnifiedConfig());
       current.model_pipeline.receipt.active.snapshot_digest = 'invalid-digest';
       fs.writeFileSync(configPath, yaml.dump(current));

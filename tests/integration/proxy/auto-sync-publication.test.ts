@@ -36,6 +36,7 @@ async function withProbe(
   const messages: ProbeMessage[] = [];
   let output = '';
   let closed = false;
+  let exitResult: { code: number | null; signal: string | null } | undefined;
   const child = spawn(
     'node',
     [path.join(__dirname, 'fixtures/auto-sync-publication-probe.cjs'), scenario],
@@ -68,7 +69,8 @@ async function withProbe(
     child.once('error', reject);
     child.once('close', (code, signal) => {
       closed = true;
-      resolve({ code, signal });
+      exitResult = { code, signal };
+      resolve(exitResult);
       events.emit('update');
     });
   });
@@ -100,7 +102,9 @@ async function withProbe(
         await wait(() => (output.includes(text) ? true : undefined));
       },
       message: (kind) => wait(() => messages.find((message) => message.kind === kind)),
-      exited,
+      get exited() {
+        return wait(() => exitResult);
+      },
       output: () => output,
     });
   } finally {
@@ -111,6 +115,14 @@ async function withProbe(
 }
 
 describe('dashboard auto-sync publication ownership', () => {
+  it('cleans up a probe that never exits', async () => {
+    await expect(
+      withProbe('format', async (probe) => {
+        await probe.message('ready');
+        await probe.exited;
+      })
+    ).rejects.toThrow('Probe format made no progress');
+  });
   for (const scenario of [
     'publication',
     'receipt',
@@ -156,7 +168,7 @@ describe('dashboard auto-sync publication ownership', () => {
     });
   }
 
-  for (const scenario of ['mixed', 'invalid', 'active-settings']) {
+  for (const scenario of ['mixed', 'invalid', 'invalid-backend', 'active-settings']) {
     it(`preserves rejection of ${scenario} changes`, async () => {
       await withProbe(scenario, async (probe) => {
         const ready = await probe.message('ready');
@@ -167,7 +179,11 @@ describe('dashboard auto-sync publication ownership', () => {
         expect(exited.signal).toBeNull();
         expect(probe.output()).toContain('ConfigError:');
         expect(probe.output()).toContain(
-          scenario === 'invalid' ? 'Invalid config format' : 'canonical publication transaction'
+          scenario === 'invalid'
+            ? 'Invalid config format'
+            : scenario === 'invalid-backend'
+              ? 'cliproxy.backend must be original or plus'
+              : 'canonical publication transaction'
         );
         if (scenario !== 'active-settings') {
           expect(probe.output()).toContain('Profile change detected: config.yaml');
