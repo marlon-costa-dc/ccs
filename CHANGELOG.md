@@ -1,3 +1,15 @@
+## [8.9.0-fd.12](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.11...v8.9.0-fd.12) (2026-09-09)
+
+### Bug Fixes
+
+* **model-pipeline:** allow independent v3 lane membership ([2ca9b52](https://github.com/marlon-costa-dc/ccs/commit/2ca9b5293355590787d047b19cf5bd1fe63de87d))
+* **proxy:** make disconnect cleanup and launch tests deterministic ([5536d36](https://github.com/marlon-costa-dc/ccs/commit/5536d36383f155f321a5c83c97469381aef600eb))
+* **release:** accept the dc-use fork lane in packaging provenance ([7f660fb](https://github.com/marlon-costa-dc/ccs/commit/7f660fb44ec814b5b1359dbf32467dff03be2567))
+
+### Documentation
+
+* **reports:** refresh hardening inventory after v3 fixes ([55f5c46](https://github.com/marlon-costa-dc/ccs/commit/55f5c46f45d5239f2a6956caf102d4c9f0c1fa08))
+
 ## [8.9.0-fd.9](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.8...v8.9.0-fd.9) (2026-09-03)
 
 ### Features
