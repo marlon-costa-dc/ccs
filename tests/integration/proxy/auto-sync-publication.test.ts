@@ -143,6 +143,7 @@ describe('dashboard auto-sync publication ownership', () => {
         } else if (scenario === 'unrelated-settings') {
           await probe.line('No profiles to sync');
         } else {
+          await probe.line('Profile change detected: config.yaml');
           await probe.line(
             scenario === 'legacy' ? 'Success: regenerated' : 'No profile config changes'
           );
@@ -174,6 +175,11 @@ describe('dashboard auto-sync publication ownership', () => {
         const ready = await probe.message('ready');
         await probe.line('Watcher ready');
         probe.send('change');
+        await probe.line(
+          scenario === 'active-settings'
+            ? 'Profile change detected: fixture.settings.json'
+            : 'Profile change detected: config.yaml'
+        );
         const exited = await probe.exited;
         expect(exited.code).not.toBe(0);
         expect(exited.signal).toBeNull();
