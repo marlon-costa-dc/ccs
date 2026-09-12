@@ -232,18 +232,28 @@ describe('model pipeline v3 publisher', () => {
     ]);
   });
 
-  it('accepts refreshed observation instants but preserves every other routing fact', async () => {
+  it('accepts refreshed observation instants and volatile health, preserves routing identity', async () => {
     const harness = dependencyHarness();
     await expect(
       new ModelPipelinePublisher(harness.dependencies).publish(modelPipelineRequestFixture())
     ).resolves.toEqual(publicationReceipt());
 
-    const stale = initialInventory();
-    stale.direct_models[0]!.routes[0]!.health.status = 'degraded';
-    const rejected = dependencyHarness({ initial: stale });
+    // Volatile runtime facts (health/quota/suspension/selectable/active) drift
+    // between consecutive CLIProxy reads and must NOT invalidate the snapshot.
+    const refreshed = initialInventory();
+    refreshed.direct_models[0]!.routes[0]!.health.status = 'degraded';
+    const accepted = dependencyHarness({ initial: refreshed });
+    await expect(
+      new ModelPipelinePublisher(accepted.dependencies).publish(modelPipelineRequestFixture())
+    ).resolves.toEqual(publicationReceipt());
+
+    // Stable routing identity (route_selector) must still match the live view.
+    const diverged = initialInventory();
+    diverged.direct_models[0]!.routes[0]!.route_selector = 'divergent-route-selector';
+    const rejected = dependencyHarness({ initial: diverged });
     await expect(
       new ModelPipelinePublisher(rejected.dependencies).publish(modelPipelineRequestFixture())
-    ).rejects.toThrow('snapshot inventory model or alias facts are stale relative to CLIProxy');
+    ).rejects.toThrow('model is absent from the CLIProxy live view');
     expect(rejected.events).not.toContain('put');
     expect(rejected.events).not.toContain('persist');
   });
