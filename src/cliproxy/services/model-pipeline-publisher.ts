@@ -157,26 +157,23 @@ function inventoryRoutingFacts(value: unknown): unknown {
   );
 }
 
+type RouteFact = { route_selector?: string } & Record<string, unknown>;
+
 function sortedModelFacts(inventory: ModelPipelineInventory): InventoryFacts {
   const snapshot = inventoryRoutingFacts(inventory) as InventoryFacts | null;
   if (snapshot === null || typeof snapshot !== 'object') {
     return { direct_models: [], aliases: [] };
   }
-  const arr = (snapshot as any).direct_models;
-  if (Array.isArray(arr)) {
-    (snapshot as any).direct_models = [...arr].sort((left: any, right: any) => {
-      const lk = left?.route_selector ?? '';
-      const rk = right?.route_selector ?? '';
-      return lk < rk ? -1 : lk > rk ? 1 : 0;
-    });
+  const bySelector = (left: unknown, right: unknown): number => {
+    const lk = (left as RouteFact)?.route_selector ?? '';
+    const rk = (right as RouteFact)?.route_selector ?? '';
+    return lk < rk ? -1 : lk > rk ? 1 : 0;
+  };
+  if (Array.isArray(snapshot.direct_models)) {
+    snapshot.direct_models = [...snapshot.direct_models].sort(bySelector);
   }
-  const al = (snapshot as any).aliases;
-  if (Array.isArray(al)) {
-    (snapshot as any).aliases = [...al].sort((left: any, right: any) => {
-      const lk = left?.route_selector ?? '';
-      const rk = right?.route_selector ?? '';
-      return lk < rk ? -1 : lk > rk ? 1 : 0;
-    });
+  if (Array.isArray(snapshot.aliases)) {
+    snapshot.aliases = [...snapshot.aliases].sort(bySelector);
   }
   return snapshot;
 }
@@ -216,17 +213,17 @@ type InventoryFacts = { direct_models?: unknown[]; aliases?: unknown[] };
 function assertInventoryFactsSubset(
   snapshot: InventoryFacts,
   live: InventoryFacts,
-  field: 'direct_models' | 'aliases',
+  field: 'direct_models' | 'aliases'
 ): void {
   const byKey = (arr: unknown[]): Map<string, unknown> =>
     new Map(
-      (arr ?? []).map((item: any) => [
-        item?.route_selector ?? JSON.stringify(item),
+      (arr ?? []).map((item) => [
+        (item as RouteFact)?.route_selector ?? JSON.stringify(item),
         inventoryRoutingFacts(item),
       ])
     );
-  const snapshotByKey = byKey((snapshot as any)[field] ?? []);
-  const liveByKey = byKey((live as any)[field] ?? []);
+  const snapshotByKey = byKey(snapshot[field] ?? []);
+  const liveByKey = byKey(live[field] ?? []);
   for (const [key, snapshotFact] of snapshotByKey) {
     const liveFact = liveByKey.get(key);
     if (liveFact === undefined) {
@@ -237,11 +234,7 @@ function assertInventoryFactsSubset(
     if (canonicalJson(snapshotFact) !== canonicalJson(liveFact)) {
       const firstDiff = (left: string, right: string): string => {
         let index = 0;
-        while (
-          index < left.length &&
-          index < right.length &&
-          left[index] === right[index]
-        ) {
+        while (index < left.length && index < right.length && left[index] === right[index]) {
           index += 1;
         }
         return `at=${index} snapshot=${left.slice(Math.max(0, index - 120), index + 160)} live=${right.slice(Math.max(0, index - 120), index + 160)}`;

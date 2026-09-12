@@ -520,7 +520,7 @@ export class ManagementApiClient {
         signal: controller.signal,
       });
 
-       if (!response.ok) {
+      if (!response.ok) {
         const errorCode = mapErrorToCode(new Error(response.statusText), response.status);
         const errBody = await response.text().catch(() => '<unreadable>');
         throw new ManagementRequestError(
