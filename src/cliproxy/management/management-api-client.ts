@@ -520,10 +520,11 @@ export class ManagementApiClient {
         signal: controller.signal,
       });
 
-      if (!response.ok) {
+       if (!response.ok) {
         const errorCode = mapErrorToCode(new Error(response.statusText), response.status);
+        const errBody = await response.text().catch(() => '<unreadable>');
         throw new ManagementRequestError(
-          `CLIProxy management request failed with HTTP ${response.status}: ${response.statusText}`,
+          `CLIProxy management request failed with HTTP ${response.status}: ${response.statusText} body=${errBody}`,
           errorCode,
           response.status
         );

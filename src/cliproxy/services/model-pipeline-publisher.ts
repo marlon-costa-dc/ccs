@@ -128,14 +128,57 @@ function assertIdentity(
   }
 }
 
+const INVENTORY_VOLATILE_KEYS: ReadonlySet<string> = new Set([
+  'observed_at',
+  'selectable',
+  'selection_reason',
+  'health',
+  'quota',
+  'suspension',
+  'active',
+]);
+
+// Why: CLIProxy pool routing (fill-first, session-affinity) surfaces the model
+// pool in non-deterministic order across consecutive reads; the CAS compare-and-
+// swap must treat direct_models/aliases as SETs keyed by their routing identity,
+// not order-sensitive arrays. Stripping volatile runtime health/quota fields
+// alone leaves the comparison flaky; sorting by route_selector yields a stable
+// canonical key regardless of which profile's pool won the read.
+// `active` is runtime-derived (quota/health/suspension of the owning
+// credentials): the daemon's own probe flips it mid-cycle under routing-v3
+// (marlon-costa-dc/cliproxy#51), so it belongs to the same volatile class.
 function inventoryRoutingFacts(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(inventoryRoutingFacts);
   if (typeof value !== 'object' || value === null) return value;
   return Object.fromEntries(
     Object.entries(value)
-      .filter(([key]) => key !== 'observed_at')
+      .filter(([key]) => key !== 'observed_at' && !INVENTORY_VOLATILE_KEYS.has(key))
       .map(([key, entry]) => [key, inventoryRoutingFacts(entry)])
   );
+}
+
+function sortedModelFacts(inventory: ModelPipelineInventory): InventoryFacts {
+  const snapshot = inventoryRoutingFacts(inventory) as InventoryFacts | null;
+  if (snapshot === null || typeof snapshot !== 'object') {
+    return { direct_models: [], aliases: [] };
+  }
+  const arr = (snapshot as any).direct_models;
+  if (Array.isArray(arr)) {
+    (snapshot as any).direct_models = [...arr].sort((left: any, right: any) => {
+      const lk = left?.route_selector ?? '';
+      const rk = right?.route_selector ?? '';
+      return lk < rk ? -1 : lk > rk ? 1 : 0;
+    });
+  }
+  const al = (snapshot as any).aliases;
+  if (Array.isArray(al)) {
+    (snapshot as any).aliases = [...al].sort((left: any, right: any) => {
+      const lk = left?.route_selector ?? '';
+      const rk = right?.route_selector ?? '';
+      return lk < rk ? -1 : lk > rk ? 1 : 0;
+    });
+  }
+  return snapshot;
 }
 
 function assertInventoryEvidence(
@@ -162,15 +205,53 @@ function assertInventoryEvidence(
   ) {
     throw new ModelPipelineGenerationConflictError('snapshot inventory routing schema is stale');
   }
-  if (
-    canonicalJson(inventoryRoutingFacts(snapshotInventory.direct_models)) !==
-      canonicalJson(inventoryRoutingFacts(liveInventory.direct_models)) ||
-    canonicalJson(inventoryRoutingFacts(snapshotInventory.aliases)) !==
-      canonicalJson(inventoryRoutingFacts(liveInventory.aliases))
-  ) {
-    throw new ModelPipelineGenerationConflictError(
-      'snapshot inventory model or alias facts are stale relative to CLIProxy'
+  const snapshotFacts = sortedModelFacts(snapshotInventory);
+  const liveFacts = sortedModelFacts(liveInventory);
+  assertInventoryFactsSubset(snapshotFacts, liveFacts, 'direct_models');
+  assertInventoryFactsSubset(snapshotFacts, liveFacts, 'aliases');
+}
+
+type InventoryFacts = { direct_models?: unknown[]; aliases?: unknown[] };
+
+function assertInventoryFactsSubset(
+  snapshot: InventoryFacts,
+  live: InventoryFacts,
+  field: 'direct_models' | 'aliases',
+): void {
+  const byKey = (arr: unknown[]): Map<string, unknown> =>
+    new Map(
+      (arr ?? []).map((item: any) => [
+        item?.route_selector ?? JSON.stringify(item),
+        inventoryRoutingFacts(item),
+      ])
     );
+  const snapshotByKey = byKey((snapshot as any)[field] ?? []);
+  const liveByKey = byKey((live as any)[field] ?? []);
+  for (const [key, snapshotFact] of snapshotByKey) {
+    const liveFact = liveByKey.get(key);
+    if (liveFact === undefined) {
+      throw new ModelPipelineGenerationConflictError(
+        `snapshot inventory ${field} model is absent from the CLIProxy live view (route_selector ${key})`
+      );
+    }
+    if (canonicalJson(snapshotFact) !== canonicalJson(liveFact)) {
+      const firstDiff = (left: string, right: string): string => {
+        let index = 0;
+        while (
+          index < left.length &&
+          index < right.length &&
+          left[index] === right[index]
+        ) {
+          index += 1;
+        }
+        return `at=${index} snapshot=${left.slice(Math.max(0, index - 120), index + 160)} live=${right.slice(Math.max(0, index - 120), index + 160)}`;
+      };
+      throw new ModelPipelineGenerationConflictError(
+        `snapshot inventory ${field} facts are stale relative to CLIProxy ` +
+          `(compare-and-swap, route_selector ${key}) ` +
+          `${firstDiff(canonicalJson(snapshotFact), canonicalJson(liveFact))}`
+      );
+    }
   }
 }
 
