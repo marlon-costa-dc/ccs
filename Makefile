@@ -18,10 +18,10 @@ gen: ## rebuild the distributed bundle and verify it
 	@bun run build
 	@bun run verify:bundle
 
-fmt: ## report unformatted sources; APPLY=Y rewrites them
+fmt: ## report unformatted sources; rewrites them
 	@if [ "$(APPLY)" = "Y" ]; then bun run format; else bun run format:check; fi
 
-fix: ## report lint findings; APPLY=Y applies the safe corrections
+fix: ## report lint findings; applies the safe corrections
 	@if [ "$(APPLY)" = "Y" ]; then bun run lint:fix; else bun run lint; fi
 
 check: ## typecheck, lint, and formatting proof
