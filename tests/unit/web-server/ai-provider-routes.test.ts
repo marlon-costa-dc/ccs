@@ -4,6 +4,7 @@ import type { Server } from 'http';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { CLIPROXY_DEFAULT_PORT } from '../../../src/cliproxy/config/port-manager';
 
 const listCalls: string[] = [];
 const updateCalls: Array<{ family: string; entryId: string; data: Record<string, unknown> }> = [];
@@ -34,7 +35,7 @@ mock.module('../../../src/cliproxy/ai-providers', () => ({
       source: {
         mode: 'local',
         label: 'Local CLIProxy',
-        target: 'http://127.0.0.1:8317',
+          target: `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}`,
         managementAuth: 'configured',
       },
       families: [],

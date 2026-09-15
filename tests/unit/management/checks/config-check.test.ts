@@ -6,6 +6,7 @@ import * as path from 'path';
 import { ClaudeSettingsChecker } from '../../../../src/management/checks/config-check';
 import { HealthCheck } from '../../../../src/management/checks/types';
 import { runWithScopedCcsHome } from '../../../../src/utils/config-manager';
+import { CLIPROXY_DEFAULT_PORT } from '../../../../src/cliproxy/config/port-manager';
 
 let originalClaudeConfigDir: string | undefined;
 
@@ -32,7 +33,7 @@ describe('ClaudeSettingsChecker', () => {
           JSON.stringify(
             {
               env: {
-                ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317/api/provider/codex',
+                ANTHROPIC_BASE_URL: `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}/api/provider/codex`,
               },
             },
             null,
