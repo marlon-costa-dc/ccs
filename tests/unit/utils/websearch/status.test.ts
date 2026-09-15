@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import type { WebSearchCliInfo } from '../../../../src/utils/websearch/types';
+import { clearAgyCliCache } from '../../../../src/utils/websearch/agy';
 import {
   buildWebSearchReadiness,
   getWebSearchCliProviders,
@@ -165,6 +166,7 @@ describe('websearch readiness', () => {
   it('exposes Antigravity (agy) as a recommended CLI provider when enabled and installed', { timeout: 15000 }, () => {
     const tempHome = mkdtempSync(path.join(tmpdir(), 'websearch-status-agy-'));
     const originalCcsHome = process.env.CCS_HOME;
+    const originalPath = process.env.PATH;
     process.env.CCS_HOME = tempHome;
 
     const ccsDir = path.join(tempHome, '.ccs');
@@ -174,6 +176,16 @@ describe('websearch readiness', () => {
       'version: 1\nwebsearch:\n  enabled: true\n  providers:\n    exa:\n      enabled: false\n      max_results: 5\n    tavily:\n      enabled: false\n      max_results: 5\n    brave:\n      enabled: false\n      max_results: 5\n    searxng:\n      enabled: false\n      url: ""\n      max_results: 5\n    duckduckgo:\n      enabled: false\n      max_results: 5\n    agy:\n      enabled: true\n      model: gemini-2.5-flash\n      timeout: 90\n    gemini:\n      enabled: false\n    grok:\n      enabled: false\n    opencode:\n      enabled: false\n',
       'utf8'
     );
+
+    // Hermetic installation: ship a fake agy binary on PATH instead of
+    // depending on the host having Antigravity CLI installed.
+    const binDir = path.join(tempHome, 'bin');
+    mkdirSync(binDir, { recursive: true });
+    const agyShim = path.join(binDir, 'agy');
+    writeFileSync(agyShim, '#!/bin/sh\ncase "$1" in --version) echo "Antigravity CLI 1.2.3";; *) echo agy;; esac\n');
+    chmodSync(agyShim, 0o755);
+    process.env.PATH = `${binDir}:${originalPath ?? ''}`;
+    clearAgyCliCache();
 
     try {
       const providers = getWebSearchCliProviders();
@@ -192,6 +204,8 @@ describe('websearch readiness', () => {
       expect(readiness.readiness).toBe('ready');
       expect(readiness.message).toContain('Antigravity CLI');
     } finally {
+      process.env.PATH = originalPath;
+      clearAgyCliCache();
       process.env.CCS_HOME = originalCcsHome;
       rmSync(tempHome, { recursive: true, force: true });
     }
