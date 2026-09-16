@@ -1,3 +1,18 @@
+## [8.9.0-fd.13](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.12...v8.9.0-fd.13) (2026-09-09)
+
+### Bug Fixes
+
+* **cliproxy:** reject invalid backend before watcher classification ([c8da9bb](https://github.com/marlon-costa-dc/ccs/commit/c8da9bbff9c089a785d11ca78bfa95fecf0f467b))
+* **cliproxy:** separate publication receipts from legacy auto-sync ([6905c20](https://github.com/marlon-costa-dc/ccs/commit/6905c201a214e693285bfe4a033fa69980af7c7c))
+
+### Tests
+
+* **cliproxy:** separate watcher detection and completion deadlines ([84e5467](https://github.com/marlon-costa-dc/ccs/commit/84e5467c3cda7ef22c7cf85b7c22459aa292f7df))
+
+### CI
+
+* validate pull requests to fork integration branch ([134acec](https://github.com/marlon-costa-dc/ccs/commit/134acec9c3e83edb0a9904da4ed99315316442d0))
+
 ## [8.9.0-fd.12](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.11...v8.9.0-fd.12) (2026-09-09)
 
 ### Bug Fixes
