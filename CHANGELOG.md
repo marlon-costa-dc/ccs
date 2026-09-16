@@ -1,3 +1,9 @@
+## [8.9.0-fd.15](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.14...v8.9.0-fd.15) (2026-09-16)
+
+### Bug Fixes
+
+* **schema:** adopt regenerated AI Hub v3 schema artifact (a8ff5973) ([624e9b3](https://github.com/marlon-costa-dc/ccs/commit/624e9b3680ab6c5b7a2bc8f72cfec38d4adf70eb))
+
 ## [8.9.0-fd.14](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.13...v8.9.0-fd.14) (2026-09-16)
 
 ### Bug Fixes
