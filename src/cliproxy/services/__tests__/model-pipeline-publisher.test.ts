@@ -130,6 +130,7 @@ function dependencyHarness(options?: {
   readonly activated?: ModelPipelineInventory;
   readonly persisted?: ModelPipelineConfig;
   readonly activationReceipt?: CLIProxyActivationReceipt;
+  readonly putFailure?: Error;
 }): DependencyHarness {
   const events: string[] = [];
   const config = configWith(options?.persisted);
@@ -186,6 +187,7 @@ function dependencyHarness(options?: {
         events.push('put');
         expect(configYaml).toBe(stagedConfigYaml);
         expect(expectedActive).toBeNull();
+        if (options?.putFailure) throw options.putFailure;
         return receipt;
       },
       async getModelInventory() {
@@ -320,6 +322,38 @@ describe('model pipeline v3 publisher', () => {
       ModelPipelineSnapshotNotFoundError
     );
     expect(absent.events).not.toContain('inventory:1');
+  });
+
+  it('retires an intent CLIProxy rejected as invalid and propagates the rejection', async () => {
+    const rejection = Object.assign(
+      new Error(
+        'CLIProxy management request failed with HTTP 422: Unprocessable Entity (invalid_publication: model-routing.direct-models: must not be empty)'
+      ),
+      { statusCode: 422 }
+    );
+    const harness = dependencyHarness({ putFailure: rejection });
+
+    await expect(
+      new ModelPipelinePublisher(harness.dependencies).publish(modelPipelineRequestFixture())
+    ).rejects.toBe(rejection);
+    expect(harness.events).toContain('intent:write');
+    expect(harness.events.slice(-2)).toEqual(['put', 'intent:remove']);
+    expect(harness.events).not.toContain('persist');
+    expect(harness.getPersisted()).toBeUndefined();
+  });
+
+  it('keeps the staged intent when activation fails without a definitive rejection', async () => {
+    const failure = Object.assign(new Error('CLIProxy management request failed with HTTP 503'), {
+      statusCode: 503,
+    });
+    const harness = dependencyHarness({ putFailure: failure });
+
+    await expect(
+      new ModelPipelinePublisher(harness.dependencies).publish(modelPipelineRequestFixture())
+    ).rejects.toBe(failure);
+    expect(harness.events).toContain('intent:write');
+    expect(harness.events).not.toContain('intent:remove');
+    expect(harness.events).not.toContain('persist');
   });
 
   it('propagates pre-cancellation without creating an intent or external request', async () => {

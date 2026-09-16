@@ -267,6 +267,33 @@ describe('management-api-client', () => {
         }
       });
 
+      it('preserves the CLIProxy rejection code and message from the response body', async () => {
+        const client = new ManagementApiClient(config);
+        const originalFetch = global.fetch;
+        global.fetch = mock(() =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify({
+                error: 'invalid_publication',
+                message:
+                  'invalid model-routing publication: model-routing.direct-models: must not be empty',
+              }),
+              { status: 422, statusText: 'Unprocessable Entity' }
+            )
+          )
+        ) as typeof global.fetch;
+
+        try {
+          const rejection = client.putConfigYaml('model-routing: {}\n', null);
+          await expect(rejection).rejects.toThrow(
+            'HTTP 422: Unprocessable Entity (invalid_publication: invalid model-routing publication: model-routing.direct-models: must not be empty)'
+          );
+          await expect(rejection).rejects.toMatchObject({ statusCode: 422 });
+        } finally {
+          global.fetch = originalFetch;
+        }
+      });
+
       it.each([401, 402, 403, 429, 500, 503])(
         'preserves HTTP %i and performs no alternate publication',
         async (status) => {

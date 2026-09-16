@@ -447,11 +447,22 @@ export class ModelPipelinePublisher {
     let inventory = await client.getModelInventory(signal);
     let activationReceipt: CLIProxyActivationReceipt | undefined;
     if (identitiesEqual(inventory.active, intent.request.expected_active)) {
-      activationReceipt = await client.putConfigYaml(
-        intent.config_yaml,
-        intent.request.expected_active,
-        signal
-      );
+      try {
+        activationReceipt = await client.putConfigYaml(
+          intent.config_yaml,
+          intent.request.expected_active,
+          signal
+        );
+      } catch (error) {
+        // CLIProxy answers 422 only after rejecting the publication and before
+        // writing any byte, so the staged intent can never activate. Retiring it
+        // keeps a definitively invalid generation from poisoning every later
+        // read and publish; the rejection itself still escapes unchanged.
+        if ((error as { readonly statusCode?: unknown } | undefined)?.statusCode === 422) {
+          store.removeIntent();
+        }
+        throw error;
+      }
       assertActivationReceipt(intent, activationReceipt);
       inventory = await client.getModelInventory(signal);
     } else if (!identitiesEqual(inventory.active, intent.proposed_active)) {
