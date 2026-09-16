@@ -54,6 +54,30 @@ function yamlBody(value: string): EncodedRequestBody {
   return { contentType: 'application/yaml', content: value };
 }
 
+/**
+ * Preserve CLIProxy's causal rejection (`{error, message}`) in the thrown error;
+ * the HTTP status line alone cannot distinguish an invalid publication from a
+ * CAS conflict or a server failure.
+ */
+function failureMessage(statusCode: number, statusText: string, content: string): string {
+  const status = `CLIProxy management request failed with HTTP ${statusCode}: ${statusText}`;
+  const trimmed = content.trim();
+  if (!trimmed) return status;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>;
+      const code = typeof record.error === 'string' ? record.error : undefined;
+      const detail = typeof record.message === 'string' ? record.message : undefined;
+      if (code && detail) return `${status} (${code}: ${detail})`;
+      if (code || detail) return `${status} (${code ?? detail})`;
+    }
+  } catch {
+    return `${status} (${trimmed})`;
+  }
+  return `${status} (${trimmed})`;
+}
+
 function decodeResponseBody<T>(content: string, format: ResponseFormat): T | undefined {
   if (!content) return undefined;
   if (format === 'text') return content as T;
@@ -523,7 +547,7 @@ export class ManagementApiClient {
       if (!response.ok) {
         const errorCode = mapErrorToCode(new Error(response.statusText), response.status);
         throw new ManagementRequestError(
-          `CLIProxy management request failed with HTTP ${response.status}: ${response.statusText}`,
+          failureMessage(response.status, response.statusText, await response.text()),
           errorCode,
           response.status
         );
@@ -594,7 +618,7 @@ export class ManagementApiClient {
               const errorCode = mapErrorToCode(new Error(res.statusMessage || ''), res.statusCode);
               reject(
                 new ManagementRequestError(
-                  `CLIProxy management request failed with HTTP ${res.statusCode}: ${res.statusMessage ?? ''}`,
+                  failureMessage(res.statusCode, res.statusMessage ?? '', data),
                   errorCode,
                   res.statusCode
                 )
