@@ -42,6 +42,7 @@ export function getAgyCliStatus(): AgyCliStatus {
       encoding: 'utf8',
       timeout: 5000,
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: process.env,
     });
 
     const agyPath = pathResult.trim().split('\n')[0]; // First result on Windows
@@ -56,6 +57,7 @@ export function getAgyCliStatus(): AgyCliStatus {
           encoding: 'utf8',
           timeout: 5000,
           stdio: ['pipe', 'pipe', 'pipe'],
+          env: process.env,
         });
         result.version = versionResult.trim();
       } catch {
