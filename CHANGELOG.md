@@ -1,3 +1,13 @@
+## [8.9.0-fd.16](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.15...v8.9.0-fd.16) (2026-09-16)
+
+### Bug Fixes
+
+* **model-pipeline:** retire intents CLIProxy rejects as invalid ([84b0134](https://github.com/marlon-costa-dc/ccs/commit/84b0134786a6a0d66103dc10cfdba0eb5b4909f2))
+
+### Tests
+
+* **cliproxy-quota:** assert rendered text independent of terminal colour ([c1edd60](https://github.com/marlon-costa-dc/ccs/commit/c1edd60349b39f9c4cf1aae472162494a3efe480))
+
 ## [8.9.0-fd.15](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.14...v8.9.0-fd.15) (2026-09-16)
 
 ### Bug Fixes
