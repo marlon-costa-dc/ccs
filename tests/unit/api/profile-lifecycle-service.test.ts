@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -22,6 +22,7 @@ describe('profile lifecycle service', () => {
   let originalCcsHome: string | undefined;
   let originalCcsDir: string | undefined;
   let originalUnifiedMode: string | undefined;
+  let restoreCopyFileSpy: (() => void) | undefined;
 
   function getScopedCcsDir(): string {
     return path.join(tempHome, '.ccs');
@@ -43,6 +44,9 @@ describe('profile lifecycle service', () => {
   });
 
   afterEach(() => {
+    restoreCopyFileSpy?.();
+    restoreCopyFileSpy = undefined;
+
     if (originalCcsHome === undefined) {
       delete process.env.CCS_HOME;
     } else {
@@ -266,6 +270,7 @@ describe('profile lifecycle service', () => {
       }
       return originalCopyFileSync(source, destination);
     });
+    restoreCopyFileSpy = () => copyFileSpy.mockRestore();
 
     const result = await runInScopedCcsDir(() => registerApiProfileOrphans({ names: ['extra'] }));
 
@@ -522,6 +527,7 @@ describe('profile lifecycle service', () => {
     const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation(() => {
       throw new Error('copy failed');
     });
+    restoreCopyFileSpy = () => copyFileSpy.mockRestore();
 
     const result = await runInScopedCcsDir(() => copyApiProfile('source', 'copy-dest'));
 
@@ -617,6 +623,7 @@ describe('profile lifecycle service', () => {
     const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation(() => {
       throw new Error('copy failed');
     });
+    restoreCopyFileSpy = () => copyFileSpy.mockRestore();
 
     const result = await runInScopedCcsDir(() =>
       importApiProfileBundle({

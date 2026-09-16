@@ -1,8 +1,8 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2179,
-    "filesAffected": 244,
+    "totalOccurrences": 2191,
+    "filesAffected": 245,
     "hotpathOccurrences": 1148,
     "hotpathFilesAffected": 152,
     "topHotpathFiles": [
@@ -307,8 +307,8 @@
     ]
   },
   "legacyShim": {
-    "totalMarkers": 384,
-    "filesAffected": 161,
+    "totalMarkers": 388,
+    "filesAffected": 162,
     "topFiles": [
       {
         "file": "src/web-server/usage/native-quota-collector.ts",
