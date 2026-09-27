@@ -7,20 +7,25 @@ import {
 } from '../../config/schemas/model-pipeline';
 import {
   ModelPipelineGenerationConflictError,
+  ModelPipelineResetConflictError,
   ModelPipelineSnapshotNotFoundError,
   publishModelPipeline,
   readVerifiedModelPipeline,
+  resetModelPipeline,
+  type ModelPipelineResetReceipt,
   type VerifiedModelPipelinePublication,
 } from '../../cliproxy/services/model-pipeline-publisher';
 
 export interface ModelPipelineRouteDependencies {
   loadPipeline(signal?: AbortSignal): Promise<ModelPipelineConfig>;
   publishPipeline(value: unknown, signal?: AbortSignal): Promise<VerifiedModelPipelinePublication>;
+  resetPipeline(signal?: AbortSignal): Promise<ModelPipelineResetReceipt>;
 }
 
 const defaultDependencies: ModelPipelineRouteDependencies = {
   loadPipeline: readVerifiedModelPipeline,
   publishPipeline: publishModelPipeline,
+  resetPipeline: resetModelPipeline,
 };
 
 function errorMessage(error: unknown): string {
@@ -97,6 +102,35 @@ export function createModelPipelineRouter(
       res.json(receipt);
     } catch (error) {
       if (res.destroyed) return;
+      if (error instanceof ModelPipelineGenerationConflictError) {
+        res.status(409).json({ error: errorMessage(error), stage: 'compare-and-swap' });
+        return;
+      }
+      res.status(502).json({ error: errorMessage(error), stage: 'cliproxy-verification' });
+    } finally {
+      cancellation.dispose();
+    }
+  });
+
+  router.delete('/model-pipeline', async (req: Request, res: Response): Promise<void> => {
+    const cancellation = requestCancellation(req, res);
+    try {
+      const receipt = await dependencies.resetPipeline(cancellation.signal);
+      res.json(receipt);
+    } catch (error) {
+      if (res.destroyed) return;
+      if (error instanceof ModelPipelineSnapshotNotFoundError) {
+        res.status(404).json({
+          ok: false,
+          error_code: 'model_pipeline_snapshot_not_found',
+          stage: 'load',
+        });
+        return;
+      }
+      if (error instanceof ModelPipelineResetConflictError) {
+        res.status(409).json({ error: errorMessage(error), stage: 'reset' });
+        return;
+      }
       if (error instanceof ModelPipelineGenerationConflictError) {
         res.status(409).json({ error: errorMessage(error), stage: 'compare-and-swap' });
         return;
