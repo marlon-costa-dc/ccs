@@ -103,6 +103,19 @@ export function readUtcTimestamp(value: unknown, path: string): string {
   return timestamp;
 }
 
+/**
+ * Binary provenance is declared by the running proxy binary itself: a released
+ * build stamps the UTC instant, a dev build declares the literal "unknown"
+ * instead of a fabricated date. The reader therefore accepts exactly that
+ * union — mirroring the ai-hub contract (PR #917) on the other side of this
+ * boundary. Real observation timestamps keep readUtcTimestamp's strict rule.
+ */
+export function readProvenanceBuiltAt(value: unknown, path: string): string {
+  const declared = readString(value, path);
+  if (declared === 'unknown') return declared;
+  return readUtcTimestamp(value, path);
+}
+
 export function readDigest(value: unknown, path: string): string {
   const digest = readString(value, path);
   if (!/^sha256:[0-9a-f]{64}$/.test(digest)) {
