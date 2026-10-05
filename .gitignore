@@ -200,3 +200,11 @@ agents/
 # Gas City
 .beads/*
 !.beads/identity.toml
+
+# Gas City pack runtime skill links and ownership manifests are runtime
+# state, never source (operators-rule: projections are not tracked).
+/.agents/skills/.gc-skill-ownership.json
+/.agents/skills/core.gc-*/
+/.codex/skills/.gc-skill-ownership.json
+/.codex/skills/core.gc-*/
+/gascity.mayor
