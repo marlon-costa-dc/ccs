@@ -26,17 +26,12 @@ export function readRecord(value: unknown, path: string): Record<string, unknown
 export function exactKeys(
   record: Record<string, unknown>,
   keys: readonly string[],
-  path: string,
-  // The AI Hub <-> CCS snapshot envelope by default. Pass
-  // MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION explicitly for a record that
-  // lives entirely inside CLIProxy's own inventory contract, which is
-  // versioned independently of the outer snapshot.
-  schemaVersion: number = MODEL_PIPELINE_SCHEMA_VERSION
+  path: string
 ): void {
   const allowed = new Set(keys);
   for (const key of Object.keys(record)) {
     if (!allowed.has(key)) {
-      fail(`${path}.${key}`, `is not part of schema version ${schemaVersion}`);
+      fail(`${path}.${key}`, `is not part of schema version ${MODEL_PIPELINE_SCHEMA_VERSION}`);
     }
   }
 }
@@ -101,6 +96,19 @@ export function readUtcTimestamp(value: unknown, path: string): string {
   }
   if (!Number.isFinite(Date.parse(timestamp))) return fail(path, 'must be a valid timestamp');
   return timestamp;
+}
+
+/**
+ * Binary provenance is declared by the running proxy binary itself: a released
+ * build stamps the UTC instant, a dev build declares the literal "unknown"
+ * instead of a fabricated date. The reader therefore accepts exactly that
+ * union — mirroring the ai-hub contract (PR #917) on the other side of this
+ * boundary. Real observation timestamps keep readUtcTimestamp's strict rule.
+ */
+export function readProvenanceBuiltAt(value: unknown, path: string): string {
+  const declared = readString(value, path);
+  if (declared === 'unknown') return declared;
+  return readUtcTimestamp(value, path);
 }
 
 export function readDigest(value: unknown, path: string): string {
