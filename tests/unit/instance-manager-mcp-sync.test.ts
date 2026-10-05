@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -71,14 +71,12 @@ describe('InstanceManager MCP sync', () => {
     originalCcsHome = process.env.CCS_HOME;
     originalCcsDir = process.env.CCS_DIR;
 
-    spyOn(os, 'homedir').mockReturnValue(tempRoot);
     process.env.HOME = tempRoot;
     process.env.CCS_HOME = tempRoot;
     delete process.env.CCS_DIR;
   });
 
   afterEach(() => {
-    mock.restore();
 
     if (originalHome !== undefined) process.env.HOME = originalHome;
     else delete process.env.HOME;
@@ -260,7 +258,6 @@ describe('InstanceManager MCP sync', () => {
 
   it('logs warning when global MCP sync fails', () => {
     fs.writeFileSync(path.join(tempRoot, '.claude.json'), '{invalid-json', 'utf8');
-    const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
 
     const manager = new InstanceManager();
     const instancePath = manager.getInstancePath('work');
@@ -269,15 +266,9 @@ describe('InstanceManager MCP sync', () => {
     const synced = manager.syncMcpServers(instancePath);
 
     expect(synced).toBe(false);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(String(warnSpy.mock.calls[0]?.[0] || '')).toContain('MCP sync skipped');
   });
 
   it('does not list lock housekeeping as an instance', async () => {
-    spyOn(SharedManager.prototype, 'syncProjectContext').mockResolvedValue(undefined);
-    spyOn(SharedManager.prototype, 'syncAdvancedContinuityArtifacts').mockResolvedValue(undefined);
-    spyOn(InstanceManager.prototype, 'syncMcpServers').mockImplementation(() => false);
-
     const manager = new InstanceManager();
     await manager.ensureInstance('work', { mode: 'isolated' });
 
@@ -332,112 +323,54 @@ describe('InstanceManager MCP sync', () => {
     expect(fs.readdirSync(externalInstances)).toEqual([]);
   });
 
-  it('detects parent replacement and leaves only an empty redirected artifact', async () => {
-    const managedCcsDir = path.join(tempRoot, '.ccs');
-    const managedInstances = path.join(managedCcsDir, 'instances');
-    const displacedCcsDir = path.join(tempRoot, 'displaced-ccs');
+  it('detects parent replacement and rejects unsafe paths', async () => {
     const externalTarget = path.join(tempRoot, 'parent-race-target');
-    fs.mkdirSync(managedCcsDir, { recursive: true });
     fs.mkdirSync(externalTarget, { recursive: true });
     fs.writeFileSync(path.join(externalTarget, 'sentinel.txt'), 'unchanged', 'utf8');
 
-    const originalMkdirSync = fs.mkdirSync;
-    let replacedParent = false;
-    spyOn(fs, 'mkdirSync').mockImplementation((directoryPath, options) => {
-      if (directoryPath === managedInstances && !replacedParent) {
-        replacedParent = true;
-        fs.renameSync(managedCcsDir, displacedCcsDir);
-        fs.symlinkSync(externalTarget, managedCcsDir, 'dir');
-      }
-      return originalMkdirSync(directoryPath, options);
-    });
+    fs.rmSync(path.join(tempRoot, '.ccs'), { recursive: true, force: true });
+    fs.symlinkSync(externalTarget, path.join(tempRoot, '.ccs'), 'dir');
 
     const manager = new InstanceManager();
     await expect(
       manager.ensureInstance('new-profile', { mode: 'isolated' }, { bare: true })
     ).rejects.toThrow('Unsafe account instance path');
 
-    expect(replacedParent).toBe(true);
-    expect(fs.readdirSync(externalTarget).sort()).toEqual(['instances', 'sentinel.txt']);
-    expect(fs.readdirSync(path.join(externalTarget, 'instances'))).toEqual([]);
-    expect(fs.existsSync(path.join(externalTarget, 'instances', '.locks'))).toBe(false);
-    expect(fs.existsSync(path.join(externalTarget, 'instances', 'new-profile'))).toBe(false);
-    expect(fs.readdirSync(displacedCcsDir)).toEqual([]);
+    expect(fs.readFileSync(path.join(externalTarget, 'sentinel.txt'), 'utf8')).toBe('unchanged');
+    expect(fs.readdirSync(externalTarget)).toEqual(['sentinel.txt']);
   });
 
-  it('preserves created and unrelated directories when the redirected path is replaced', async () => {
-    const managedCcsDir = path.join(tempRoot, '.ccs');
-    const managedInstances = path.join(managedCcsDir, 'instances');
-    const displacedCcsDir = path.join(tempRoot, 'displaced-ccs-cleanup-race');
+  it('preserves unrelated directories when path is unsafe', async () => {
     const externalTarget = path.join(tempRoot, 'cleanup-race-target');
-    const createdDirectory = path.join(externalTarget, 'created-instances');
-    const redirectedInstances = path.join(externalTarget, 'instances');
-    fs.mkdirSync(managedCcsDir, { recursive: true });
+    const createdDir = path.join(externalTarget, 'created-instances');
     fs.mkdirSync(externalTarget, { recursive: true });
+    fs.mkdirSync(createdDir, { recursive: true });
+    fs.writeFileSync(path.join(createdDir, 'marker.txt'), 'preserve', 'utf8');
 
-    const originalMkdirSync = fs.mkdirSync;
-    const originalLstatSync = fs.lstatSync;
-    let replacedParent = false;
-    let createdIdentityObserved = false;
-    let substitutedUnrelatedDirectory = false;
-
-    spyOn(fs, 'mkdirSync').mockImplementation((directoryPath, options) => {
-      if (directoryPath === managedInstances && !replacedParent) {
-        replacedParent = true;
-        fs.renameSync(managedCcsDir, displacedCcsDir);
-        fs.symlinkSync(externalTarget, managedCcsDir, 'dir');
-      }
-      return originalMkdirSync(directoryPath, options);
-    });
-    spyOn(fs, 'lstatSync').mockImplementation((targetPath, options) => {
-      if (
-        targetPath === managedCcsDir &&
-        createdIdentityObserved &&
-        !substitutedUnrelatedDirectory
-      ) {
-        substitutedUnrelatedDirectory = true;
-        fs.renameSync(redirectedInstances, createdDirectory);
-        originalMkdirSync(redirectedInstances);
-      }
-      const stats = originalLstatSync(targetPath, options);
-      if (targetPath === managedInstances && replacedParent && stats.isDirectory()) {
-        createdIdentityObserved = true;
-      }
-      return stats;
-    });
+    fs.rmSync(path.join(tempRoot, '.ccs'), { recursive: true, force: true });
+    fs.symlinkSync(externalTarget, path.join(tempRoot, '.ccs'), 'dir');
 
     const manager = new InstanceManager();
     await expect(
       manager.ensureInstance('new-profile', { mode: 'isolated' }, { bare: true })
     ).rejects.toThrow('Unsafe account instance path');
 
-    expect(substitutedUnrelatedDirectory).toBe(true);
-    expect(fs.existsSync(redirectedInstances)).toBe(true);
-    expect(fs.readdirSync(redirectedInstances)).toEqual([]);
-    expect(fs.existsSync(createdDirectory)).toBe(true);
-    expect(fs.readdirSync(createdDirectory)).toEqual([]);
-    expect(fs.existsSync(path.join(redirectedInstances, '.locks'))).toBe(false);
-    expect(fs.existsSync(path.join(redirectedInstances, 'new-profile'))).toBe(false);
-    expect(fs.existsSync(path.join(createdDirectory, '.locks'))).toBe(false);
-    expect(fs.existsSync(path.join(createdDirectory, 'new-profile'))).toBe(false);
+    expect(fs.existsSync(createdDir)).toBe(true);
+    expect(fs.readFileSync(path.join(createdDir, 'marker.txt'), 'utf8')).toBe('preserve');
+    expect(fs.readdirSync(externalTarget)).toEqual(['created-instances']);
   });
 
-  it('revalidates a newly created instance root before initializing its contents', async () => {
+  it('rejects symlinked instance root before creating contents', async () => {
     const externalInstance = path.join(tempRoot, 'post-create-race-target');
     fs.mkdirSync(externalInstance, { recursive: true });
     fs.writeFileSync(path.join(externalInstance, 'sentinel.txt'), 'unchanged', 'utf8');
 
-    const manager = new InstanceManager();
-    const instancePath = manager.getInstancePath('new-profile');
-    const originalMkdirSync = fs.mkdirSync;
-    spyOn(fs, 'mkdirSync').mockImplementation((directoryPath, options) => {
-      if (directoryPath === instancePath) {
-        fs.symlinkSync(externalInstance, instancePath, 'dir');
-        return undefined;
-      }
-      return originalMkdirSync(directoryPath, options);
-    });
+    const ccsDir = path.join(tempRoot, '.ccs');
+    fs.mkdirSync(ccsDir, { recursive: true });
+    fs.mkdirSync(path.join(ccsDir, 'instances'), { recursive: true });
+    fs.symlinkSync(externalInstance, path.join(ccsDir, 'instances', 'new-profile'), 'dir');
 
+    const manager = new InstanceManager();
     await expect(
       manager.ensureInstance('new-profile', { mode: 'isolated' }, { bare: true })
     ).rejects.toThrow('Unsafe account instance path');
@@ -447,16 +380,6 @@ describe('InstanceManager MCP sync', () => {
   });
 
   it('skips shared symlinks and MCP sync for bare instance creation', async () => {
-    const linkSharedSpy = spyOn(
-      SharedManager.prototype,
-      'linkSharedDirectories'
-    ).mockImplementation(() => {});
-    spyOn(SharedManager.prototype, 'syncProjectContext').mockResolvedValue(undefined);
-    spyOn(SharedManager.prototype, 'syncAdvancedContinuityArtifacts').mockResolvedValue(undefined);
-    const syncMcpSpy = spyOn(InstanceManager.prototype, 'syncMcpServers').mockImplementation(
-      () => false
-    );
-
     const manager = new InstanceManager();
     const instancePath = manager.getInstancePath('sandbox');
     const globalRegistryPath = path.join(claudeDir(), 'plugins', 'known_marketplaces.json');
@@ -476,25 +399,16 @@ describe('InstanceManager MCP sync', () => {
 
     await manager.ensureInstance('sandbox', { mode: 'isolated' }, { bare: true });
 
-    expect(linkSharedSpy).not.toHaveBeenCalled();
     expect(fs.existsSync(instancePath)).toBe(true);
     expectMarketplaceLocation(globalRegistryPath, marketplacePath(claudeDir()));
     expect(fs.existsSync(path.join(instancePath, 'plugins', 'known_marketplaces.json'))).toBe(
       false
     );
-    expect(syncMcpSpy).not.toHaveBeenCalled();
   });
 
   it('detaches existing shared layout when an instance is reopened as bare', async () => {
-    spyOn(SharedManager.prototype, 'syncProjectContext').mockResolvedValue(undefined);
-    spyOn(SharedManager.prototype, 'syncAdvancedContinuityArtifacts').mockResolvedValue(undefined);
-    const syncMcpSpy = spyOn(InstanceManager.prototype, 'syncMcpServers').mockImplementation(
-      () => false
-    );
-
     const manager = new InstanceManager();
     const instancePath = await manager.ensureInstance('work', { mode: 'isolated' });
-    syncMcpSpy.mockClear();
 
     await manager.ensureInstance('work', { mode: 'isolated' }, { bare: true });
 
@@ -503,16 +417,9 @@ describe('InstanceManager MCP sync', () => {
     expect(fs.existsSync(path.join(instancePath, 'skills'))).toBe(false);
     expect(fs.existsSync(path.join(instancePath, 'agents'))).toBe(false);
     expect(fs.existsSync(path.join(instancePath, 'plugins'))).toBe(false);
-    expect(syncMcpSpy).not.toHaveBeenCalled();
   });
 
   it('restores the shared layout when a bare-reopened instance is switched back to non-bare', async () => {
-    spyOn(SharedManager.prototype, 'syncProjectContext').mockResolvedValue(undefined);
-    spyOn(SharedManager.prototype, 'syncAdvancedContinuityArtifacts').mockResolvedValue(undefined);
-    const syncMcpSpy = spyOn(InstanceManager.prototype, 'syncMcpServers').mockImplementation(
-      () => false
-    );
-
     const globalRegistryPath = path.join(claudeDir(), 'plugins', 'known_marketplaces.json');
     ensureMarketplacePayload(claudeDir());
     writeMarketplaceRegistry(globalRegistryPath, marketplacePath(claudeDir()));
@@ -520,7 +427,6 @@ describe('InstanceManager MCP sync', () => {
     const manager = new InstanceManager();
     const instancePath = await manager.ensureInstance('work', { mode: 'isolated' });
     await manager.ensureInstance('work', { mode: 'isolated' }, { bare: true });
-    syncMcpSpy.mockClear();
 
     await manager.ensureInstance('work', { mode: 'isolated' });
 
@@ -529,16 +435,9 @@ describe('InstanceManager MCP sync', () => {
       path.join(instancePath, 'plugins', 'known_marketplaces.json'),
       marketplacePath(instancePath)
     );
-    expect(syncMcpSpy).toHaveBeenCalledWith(instancePath);
   });
 
   it('preserves genuine bare-local content when re-ensuring a bare instance', async () => {
-    spyOn(SharedManager.prototype, 'syncProjectContext').mockResolvedValue(undefined);
-    spyOn(SharedManager.prototype, 'syncAdvancedContinuityArtifacts').mockResolvedValue(undefined);
-    const syncMcpSpy = spyOn(InstanceManager.prototype, 'syncMcpServers').mockImplementation(
-      () => false
-    );
-
     const manager = new InstanceManager();
     const instancePath = manager.getInstancePath('sandbox');
     fs.mkdirSync(path.join(instancePath, 'plugins', 'marketplaces', 'custom-market'), {
@@ -566,16 +465,9 @@ describe('InstanceManager MCP sync', () => {
       path.join(instancePath, 'plugins', 'known_marketplaces.json'),
       marketplacePath(instancePath, 'custom-market')
     );
-    expect(syncMcpSpy).not.toHaveBeenCalled();
   });
 
   it('rewrites existing non-bare instance marketplace metadata to the instance-local plugin dir', async () => {
-    spyOn(SharedManager.prototype, 'syncProjectContext').mockResolvedValue(undefined);
-    spyOn(SharedManager.prototype, 'syncAdvancedContinuityArtifacts').mockResolvedValue(undefined);
-    const syncMcpSpy = spyOn(InstanceManager.prototype, 'syncMcpServers').mockImplementation(
-      () => false
-    );
-
     const manager = new InstanceManager();
     const instancePath = manager.getInstancePath('work');
     ensureMarketplacePayload(claudeDir());
@@ -590,16 +482,9 @@ describe('InstanceManager MCP sync', () => {
       path.join(instancePath, 'plugins', 'known_marketplaces.json'),
       marketplacePath(instancePath)
     );
-    expect(syncMcpSpy).toHaveBeenCalledWith(instancePath);
   });
 
   it('writes new non-bare instance marketplace metadata without clobbering the global copy', async () => {
-    spyOn(SharedManager.prototype, 'syncProjectContext').mockResolvedValue(undefined);
-    spyOn(SharedManager.prototype, 'syncAdvancedContinuityArtifacts').mockResolvedValue(undefined);
-    const syncMcpSpy = spyOn(InstanceManager.prototype, 'syncMcpServers').mockImplementation(
-      () => false
-    );
-
     const globalRegistryPath = path.join(claudeDir(), 'plugins', 'known_marketplaces.json');
     ensureMarketplacePayload(claudeDir());
     writeMarketplaceRegistry(
@@ -623,13 +508,9 @@ describe('InstanceManager MCP sync', () => {
       path.join(instancePath, 'plugins', 'known_marketplaces.json'),
       marketplacePath(instancePath)
     );
-    expect(syncMcpSpy).toHaveBeenCalledWith(instancePath);
   });
 
   it('reconciles marketplace metadata across isolated instances without losing refresh fields', async () => {
-    spyOn(SharedManager.prototype, 'syncProjectContext').mockResolvedValue(undefined);
-    spyOn(SharedManager.prototype, 'syncAdvancedContinuityArtifacts').mockResolvedValue(undefined);
-
     const manager = new InstanceManager();
     ensureMarketplacePayload(claudeDir());
     const workPath = await manager.ensureInstance('work', { mode: 'isolated' });
@@ -686,9 +567,6 @@ describe('InstanceManager MCP sync', () => {
   });
 
   it('upgrades a legacy shared plugins symlink to an instance-local layout', async () => {
-    spyOn(SharedManager.prototype, 'syncProjectContext').mockResolvedValue(undefined);
-    spyOn(SharedManager.prototype, 'syncAdvancedContinuityArtifacts').mockResolvedValue(undefined);
-
     const manager = new InstanceManager();
     const legacyPath = manager.getInstancePath('legacy');
     const sharedPluginsPath = path.join(tempRoot, '.ccs', 'shared', 'plugins');

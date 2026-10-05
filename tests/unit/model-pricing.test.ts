@@ -66,8 +66,6 @@ describe('model-pricing', () => {
     });
 
     it('should price current provider preset defaults without fallback rates', () => {
-      const fallback = getModelPricing('unknown-model-xyz');
-
       expect(getModelPricing('glm-5.2')).toMatchObject({
         inputPerMillion: 1.4,
         outputPerMillion: 4.4,
@@ -84,31 +82,32 @@ describe('model-pricing', () => {
         cacheReadPerMillion: 0.09,
       });
 
-      expect(getModelPricing('glm-5.2')).not.toEqual(fallback);
-      expect(getModelPricing('MiniMax-M3')).not.toEqual(fallback);
-      expect(getModelPricing('kimi-for-coding')).not.toEqual(fallback);
+      expect(hasCustomPricing('glm-5.2')).toBe(true);
+      expect(hasCustomPricing('MiniMax-M3')).toBe(true);
+      expect(hasCustomPricing('kimi-for-coding')).toBe(true);
     });
 
     it('should not use fallback pricing for known Qwen catalog IDs', () => {
-      const fallback = getModelPricing('unknown-model-xyz');
       const catalogIds = ['qwen3-235b', 'qwen3-vl-plus', 'qwen3-32b'];
 
       for (const model of catalogIds) {
-        const pricing = getModelPricing(model);
-        expect(pricing).not.toEqual(fallback);
+        expect(hasCustomPricing(model)).toBe(true);
       }
     });
 
     it('should map qwen3-coder to deterministic custom pricing', () => {
       const pricing = getModelPricing('qwen3-coder');
-      const canonical = getModelPricing('qwen3-coder-plus');
 
-      expect(pricing).toEqual(canonical);
-      expect(pricing).not.toEqual(getModelPricing('unknown-model-xyz'));
+      expect(pricing).toMatchObject({
+        inputPerMillion: 1,
+        outputPerMillion: 5,
+        cacheCreationPerMillion: 1,
+        cacheReadPerMillion: 0.2,
+      });
+      expect(hasCustomPricing('qwen3-coder')).toBe(true);
     });
 
     it('should map Gemini 3 and 3.1 Flash preview variants to flash pricing', () => {
-      const canonical = getModelPricing('gemini-2.5-flash');
       const aliases = [
         'gemini-3-flash-preview',
         'gemini-3-flash-preview-customtools',
@@ -119,7 +118,12 @@ describe('model-pricing', () => {
       ];
 
       for (const model of aliases) {
-        expect(getModelPricing(model)).toEqual(canonical);
+        expect(getModelPricing(model)).toMatchObject({
+          inputPerMillion: 0.3,
+          outputPerMillion: 2.5,
+          cacheCreationPerMillion: 0,
+          cacheReadPerMillion: 0.075,
+        });
       }
     });
 
@@ -302,10 +306,8 @@ describe('model-pricing', () => {
     });
 
     it('should not map unknown future model families onto known family pricing', () => {
-      const fallback = getModelPricing('unknown-model-xyz');
-
-      expect(getModelPricing('claude-opus-6-20270101')).toEqual(fallback);
-      expect(getModelPricing('gemini-3.2-pro')).toEqual(fallback);
+      expect(hasCustomPricing('claude-opus-6-20270101')).toBe(false);
+      expect(hasCustomPricing('gemini-3.2-pro')).toBe(false);
     });
   });
 
@@ -613,39 +615,38 @@ describe('model-pricing', () => {
 
     it('keeps CCS compatibility aliases ahead of provider-aware models.dev matches', () => {
       const pricing = getModelPricing('gemini-3-flash-preview', { provider: 'google' });
-      const canonical = getModelPricing('gemini-2.5-flash');
 
-      expect(pricing).toEqual(canonical);
+      expect(pricing).toMatchObject({
+        inputPerMillion: 0.3,
+        outputPerMillion: 2.5,
+        cacheCreationPerMillion: 0,
+        cacheReadPerMillion: 0.075,
+      });
       expect(pricing.inputPerMillion).not.toBe(99);
     });
 
     it('falls back to CCS static pricing when provider-aware models.dev lookup misses a known model', () => {
-      const staticPricing = getModelPricing('claude-sonnet-4-5');
-
-      expect(getModelPricing('anthropic/claude-sonnet-4-5')).toEqual(staticPricing);
-      expect(getModelPricing('claude-sonnet-4-5', { provider: 'anthropic' })).toEqual(
-        staticPricing
-      );
+      expect(getModelPricing('anthropic/claude-sonnet-4-5')).toMatchObject({
+        inputPerMillion: 3.0,
+        outputPerMillion: 15.0,
+      });
+      expect(getModelPricing('claude-sonnet-4-5', { provider: 'anthropic' })).toMatchObject({
+        inputPerMillion: 3.0,
+        outputPerMillion: 15.0,
+      });
       expect(hasCustomPricing('anthropic/claude-sonnet-4-5')).toBe(true);
     });
 
     it('does not use ambiguous model-only models.dev matches', () => {
-      const pricing = getModelPricing('gpt-5.5');
-      expect(pricing).toEqual(getModelPricing('unknown-model-xyz'));
       expect(hasCustomPricing('gpt-5.5')).toBe(false);
       expect(hasCustomPricing('gpt-5.5', { provider: 'openai' })).toBe(true);
     });
 
     it('does not use another provider pricing when explicit provider lookup misses', () => {
-      const fallback = getModelPricing('unknown-model-xyz');
-
-      expect(getModelPricing('openai-exclusive-model', { provider: 'github-copilot' })).toEqual(
-        fallback
-      );
-      expect(getModelPricing('github-copilot/openai-exclusive-model')).toEqual(fallback);
       expect(hasCustomPricing('openai-exclusive-model', { provider: 'github-copilot' })).toBe(
         false
       );
+      expect(hasCustomPricing('github-copilot/openai-exclusive-model')).toBe(false);
     });
 
     it('calculates cost with provider-aware models.dev pricing', () => {

@@ -2,7 +2,7 @@
  * Unit tests for JSONL Parser
  */
 
-import { describe, expect, test, beforeEach, afterEach, spyOn } from 'bun:test';
+import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -314,18 +314,13 @@ describe('parseProjectDirectory', () => {
     expect(entries.length).toBe(0);
   });
 
-  test('returns empty array when directory read fails', async () => {
-    const existsSyncSpy = spyOn(fs, 'existsSync').mockReturnValue(true);
-    const readdirSpy = spyOn(fs.promises, 'readdir').mockRejectedValue(new Error('EACCES'));
+    test('returns empty array when readdir fails on a non-directory path', async () => {
+      const filePath = path.join(tempDir, 'not-a-directory.jsonl');
+      fs.writeFileSync(filePath, VALID_ASSISTANT_ENTRY);
 
-    try {
-      const entries = await parseProjectDirectory('/protected/dir');
+      const entries = await parseProjectDirectory(filePath);
       expect(entries).toEqual([]);
-    } finally {
-      existsSyncSpy.mockRestore();
-      readdirSpy.mockRestore();
-    }
-  });
+    });
 
   test('sanitizes derived projectPath from dashed directory names', async () => {
     const projectDir = path.join(tempDir, '-..-etc-passwd');

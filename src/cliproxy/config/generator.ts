@@ -518,6 +518,15 @@ export function configNeedsRegeneration(port: number = CLIPROXY_DEFAULT_PORT): b
     return false; // Will be created on first use
   }
 
+  // Enforce the mutation owner: while the canonical model-pipeline publication
+  // transaction is active, config.yaml is published atomically by it and legacy
+  // regeneration is never the writer. The marker check below applies only to
+  // legacy-generated configs; stale routing is reverted through publication,
+  // never through regeneration.
+  if (loadOrCreateUnifiedConfig().model_pipeline) {
+    return false;
+  }
+
   try {
     const content = fs.readFileSync(configPath, 'utf-8');
 

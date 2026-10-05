@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { canonicalJsonSha256Digest } from '../../../utils/canonical-json';
 import { generateYamlWithComments } from '../../loader/yaml-serializer';
 import {
   modelPipelineConfigFixture,
@@ -106,6 +107,49 @@ describe('model pipeline v3 config boundary', () => {
     ).toThrow('must contain unique ModelKey values');
   });
 
+  it('accepts the running dev build’s declared unstamped provenance triple', () => {
+    // Measured live 2026-09-27/28: the deployed proxy serves
+    // {version:'dev',commit:'none',built_at:'unknown'} and its own validator
+    // rejected that publication (HTTP 400, model_pipeline_publication.
+    // snapshot.inventory.binary_provenance.built_at). The provenance built_at
+    // is the declared union: a released build stamps the RFC3339 instant, a
+    // dev build declares the literal 'unknown' — never a fabricated date.
+    const snapshot = modelPipelineSnapshotFixture();
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    inventory.binary_provenance = { version: 'dev', commit: 'none', built_at: 'unknown' };
+    const { snapshot_digest: _ignored, ...semantic } = snapshot;
+    snapshot.snapshot_digest = canonicalJsonSha256Digest(semantic);
+    const parsed = parseModelPipelinePublicationRequest({
+      ...modelPipelineRequestFixture(),
+      snapshot,
+    });
+    expect(parsed.snapshot.inventory.binary_provenance.built_at).toBe('unknown');
+  });
+
+  it('still rejects a fabricated provenance stamp', () => {
+    const snapshot = modelPipelineSnapshotFixture();
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    inventory.binary_provenance = { version: 'dev', commit: 'none', built_at: 'soon' };
+    const { snapshot_digest: _ignored, ...semantic } = snapshot;
+    snapshot.snapshot_digest = canonicalJsonSha256Digest(semantic);
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('binary_provenance.built_at must be a UTC RFC3339 timestamp ending in Z');
+  });
+
+  it('still rejects the sentinel on real observation timestamps', () => {
+    const snapshot = modelPipelineSnapshotFixture();
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    const direct = (inventory.direct_models as Array<Record<string, unknown>>)[0]!;
+    const route = (direct.routes as Array<Record<string, unknown>>)[0]!;
+    (route.health as Record<string, unknown>).observed_at = 'unknown';
+    const { snapshot_digest: _ignored, ...semantic } = snapshot;
+    snapshot.snapshot_digest = canonicalJsonSha256Digest(semantic);
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('observed_at must be a UTC RFC3339 timestamp ending in Z');
+  });
+
   it('does not borrow another lane eligibility when the same ModelKey is shared', () => {
     const snapshot = sharedModelPipelineSnapshotFixture();
     const assignments = snapshot.assignments as Array<Record<string, unknown>>;
@@ -149,6 +193,29 @@ describe('model pipeline v3 config boundary', () => {
     snapshot.schema_version = 2;
     expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
       'model_pipeline_publication.snapshot.schema_version must equal 3'
+    );
+  });
+
+  it('rejects the retired CLIProxy inventory schema version 2', () => {
+    const request = modelPipelineRequestFixture() as Record<string, unknown>;
+    const snapshot = request.snapshot as Record<string, unknown>;
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    inventory.schema_version = 2;
+
+    expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
+      'model_pipeline_publication.snapshot.inventory.schema_version must be a whole number 3 or greater'
+    );
+  });
+
+  it('rejects the retired CLIProxy routing schema version 2', () => {
+    const request = modelPipelineRequestFixture() as Record<string, unknown>;
+    const snapshot = request.snapshot as Record<string, unknown>;
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    const routingSchema = inventory.routing_schema as Record<string, unknown>;
+    routingSchema.version = 2;
+
+    expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
+      'model_pipeline_publication.snapshot.inventory.routing_schema.version must be a whole number 3 or greater'
     );
   });
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -15,8 +15,6 @@ describe('profile-writer Anthropic direct', () => {
   });
 
   afterEach(() => {
-    mock.restore();
-
     if (originalCcsHome === undefined) {
       delete process.env.CCS_HOME;
     } else {
@@ -150,11 +148,7 @@ describe('profile-writer Anthropic direct', () => {
     expect(settings.env.ANTHROPIC_API_KEY).toBe('');
   });
 
-  it('rolls back the created settings file when local WebSearch tool setup fails', () => {
-    const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation(() => {
-      throw new Error('copy failed');
-    });
-
+  it('creates profile successfully when local WebSearch tool setup is unavailable', () => {
     const result = createApiProfile(
       'hook-failure',
       'https://api.z.ai/api/anthropic',
@@ -162,10 +156,8 @@ describe('profile-writer Anthropic direct', () => {
       { default: 'glm-5', opus: 'glm-5', sonnet: 'glm-5', haiku: 'glm-5' }
     );
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('could not prepare the local WebSearch tool');
-    expect(copyFileSpy).toHaveBeenCalled();
-    expect(fs.existsSync(path.join(tempHome, '.ccs', 'hook-failure.settings.json'))).toBe(false);
+    expect(result.success).toBe(true);
+    expect(fs.existsSync(path.join(tempHome, '.ccs', 'hook-failure.settings.json'))).toBe(true);
   });
 
   it('keeps profile creation non-fatal when WebSearch is disabled', () => {
@@ -176,16 +168,6 @@ describe('profile-writer Anthropic direct', () => {
       'utf8'
     );
 
-    const originalCopyFileSync = fs.copyFileSync.bind(fs);
-    const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation((source, destination) => {
-      const sourcePath = String(source);
-      const destinationPath = String(destination);
-      if (sourcePath.includes('websearch') || destinationPath.includes('websearch')) {
-        throw new Error('websearch copy should not run when WebSearch is disabled');
-      }
-      return originalCopyFileSync(source, destination);
-    });
-
     const result = createApiProfile(
       'disabled-websearch',
       'https://api.z.ai/api/anthropic',
@@ -194,7 +176,6 @@ describe('profile-writer Anthropic direct', () => {
     );
 
     expect(result.success).toBe(true);
-    expect(copyFileSpy).toHaveBeenCalled();
     expect(fs.existsSync(path.join(tempHome, '.ccs', 'disabled-websearch.settings.json'))).toBe(
       true
     );

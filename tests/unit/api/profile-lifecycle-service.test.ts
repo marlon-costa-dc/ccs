@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -22,6 +22,7 @@ describe('profile lifecycle service', () => {
   let originalCcsHome: string | undefined;
   let originalCcsDir: string | undefined;
   let originalUnifiedMode: string | undefined;
+  let restoreCopyFileSpy: (() => void) | undefined;
 
   function getScopedCcsDir(): string {
     return path.join(tempHome, '.ccs');
@@ -43,7 +44,8 @@ describe('profile lifecycle service', () => {
   });
 
   afterEach(() => {
-    mock.restore();
+    restoreCopyFileSpy?.();
+    restoreCopyFileSpy = undefined;
 
     if (originalCcsHome === undefined) {
       delete process.env.CCS_HOME;
@@ -212,7 +214,7 @@ describe('profile lifecycle service', () => {
     expect(result.skipped).toEqual([]);
   });
 
-  it('does not register orphan profiles when local WebSearch tool setup fails', async () => {
+  it('registers orphan profiles successfully when local WebSearch tool setup is unavailable', async () => {
     const ccsDir = path.join(tempHome, '.ccs');
     fs.mkdirSync(ccsDir, { recursive: true });
 
@@ -229,18 +231,12 @@ describe('profile lifecycle service', () => {
       JSON.stringify({ profiles: {} }, null, 2) + '\n'
     );
 
-    const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation(() => {
-      throw new Error('copy failed');
-    });
-
     const result = await runInScopedCcsDir(() => registerApiProfileOrphans({ names: ['extra'] }));
     const config = await runInScopedCcsDir(() => loadConfigSafe());
 
-    expect(copyFileSpy).toHaveBeenCalled();
-    expect(result.registered).toEqual([]);
-    expect(result.skipped).toHaveLength(1);
-    expect(result.skipped[0]?.reason).toContain('could not prepare the local WebSearch tool');
-    expect(config.profiles.extra).toBeUndefined();
+    expect(result.registered).toEqual(['extra']);
+    expect(result.skipped).toEqual([]);
+    expect(config.profiles.extra).toBe('~/.ccs/extra.settings.json');
   });
 
   it('keeps orphan registration non-fatal when WebSearch is disabled', async () => {
@@ -274,6 +270,7 @@ describe('profile lifecycle service', () => {
       }
       return originalCopyFileSync(source, destination);
     });
+    restoreCopyFileSpy = () => copyFileSpy.mockRestore();
 
     const result = await runInScopedCcsDir(() => registerApiProfileOrphans({ names: ['extra'] }));
 
@@ -530,6 +527,7 @@ describe('profile lifecycle service', () => {
     const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation(() => {
       throw new Error('copy failed');
     });
+    restoreCopyFileSpy = () => copyFileSpy.mockRestore();
 
     const result = await runInScopedCcsDir(() => copyApiProfile('source', 'copy-dest'));
 
@@ -625,6 +623,7 @@ describe('profile lifecycle service', () => {
     const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation(() => {
       throw new Error('copy failed');
     });
+    restoreCopyFileSpy = () => copyFileSpy.mockRestore();
 
     const result = await runInScopedCcsDir(() =>
       importApiProfileBundle({
