@@ -25,6 +25,7 @@ import {
   readNullableSignedInteger,
   readNullableString,
   readRecord,
+  readProvenanceBuiltAt,
   readString,
   readStringSet,
   readStringValue,
@@ -1004,7 +1005,7 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
     binary_provenance: {
       version: readString(provenance.version, `${provenancePath}.version`),
       commit: readString(provenance.commit, `${provenancePath}.commit`),
-      built_at: readUtcTimestamp(provenance.built_at, `${provenancePath}.built_at`),
+      built_at: readProvenanceBuiltAt(provenance.built_at, `${provenancePath}.built_at`),
     },
     routing_schema: {
       version: MODEL_PIPELINE_INVENTORY_SCHEMA_VERSION,
@@ -1330,7 +1331,7 @@ export function parseModelPipelineBinaryProvenance(
   return {
     version: readString(record.version, `${path}.version`),
     commit: readString(record.commit, `${path}.commit`),
-    built_at: readUtcTimestamp(record.built_at, `${path}.built_at`),
+    built_at: readProvenanceBuiltAt(record.built_at, `${path}.built_at`),
   };
 }
 
