@@ -9,6 +9,7 @@ import { parseModelPipelineConfig } from '../../../config/schemas/model-pipeline
 import { ConfigError } from '../../../errors/error-types';
 import {
   ModelPipelineGenerationConflictError,
+  ModelPipelineResetConflictError,
   ModelPipelineSnapshotNotFoundError,
 } from '../../../cliproxy/services/model-pipeline-publisher';
 import {
@@ -21,7 +22,7 @@ const servers: http.Server[] = [];
 
 async function request(
   dependencies: ModelPipelineRouteDependencies,
-  method: 'GET' | 'PUT',
+  method: 'GET' | 'PUT' | 'DELETE',
   body?: unknown
 ): Promise<Response> {
   const app = express();
@@ -45,6 +46,11 @@ function dependencies(): ModelPipelineRouteDependencies {
   return {
     loadPipeline: async () => pipeline,
     publishPipeline: async () => pipeline.receipt,
+    resetPipeline: async () => ({
+      schema_version: 3,
+      ok: true,
+      cleared_active: pipeline.receipt.active,
+    }),
   };
 }
 
@@ -232,6 +238,81 @@ describe('model pipeline config routes', () => {
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({
       error: 'Model pipeline snapshot not found',
+      stage: 'cliproxy-verification',
+    });
+  });
+
+  it('reset returns the cleared provenance identity', async () => {
+    const deps = dependencies();
+    const reset = mock(deps.resetPipeline);
+    deps.resetPipeline = reset;
+
+    const response = await request(deps, 'DELETE');
+    const result = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(result).toEqual({
+      schema_version: 3,
+      ok: true,
+      cleared_active: pipeline.receipt.active,
+    });
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(reset.mock.calls[0]?.[0]).toBeInstanceOf(AbortSignal);
+  });
+
+  it('reset reports absence as not found', async () => {
+    const deps = dependencies();
+    deps.resetPipeline = async () => {
+      throw new ModelPipelineSnapshotNotFoundError();
+    };
+
+    const response = await request(deps, 'DELETE');
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({
+      ok: false,
+      error_code: 'model_pipeline_snapshot_not_found',
+      stage: 'load',
+    });
+  });
+
+  it('reset reports reset-specific and generation conflicts as conflicting', async () => {
+    const resetConflict = dependencies();
+    resetConflict.resetPipeline = async () => {
+      throw new ModelPipelineResetConflictError('publication intent is pending');
+    };
+    const response = await request(resetConflict, 'DELETE');
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'publication intent is pending',
+      stage: 'reset',
+    });
+
+    const generationConflict = dependencies();
+    generationConflict.resetPipeline = async () => {
+      throw new ModelPipelineGenerationConflictError('CLIProxy still routes actively');
+    };
+    const conflict = await request(generationConflict, 'DELETE');
+
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toEqual({
+      error: 'CLIProxy still routes actively',
+      stage: 'compare-and-swap',
+    });
+  });
+
+  it('reset surfaces unexpected failures as a bad gateway', async () => {
+    const deps = dependencies();
+    deps.resetPipeline = async () => {
+      throw new ConfigError('CLIProxy management request failed with HTTP 503');
+    };
+
+    const response = await request(deps, 'DELETE');
+
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({
+      error: 'CLIProxy management request failed with HTTP 503',
       stage: 'cliproxy-verification',
     });
   });

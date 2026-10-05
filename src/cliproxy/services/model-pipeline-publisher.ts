@@ -41,6 +41,7 @@ export interface ModelPipelinePublisherDependencies {
     pipeline: ModelPipelineConfig,
     expectedActive: ActiveIdentityV3 | null
   ): UnifiedConfig;
+  clearPipeline(): void;
   renderConfig(activeConfigYaml: string, snapshot: ModelPipelineSnapshot): string;
   resolveTarget(config: UnifiedConfig): ProxyTarget;
   createClient(target: ProxyTarget, config: UnifiedConfig): ModelPipelinePublicationClient;
@@ -51,10 +52,23 @@ export interface ModelPipelinePublisherDependencies {
 
 export type VerifiedModelPipelinePublication = PublicationReceiptV3;
 
+export interface ModelPipelineResetReceipt {
+  readonly schema_version: typeof MODEL_PIPELINE_SCHEMA_VERSION;
+  readonly ok: true;
+  readonly cleared_active: ActiveIdentityV3;
+}
+
 export class ModelPipelineGenerationConflictError extends ConfigError {
   constructor(message: string, cause?: unknown) {
     super(message, undefined, cause);
     this.name = 'ModelPipelineGenerationConflictError';
+  }
+}
+
+export class ModelPipelineResetConflictError extends ConfigError {
+  constructor(message: string, cause?: unknown) {
+    super(message, undefined, cause);
+    this.name = 'ModelPipelineResetConflictError';
   }
 }
 
@@ -316,6 +330,11 @@ const defaultDependencies: ModelPipelinePublisherDependencies = {
   persistPipeline(pipeline, expectedActive) {
     return mutateConfig((config) => replaceModelPipeline(config, pipeline, expectedActive));
   },
+  clearPipeline() {
+    mutateConfig((config) => {
+      delete config.model_pipeline;
+    });
+  },
   renderConfig: renderUnifiedConfigForPublication,
   resolveTarget(config) {
     return resolveProxyTarget(config.cliproxy_server);
@@ -463,6 +482,41 @@ export class ModelPipelinePublisher {
     });
   }
 
+  /**
+   * Clear the persisted model_pipeline provenance so the next bootstrap starts
+   * from generation 1. The reset is the typed repair for stale provenance that
+   * outlived its CLIProxy: it refuses while a publication intent is pending,
+   * refuses when nothing is persisted, and refuses unless CLIProxy itself
+   * reports no active routing identity — the exact precondition CCS's own
+   * bootstrap contract (expected_active === null) enforces on the next PUT.
+   * It never touches CLIProxy's configuration bytes.
+   */
+  async reset(signal?: AbortSignal): Promise<ModelPipelineResetReceipt> {
+    return this.dependencies.withTransaction(async (store) => {
+      assertNotCancelled(signal);
+      if (store.readIntent()) {
+        throw new ModelPipelineResetConflictError(
+          'model pipeline reset is forbidden while a publication intent is pending'
+        );
+      }
+      const { config, client } = this.resolveCycle();
+      const pipeline = config.model_pipeline;
+      if (!pipeline) throw new ModelPipelineSnapshotNotFoundError();
+      const inventory = await client.getModelInventory(signal);
+      if (inventory.active !== null) {
+        throw new ModelPipelineResetConflictError(
+          'model pipeline reset requires CLIProxy to report no active routing identity'
+        );
+      }
+      this.dependencies.clearPipeline();
+      return {
+        schema_version: MODEL_PIPELINE_SCHEMA_VERSION,
+        ok: true,
+        cleared_active: pipeline.receipt.active,
+      };
+    });
+  }
+
   private resolveCycle(): {
     readonly config: UnifiedConfig;
     readonly client: ModelPipelinePublicationClient;
@@ -592,4 +646,8 @@ export function publishModelPipeline(
 
 export function readVerifiedModelPipeline(signal?: AbortSignal): Promise<ModelPipelineConfig> {
   return defaultPublisher.read(signal);
+}
+
+export function resetModelPipeline(signal?: AbortSignal): Promise<ModelPipelineResetReceipt> {
+  return defaultPublisher.reset(signal);
 }

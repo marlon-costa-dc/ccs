@@ -21,6 +21,7 @@ import { projectModelRouting } from '../../config/model-routing-projector';
 import {
   ModelPipelineGenerationConflictError,
   ModelPipelinePublisher,
+  ModelPipelineResetConflictError,
   ModelPipelineSnapshotNotFoundError,
   replaceModelPipeline,
   type ModelPipelinePublisherDependencies,
@@ -166,6 +167,11 @@ function dependencyHarness(options?: {
       replaceModelPipeline(config, incoming, expectedActive);
       persisted = incoming;
       return config;
+    }),
+    clearPipeline: mock(() => {
+      events.push('clear');
+      delete config.model_pipeline;
+      persisted = undefined;
     }),
     renderConfig: mock((yaml, snapshot) => {
       events.push(
@@ -332,6 +338,65 @@ describe('model pipeline v3 publisher', () => {
       ModelPipelineSnapshotNotFoundError
     );
     expect(absent.events).not.toContain('inventory:1');
+  });
+
+  it('reset clears stale provenance only while CLIProxy reports no active routing', async () => {
+    const harness = dependencyHarness({ persisted: persistedPipeline() });
+    const publisher = new ModelPipelinePublisher(harness.dependencies);
+
+    await expect(publisher.reset()).resolves.toEqual({
+      schema_version: 3,
+      ok: true,
+      cleared_active: publicationReceipt().active,
+    });
+    expect(harness.getPersisted()).toBeUndefined();
+    expect(harness.events).toEqual(['intent:read', 'load', 'target', 'inventory:1', 'clear']);
+
+    const activated = dependencyHarness({ persisted: persistedPipeline() });
+    activated.dependencies.createClient = () => ({
+      async getModelInventory() {
+        return activatedInventory();
+      },
+      async getConfigYaml() {
+        return stagedConfigYaml;
+      },
+      async putConfigYaml() {
+        throw new Error('reset must not activate');
+      },
+    });
+    await expect(new ModelPipelinePublisher(activated.dependencies).reset()).rejects.toBeInstanceOf(
+      ModelPipelineResetConflictError
+    );
+    await expect(new ModelPipelinePublisher(activated.dependencies).reset()).rejects.toThrow(
+      'requires CLIProxy to report no active routing identity'
+    );
+    expect(activated.getPersisted()).toEqual(persistedPipeline());
+  });
+
+  it('reset refuses absent provenance and a pending publication intent', async () => {
+    const absent = dependencyHarness();
+    await expect(new ModelPipelinePublisher(absent.dependencies).reset()).rejects.toBeInstanceOf(
+      ModelPipelineSnapshotNotFoundError
+    );
+    expect(absent.events).not.toContain('inventory:1');
+    expect(absent.events).not.toContain('clear');
+
+    const rejection = Object.assign(new Error('CLIProxy management request failed with HTTP 503'), {
+      statusCode: 503,
+    });
+    const pending = dependencyHarness({ putFailure: rejection });
+    await expect(
+      new ModelPipelinePublisher(pending.dependencies).publish(modelPipelineRequestFixture())
+    ).rejects.toBe(rejection);
+    expect(pending.events).toContain('intent:write');
+
+    await expect(new ModelPipelinePublisher(pending.dependencies).reset()).rejects.toBeInstanceOf(
+      ModelPipelineResetConflictError
+    );
+    await expect(new ModelPipelinePublisher(pending.dependencies).reset()).rejects.toThrow(
+      'forbidden while a publication intent is pending'
+    );
+    expect(pending.events).not.toContain('clear');
   });
 
   it('retires an intent CLIProxy rejected as invalid and propagates the rejection', async () => {
