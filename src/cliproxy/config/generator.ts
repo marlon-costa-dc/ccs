@@ -172,6 +172,15 @@ function generateOAuthModelAliasSection(configuredAliases?: CLIProxyOAuthModelAl
   return body ? `oauth-model-alias:\n${body}` : '';
 }
 
+/** Enforce the mutation owner before any legacy raw-config write. */
+export function assertLegacyConfigMutationAllowed(config: UnifiedConfig): void {
+  if (config.model_pipeline) {
+    throw new ConfigError(
+      'model_pipeline is active; CLIProxy config may only be changed through the canonical publication transaction'
+    );
+  }
+}
+
 /**
  * Generate UNIFIED config.yaml content for ALL providers
  * This enables concurrent usage of gemini/codex/agy without config conflicts.
@@ -187,11 +196,7 @@ function generateUnifiedConfigContent(
   existingPayload?: string,
   unifiedConfig: UnifiedConfig = loadOrCreateUnifiedConfig()
 ): string {
-  if (unifiedConfig.model_pipeline) {
-    throw new ConfigError(
-      'model_pipeline is active; CLIProxy config may only be changed through the canonical publication transaction'
-    );
-  }
+  assertLegacyConfigMutationAllowed(unifiedConfig);
   const authDir = getAuthDir(); // Base auth dir - CLIProxyAPI scans subdirectories
   // Convert Windows backslashes to forward slashes for YAML compatibility
   const authDirNormalized = authDir.split(path.sep).join('/');
@@ -511,6 +516,15 @@ export function configNeedsRegeneration(port: number = CLIPROXY_DEFAULT_PORT): b
   const configPath = getConfigPathForPort(port);
   if (!fs.existsSync(configPath)) {
     return false; // Will be created on first use
+  }
+
+  // Enforce the mutation owner: while the canonical model-pipeline publication
+  // transaction is active, config.yaml is published atomically by it and legacy
+  // regeneration is never the writer. The marker check below applies only to
+  // legacy-generated configs; stale routing is reverted through publication,
+  // never through regeneration.
+  if (loadOrCreateUnifiedConfig().model_pipeline) {
+    return false;
   }
 
   try {

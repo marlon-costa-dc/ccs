@@ -358,10 +358,21 @@ describe('ccs-browser MCP server - orchestration and artifacts', () => {
             },
           },
         },
+        {
+          jsonrpc: '2.0',
+          id: 1212_1,
+          method: 'tools/call',
+          params: {
+            name: 'browser_get_orchestration',
+            arguments: { waitForCompletion: true },
+          },
+        },
       ]
     );
 
-    expect(getResponseText(responses.find((message) => message.id === 1212))).toContain('status: completed');
+    expect(getResponseText(responses.find((message) => message.id === 1212_1))).toContain(
+      'status: completed'
+    );
   });
 
   it('fails orchestration on the first failing block', async () => {

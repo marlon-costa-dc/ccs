@@ -35,14 +35,6 @@ describe('GlmtTransformer', () => {
       assert.strictEqual(openaiRequest.top_p, 0.9);
     });
 
-    it.skip('handles errors in transformRequest gracefully', () => { // Skip: requires proper null safety mocking
-      const transformer = new GlmtTransformer();
-      const { thinkingConfig, error } = transformer.transformRequest(null);
-
-      assert.ok(error);
-      assert.strictEqual(thinkingConfig.thinking, false);
-    });
-
     it('enables streaming when requested', () => {
       const transformer = new GlmtTransformer();
       const input = {
@@ -150,14 +142,6 @@ describe('GlmtTransformer', () => {
       assert.strictEqual(result.content[0].text, 'Simple answer');
     });
 
-    it.skip('handles errors in transformResponse gracefully', () => { // Skip: requires proper null safety mocking
-      const transformer = new GlmtTransformer();
-      const result = transformer.transformResponse({}, {});
-
-      assert.strictEqual(result.type, 'message');
-      assert.strictEqual(result.role, 'assistant');
-      assert.ok(result.content[0].text);
-    });
   });
 
   describe('Thinking signature', () => {

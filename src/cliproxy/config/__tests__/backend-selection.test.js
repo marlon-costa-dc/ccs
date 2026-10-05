@@ -55,7 +55,7 @@ describe('Backend Selection', () => {
 
     it('has correct configuration for plus backend', () => {
       const config = platformDetector.BACKEND_CONFIG.plus;
-      assert.strictEqual(config.repo, 'marlon-costa-dc/CLIProxyAPI');
+      assert.strictEqual(config.repo, 'marlon-costa-dc/cliproxy');
       assert.strictEqual(config.binaryPrefix, 'CLIProxyAPI');
       assert.strictEqual(config.executable, 'cli-proxy-api-plus');
       assert(config.fallbackVersion.match(/^\d+\.\d+\.\d+-dc\d+$/), 'plus version has -dcN suffix');
@@ -175,7 +175,7 @@ describe('Backend Selection', () => {
         );
         assert.strictEqual(
           platformDetector.getDownloadUrl('7.2.136-dc6', 'plus'),
-          'https://github.com/marlon-costa-dc/CLIProxyAPI/releases/download/v7.2.136-dc6/CLIProxyAPI_7.2.136-dc6_darwin_aarch64_no-plugin.tar.gz'
+          'https://github.com/marlon-costa-dc/cliproxy/releases/download/v7.2.136-dc6/CLIProxyAPI_7.2.136-dc6_darwin_aarch64_no-plugin.tar.gz'
         );
       });
 
@@ -240,7 +240,7 @@ describe('Backend Selection', () => {
 
     it('uses correct repo for plus backend', () => {
       const url = platformDetector.getDownloadUrl('7.2.136-dc6', 'plus');
-      assert(url.includes('marlon-costa-dc/CLIProxyAPI/releases'));
+      assert(url.includes('marlon-costa-dc/cliproxy/releases'));
     });
 
     it('defaults to original backend', () => {

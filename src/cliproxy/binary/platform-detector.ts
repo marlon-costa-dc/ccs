@@ -22,10 +22,10 @@ export const BACKEND_CONFIG = {
     fallbackVersion: '6.9.45',
   },
   plus: {
-    repo: 'marlon-costa-dc/CLIProxyAPI',
+    repo: 'marlon-costa-dc/cliproxy',
     binaryPrefix: 'CLIProxyAPI',
     executable: 'cli-proxy-api-plus',
-    fallbackVersion: '7.2.136-dc7',
+    fallbackVersion: '7.2.145-dc7',
   },
 } as const;
 
@@ -86,6 +86,21 @@ const RELEASE_ARCH_MAP: Record<SupportedArch, SupportedArch> = {
 const PLUS_NO_PLUGIN_ASSET_MIN_VERSION = '7.1.68-0';
 const PLUS_AARCH64_ASSET_MIN_VERSION = '7.1.45-1';
 
+/** The dc6 fork release renamed release assets to lowercase (CLIProxyAPI_* -> cliproxy_*). */
+const PLUS_LOWERCASE_ASSET_MIN_VERSION = '7.2.145-dc6';
+
+/**
+ * Release asset prefix for one backend at one version. Only the fork's dc6+
+ * releases publish lowercase asset names; older fork releases and the
+ * upstream original keep the uppercase prefix.
+ */
+function binaryPrefixFor(backend: CLIProxyBackend, version: string): string {
+  if (backend === 'plus' && isAtLeastVersion(version, PLUS_LOWERCASE_ASSET_MIN_VERSION)) {
+    return 'cliproxy';
+  }
+  return BACKEND_CONFIG[backend].binaryPrefix;
+}
+
 export function mapNodeArchToReleaseArch(nodeArch: string): SupportedArch | undefined {
   const arch = ARCH_MAP[nodeArch];
   return arch ? RELEASE_ARCH_MAP[arch] : undefined;
@@ -107,7 +122,8 @@ function parseVersionParts(version: string): [number, number, number, number] {
   return [major, minor, patch, parseForkRelease(forkRelease)];
 }
 
-function isAtLeastVersion(version: string, minimum: string): boolean {
+/** Compare fork-aware versions: core semver, then the numeric -dcN suffix. */
+export function isAtLeastVersion(version: string, minimum: string): boolean {
   const left = parseVersionParts(version);
   const right = parseVersionParts(minimum);
 
@@ -185,7 +201,7 @@ export function detectPlatform(
     usesOriginalNoPluginAsset || (backend === 'plus' && usesPlusNoPluginAsset(ver, os))
       ? '_no-plugin'
       : '';
-  const binaryName = `${config.binaryPrefix}_${ver}_${os}_${assetArch}${assetVariant}.${extension}`;
+  const binaryName = `${binaryPrefixFor(backend, ver)}_${ver}_${os}_${assetArch}${assetVariant}.${extension}`;
 
   return {
     os,

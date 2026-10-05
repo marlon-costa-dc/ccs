@@ -217,15 +217,15 @@ describe('image analyzer hook regression coverage', () => {
     }
   });
 
-  it.if(process.platform === 'win32')(
-    'analyzes Windows-style relative paths inside the current workspace',
+  it(
+    'analyzes workspace-relative paths inside the current workspace',
     async () => {
-      const nestedDir = path.join(TEST_DIR, 'windows-style-fixture-dir');
+      const nestedDir = path.join(TEST_DIR, 'relative-path-fixture-dir');
       const nestedPath = path.join(nestedDir, 'inside-workspace.png');
       fs.mkdirSync(nestedDir, { recursive: true });
       createTestPng(nestedPath);
 
-      const result = await invokeHook({}, { filePath: path.win32.relative(TEST_DIR, nestedPath) });
+      const result = await invokeHook({}, { filePath: path.relative(TEST_DIR, nestedPath) });
 
       expect(result.code).toBe(2);
       expect(requests).toHaveLength(1);

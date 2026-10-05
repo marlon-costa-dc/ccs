@@ -2,7 +2,9 @@ export const MODEL_PIPELINE_SCHEMA_VERSION = 3 as const;
 
 /**
  * CLIProxy owns one `modelrouting.SchemaVersion` and publishes it in both the
- * routing projection and model-inventory envelope.
+ * routing projection and model-inventory envelope. This fork pins it at 3 to
+ * accept the inventory v3 publications that CLIProxy's producer side
+ * (PRs #44/#45) and ai-hub's model pipeline already serve.
  */
 export const CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION = 3 as const;
 export const CLIPROXY_INVENTORY_SCHEMA_VERSION = CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION;

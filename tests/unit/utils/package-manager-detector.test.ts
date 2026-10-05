@@ -72,8 +72,8 @@ describe('package-manager-detector', () => {
     expect(readInstalledPackageVersion(install)).toBe('7.67.0-dev.9');
   });
 
-  it.if(process.platform !== 'win32')(
-    'detects bun installs from a POSIX symlinked ~/.bun/bin/ccs entrypoint',
+  it(
+    'detects bun installs from a symlinked ~/.bun/bin/ccs entrypoint',
     () => {
       const tempRoot = makeTempDir('ccs-install-detector-bun-symlink-');
       const packageRoot = join(

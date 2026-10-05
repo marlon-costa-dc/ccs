@@ -39,12 +39,15 @@ describe('cliproxy quota subcommand failure formatting', () => {
       console.log = originalLog;
     }
 
-    expect(output.join('\n')).toContain('[!] healthy@example.com');
-    expect(output.join('\n')).not.toContain('[X] healthy@example.com');
-    expect(output.join('\n')).toContain('Claude usage status temporarily unavailable');
-    expect(output.join('\n')).toContain('Inference may still be available');
-    expect(output.join('\n')).toContain('HTTP 429 | Code: usage_probe_unavailable | Retryable');
-    expect(output.join('\n')).toContain('Detail: retry-after:0');
+    // The rendered text is the contract; terminal colour depends on the caller's
+    // FORCE_COLOR/TTY and must not decide the outcome.
+    const rendered = output.join('\n').replace(/\[[0-9;]*m/g, '');
+    expect(rendered).toContain('[!] healthy@example.com');
+    expect(rendered).not.toContain('[X] healthy@example.com');
+    expect(rendered).toContain('Claude usage status temporarily unavailable');
+    expect(rendered).toContain('Inference may still be available');
+    expect(rendered).toContain('HTTP 429 | Code: usage_probe_unavailable | Retryable');
+    expect(rendered).toContain('Detail: retry-after:0');
   });
 
   it('builds Gemini failure lines with the remediation hint, code, and detail', async () => {

@@ -25,6 +25,7 @@ import {
   readNullableSignedInteger,
   readNullableString,
   readRecord,
+  readProvenanceBuiltAt,
   readString,
   readStringSet,
   readStringValue,
@@ -998,7 +999,7 @@ function parseInventory(value: unknown, path: string): ModelPipelineInventory {
     binary_provenance: {
       version: readString(provenance.version, `${provenancePath}.version`),
       commit: readString(provenance.commit, `${provenancePath}.commit`),
-      built_at: readUtcTimestamp(provenance.built_at, `${provenancePath}.built_at`),
+      built_at: readProvenanceBuiltAt(provenance.built_at, `${provenancePath}.built_at`),
     },
     routing_schema: {
       version: CLIPROXY_MODEL_ROUTING_SCHEMA_VERSION,
@@ -1187,17 +1188,10 @@ function parseSnapshot(value: unknown, path: string): ModelPipelineSnapshot {
       .filter((item) => item.eligible)
       .map((item) => `${item.tier_id}\u0000${candidateKey(item)}`)
   );
-  const tierByModel = new Map<string, string>();
   const candidateRoute = (candidate: ModelPipelineCandidate): ModelPipelineRouteKey =>
     candidate.route_key;
   for (const assignment of assignments) {
     for (const member of assignment.members) {
-      const key = modelKey(member.model_key);
-      const previousTier = tierByModel.get(key);
-      if (previousTier && previousTier !== assignment.tier_id) {
-        fail(`${path}.assignments`, 'assigns one ModelKey to more than one tier');
-      }
-      tierByModel.set(key, assignment.tier_id);
       for (const candidate of member.candidates) {
         if (!eligible.has(`${assignment.tier_id}\u0000${candidateKey(candidate)}`)) {
           fail(`${path}.assignments`, 'contains a candidate without an eligible evaluation');
@@ -1331,7 +1325,7 @@ export function parseModelPipelineBinaryProvenance(
   return {
     version: readString(record.version, `${path}.version`),
     commit: readString(record.commit, `${path}.commit`),
-    built_at: readUtcTimestamp(record.built_at, `${path}.built_at`),
+    built_at: readProvenanceBuiltAt(record.built_at, `${path}.built_at`),
   };
 }
 

@@ -1,3 +1,82 @@
+## [8.9.0-fd.18](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.17...v8.9.0-fd.18) (2026-09-23)
+
+### Bug Fixes
+
+* **schema:** adopt regenerated AI Hub v3 schema artifact ([663f9d7](https://github.com/marlon-costa-dc/ccs/commit/663f9d7e2af0c61a916dd7cb0ec7310cb38673cc))
+
+## [8.9.0-fd.17](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.16...v8.9.0-fd.17) (2026-09-18)
+
+### Bug Fixes
+
+* **schema:** adopt regenerated AI Hub v3 schema artifact ([#50](https://github.com/marlon-costa-dc/ccs/issues/50)) ([8cb44c2](https://github.com/marlon-costa-dc/ccs/commit/8cb44c2d25df3705344e22237ef6f371be685b81))
+
+## [8.9.0-fd.16](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.15...v8.9.0-fd.16) (2026-09-16)
+
+### Bug Fixes
+
+* **model-pipeline:** retire intents CLIProxy rejects as invalid ([84b0134](https://github.com/marlon-costa-dc/ccs/commit/84b0134786a6a0d66103dc10cfdba0eb5b4909f2))
+
+### Tests
+
+* **cliproxy-quota:** assert rendered text independent of terminal colour ([c1edd60](https://github.com/marlon-costa-dc/ccs/commit/c1edd60349b39f9c4cf1aae472162494a3efe480))
+
+## [8.9.0-fd.15](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.14...v8.9.0-fd.15) (2026-09-16)
+
+### Bug Fixes
+
+* **schema:** adopt regenerated AI Hub v3 schema artifact (a8ff5973) ([624e9b3](https://github.com/marlon-costa-dc/ccs/commit/624e9b3680ab6c5b7a2bc8f72cfec38d4adf70eb))
+
+## [8.9.0-fd.14](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.13...v8.9.0-fd.14) (2026-09-16)
+
+### Bug Fixes
+
+* **cliproxy:** skip legacy regeneration while model pipeline owns config.yaml ([7d1ceca](https://github.com/marlon-costa-dc/ccs/commit/7d1ceca1c561af1a834ce9c7f9abd65c233d20d4))
+* **cliproxy:** stabilize pipeline inventory reconciliation ([f02aa3c](https://github.com/marlon-costa-dc/ccs/commit/f02aa3cd01713c5c9f8ee418cd936b0dc136fa1f))
+* **websearch:** agy detection inherits caller env explicitly (bun execSync PATH) ([61f284c](https://github.com/marlon-costa-dc/ccs/commit/61f284cb27ae1c2efea3a816f64feb912414ea03))
+
+### Styles
+
+* format websearch status test ([43d6f83](https://github.com/marlon-costa-dc/ccs/commit/43d6f83a9bfeb8cd381e680b682718b2b041fdc3))
+
+### Tests
+
+* **api:** import bun:test spyOn in profile lifecycle service ([6f2dfe1](https://github.com/marlon-costa-dc/ccs/commit/6f2dfe10c13cb73961773b21288470b838878a58))
+* **api:** restore copyFileSync spies after profile lifecycle tests ([8857922](https://github.com/marlon-costa-dc/ccs/commit/88579227f3829cff17b4c6dbe4e6763e87dc01f6))
+* **websearch:** install hermetic agy shim on PATH for readiness status test ([4f49403](https://github.com/marlon-costa-dc/ccs/commit/4f49403f42eb048c8ce17d6d75184e02edeacd77))
+
+## [8.9.0-fd.13](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.12...v8.9.0-fd.13) (2026-09-09)
+
+### Bug Fixes
+
+* **cliproxy:** reject invalid backend before watcher classification ([c8da9bb](https://github.com/marlon-costa-dc/ccs/commit/c8da9bbff9c089a785d11ca78bfa95fecf0f467b))
+* **cliproxy:** separate publication receipts from legacy auto-sync ([6905c20](https://github.com/marlon-costa-dc/ccs/commit/6905c201a214e693285bfe4a033fa69980af7c7c))
+
+### Tests
+
+* **cliproxy:** separate watcher detection and completion deadlines ([84e5467](https://github.com/marlon-costa-dc/ccs/commit/84e5467c3cda7ef22c7cf85b7c22459aa292f7df))
+
+### CI
+
+* validate pull requests to fork integration branch ([134acec](https://github.com/marlon-costa-dc/ccs/commit/134acec9c3e83edb0a9904da4ed99315316442d0))
+
+## [8.9.0-fd.12](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.11...v8.9.0-fd.12) (2026-09-09)
+
+### Bug Fixes
+
+* **model-pipeline:** allow independent v3 lane membership ([2ca9b52](https://github.com/marlon-costa-dc/ccs/commit/2ca9b5293355590787d047b19cf5bd1fe63de87d))
+* **proxy:** make disconnect cleanup and launch tests deterministic ([5536d36](https://github.com/marlon-costa-dc/ccs/commit/5536d36383f155f321a5c83c97469381aef600eb))
+* **release:** accept the dc-use fork lane in packaging provenance ([7f660fb](https://github.com/marlon-costa-dc/ccs/commit/7f660fb44ec814b5b1359dbf32467dff03be2567))
+
+### Documentation
+
+* **reports:** refresh hardening inventory after v3 fixes ([55f5c46](https://github.com/marlon-costa-dc/ccs/commit/55f5c46f45d5239f2a6956caf102d4c9f0c1fa08))
+
+## [8.9.0-fd.9](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.8...v8.9.0-fd.9) (2026-09-03)
+
+### Features
+
+* **model-pipeline:** consume AI Hub snapshot schema v3 and project routing schema 3 (ccs-4o2) ([d5ec44a](https://github.com/marlon-costa-dc/ccs/commit/d5ec44a220e1eeca96952b30b55e0cb8f3b9014d))
+
 ## [8.9.0-fd.8](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.7...v8.9.0-fd.8) (2026-09-03)
 
 ### Bug Fixes

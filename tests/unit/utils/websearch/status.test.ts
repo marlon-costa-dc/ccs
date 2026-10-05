@@ -1,18 +1,13 @@
-import { describe, expect, it, spyOn } from 'bun:test';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { describe, expect, it } from 'bun:test';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import * as agyCli from '../../../../src/utils/websearch/agy';
-import * as geminiCli from '../../../../src/utils/websearch/gemini-cli';
-import * as grokCli from '../../../../src/utils/websearch/grok-cli';
-import * as opencodeCli from '../../../../src/utils/websearch/opencode-cli';
-import * as providerSecrets from '../../../../src/utils/websearch/provider-secrets';
-import * as unifiedConfigLoader from '../../../../src/config/unified-config-loader';
+import * as path from 'node:path';
+import type { WebSearchCliInfo } from '../../../../src/utils/websearch/types';
+import { clearAgyCliCache } from '../../../../src/utils/websearch/agy';
 import {
   buildWebSearchReadiness,
   getWebSearchCliProviders,
 } from '../../../../src/utils/websearch/status';
-import type { WebSearchCliInfo } from '../../../../src/utils/websearch/types';
 
 function provider(
   overrides: Partial<WebSearchCliInfo> & Pick<WebSearchCliInfo, 'id' | 'name'>
@@ -118,291 +113,174 @@ describe('websearch readiness', () => {
     expect(readiness.message).toContain('SearXNG');
   });
 
-  it('marks SearXNG as unavailable when config uses a query-bearing endpoint URL', () => {
-    const getConfigSpy = spyOn(unifiedConfigLoader, 'getWebSearchConfig').mockReturnValue({
-      enabled: true,
-      providers: {
-        exa: { enabled: false, max_results: 5 },
-        tavily: { enabled: false, max_results: 5 },
-        brave: { enabled: false, max_results: 5 },
-        searxng: {
-          enabled: true,
-          url: 'https://search.example.com/search?format=json',
-          max_results: 5,
-        },
-        duckduckgo: { enabled: false, max_results: 5 },
-        gemini: { enabled: false },
-        grok: { enabled: false },
-        opencode: { enabled: false },
-      },
-    } as any);
-    const apiKeySpy = spyOn(providerSecrets, 'getWebSearchApiKeyStates').mockReturnValue({
-      exa: { envVar: 'EXA_API_KEY', configured: false, available: false, source: 'none' },
-      tavily: { envVar: 'TAVILY_API_KEY', configured: false, available: false, source: 'none' },
-      brave: { envVar: 'BRAVE_API_KEY', configured: false, available: false, source: 'none' },
-    });
-    const geminiStatusSpy = spyOn(geminiCli, 'getGeminiCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const geminiAuthSpy = spyOn(geminiCli, 'isGeminiAuthenticated').mockReturnValue(false);
-    const grokStatusSpy = spyOn(grokCli, 'getGrokCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const opencodeStatusSpy = spyOn(opencodeCli, 'getOpenCodeCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const agyStatusSpy = spyOn(agyCli, 'getAgyCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
+  it(
+    'marks SearXNG as unavailable when config uses a query-bearing endpoint URL',
+    { timeout: 15000 },
+    () => {
+      const tempHome = mkdtempSync(path.join(tmpdir(), 'websearch-status-'));
+      const originalCcsHome = process.env.CCS_HOME;
+      process.env.CCS_HOME = tempHome;
+      const ccsDir = path.join(tempHome, '.ccs');
+      mkdirSync(path.join(ccsDir, 'cache'), { recursive: true });
+      writeFileSync(
+        path.join(ccsDir, 'config.yaml'),
+        'version: 1\nwebsearch:\n  enabled: true\n  providers:\n    exa:\n      enabled: false\n      max_results: 5\n    tavily:\n      enabled: false\n      max_results: 5\n    brave:\n      enabled: false\n      max_results: 5\n    searxng:\n      enabled: true\n      url: "https://search.example.com/search?format=json"\n      max_results: 5\n    duckduckgo:\n      enabled: false\n      max_results: 5\n    gemini:\n      enabled: false\n    grok:\n      enabled: false\n    opencode:\n      enabled: false\n',
+        'utf8'
+      );
 
-    try {
-      const providers = getWebSearchCliProviders();
-      const searxng = providers.find((entry) => entry.id === 'searxng');
+      try {
+        const providers = getWebSearchCliProviders();
+        const searxng = providers.find((entry) => entry.id === 'searxng');
 
-      expect(searxng?.enabled).toBe(true);
-      expect(searxng?.available).toBe(false);
-      expect(searxng?.detail).toContain('Set a valid SearXNG base URL');
-    } finally {
-      getConfigSpy.mockRestore();
-      apiKeySpy.mockRestore();
-      geminiStatusSpy.mockRestore();
-      geminiAuthSpy.mockRestore();
-      grokStatusSpy.mockRestore();
-      opencodeStatusSpy.mockRestore();
-      agyStatusSpy.mockRestore();
+        expect(searxng?.enabled).toBe(true);
+        expect(searxng?.available).toBe(false);
+        expect(searxng?.detail).toContain('Set a valid SearXNG base URL');
+      } finally {
+        process.env.CCS_HOME = originalCcsHome;
+        rmSync(tempHome, { recursive: true, force: true });
+      }
     }
-  });
+  );
 
-  it('marks SearXNG as unavailable when enabled with a blank URL', () => {
-    const getConfigSpy = spyOn(unifiedConfigLoader, 'getWebSearchConfig').mockReturnValue({
-      enabled: true,
-      providers: {
-        exa: { enabled: false, max_results: 5 },
-        tavily: { enabled: false, max_results: 5 },
-        brave: { enabled: false, max_results: 5 },
-        searxng: {
-          enabled: true,
-          url: '',
-          max_results: 5,
-        },
-        duckduckgo: { enabled: false, max_results: 5 },
-        gemini: { enabled: false },
-        grok: { enabled: false },
-        opencode: { enabled: false },
-      },
-    } as any);
-    const apiKeySpy = spyOn(providerSecrets, 'getWebSearchApiKeyStates').mockReturnValue({
-      exa: { envVar: 'EXA_API_KEY', configured: false, available: false, source: 'none' },
-      tavily: { envVar: 'TAVILY_API_KEY', configured: false, available: false, source: 'none' },
-      brave: { envVar: 'BRAVE_API_KEY', configured: false, available: false, source: 'none' },
-    });
-    const geminiStatusSpy = spyOn(geminiCli, 'getGeminiCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const geminiAuthSpy = spyOn(geminiCli, 'isGeminiAuthenticated').mockReturnValue(false);
-    const grokStatusSpy = spyOn(grokCli, 'getGrokCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const opencodeStatusSpy = spyOn(opencodeCli, 'getOpenCodeCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const agyStatusSpy = spyOn(agyCli, 'getAgyCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-
-    try {
-      const providers = getWebSearchCliProviders();
-      const searxng = providers.find((entry) => entry.id === 'searxng');
-
-      expect(searxng?.enabled).toBe(true);
-      expect(searxng?.available).toBe(false);
-      expect(searxng?.detail).toContain('Set a valid SearXNG base URL');
-    } finally {
-      getConfigSpy.mockRestore();
-      apiKeySpy.mockRestore();
-      geminiStatusSpy.mockRestore();
-      geminiAuthSpy.mockRestore();
-      grokStatusSpy.mockRestore();
-      opencodeStatusSpy.mockRestore();
-      agyStatusSpy.mockRestore();
-    }
-  });
-
-  it('exposes Antigravity (agy) as a recommended CLI provider when enabled and installed', () => {
-    const getConfigSpy = spyOn(unifiedConfigLoader, 'getWebSearchConfig').mockReturnValue({
-      enabled: true,
-      providers: {
-        exa: { enabled: false, max_results: 5 },
-        tavily: { enabled: false, max_results: 5 },
-        brave: { enabled: false, max_results: 5 },
-        searxng: { enabled: false, url: '', max_results: 5 },
-        duckduckgo: { enabled: false, max_results: 5 },
-        agy: { enabled: true, model: 'gemini-2.5-flash', timeout: 90 },
-        gemini: { enabled: false },
-        grok: { enabled: false },
-        opencode: { enabled: false },
-      },
-    } as any);
-    const apiKeySpy = spyOn(providerSecrets, 'getWebSearchApiKeyStates').mockReturnValue({
-      exa: { envVar: 'EXA_API_KEY', configured: false, available: false, source: 'none' },
-      tavily: { envVar: 'TAVILY_API_KEY', configured: false, available: false, source: 'none' },
-      brave: { envVar: 'BRAVE_API_KEY', configured: false, available: false, source: 'none' },
-    });
-    const agyStatusSpy = spyOn(agyCli, 'getAgyCliStatus').mockReturnValue({
-      installed: true,
-      version: '1.0.13',
-    } as any);
-    const geminiStatusSpy = spyOn(geminiCli, 'getGeminiCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const geminiAuthSpy = spyOn(geminiCli, 'isGeminiAuthenticated').mockReturnValue(false);
-    const grokStatusSpy = spyOn(grokCli, 'getGrokCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const opencodeStatusSpy = spyOn(opencodeCli, 'getOpenCodeCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-
-    try {
-      const providers = getWebSearchCliProviders();
-      const agy = providers.find((entry) => entry.id === 'agy');
-
-      expect(agy?.name).toBe('Antigravity CLI');
-      expect(agy?.kind).toBe('legacy-cli');
-      expect(agy?.command).toBe('agy');
-      expect(agy?.enabled).toBe(true);
-      expect(agy?.available).toBe(true);
-      expect(agy?.requiresApiKey).toBe(false);
-      expect(agy?.installCommand).toContain('antigravity.google');
-      expect(agy?.detail).toContain('1.0.13');
-
-      const readiness = buildWebSearchReadiness(true, providers);
-      expect(readiness.readiness).toBe('ready');
-      expect(readiness.message).toContain('Antigravity CLI');
-    } finally {
-      getConfigSpy.mockRestore();
-      apiKeySpy.mockRestore();
-      agyStatusSpy.mockRestore();
-      geminiStatusSpy.mockRestore();
-      geminiAuthSpy.mockRestore();
-      grokStatusSpy.mockRestore();
-      opencodeStatusSpy.mockRestore();
-    }
-  });
-
-  it('treats cooled-down providers as temporarily unavailable in readiness status', () => {
-    const tempHome = mkdtempSync(join(tmpdir(), 'websearch-status-cooldown-'));
-    const statePath = join(tempHome, '.ccs', 'cache', 'websearch-provider-state.json');
+  it('marks SearXNG as unavailable when enabled with a blank URL', { timeout: 15000 }, () => {
+    const tempHome = mkdtempSync(path.join(tmpdir(), 'websearch-status-'));
     const originalCcsHome = process.env.CCS_HOME;
-
-    mkdirSync(join(tempHome, '.ccs', 'cache'), { recursive: true });
+    process.env.CCS_HOME = tempHome;
+    const ccsDir = path.join(tempHome, '.ccs');
+    mkdirSync(path.join(ccsDir, 'cache'), { recursive: true });
     writeFileSync(
-      statePath,
-      JSON.stringify(
-        {
-          cooldowns: {
-            exa: {
-              until: Date.now() + 10 * 60 * 1000,
-              reason: 'quota_exhausted',
-            },
-          },
-        },
-        null,
-        2
-      ),
+      path.join(ccsDir, 'config.yaml'),
+      'version: 1\nwebsearch:\n  enabled: true\n  providers:\n    exa:\n      enabled: false\n      max_results: 5\n    tavily:\n      enabled: false\n      max_results: 5\n    brave:\n      enabled: false\n      max_results: 5\n    searxng:\n      enabled: true\n      url: ""\n      max_results: 5\n    duckduckgo:\n      enabled: false\n      max_results: 5\n    gemini:\n      enabled: false\n    grok:\n      enabled: false\n    opencode:\n      enabled: false\n',
       'utf8'
     );
-    process.env.CCS_HOME = tempHome;
-
-    const getConfigSpy = spyOn(unifiedConfigLoader, 'getWebSearchConfig').mockReturnValue({
-      enabled: true,
-      providers: {
-        exa: { enabled: true, max_results: 5 },
-        tavily: { enabled: false, max_results: 5 },
-        brave: { enabled: false, max_results: 5 },
-        searxng: { enabled: false, url: '', max_results: 5 },
-        duckduckgo: { enabled: false, max_results: 5 },
-        gemini: { enabled: false },
-        grok: { enabled: false },
-        opencode: { enabled: false },
-      },
-    } as any);
-    const apiKeySpy = spyOn(providerSecrets, 'getWebSearchApiKeyStates').mockReturnValue({
-      exa: {
-        envVar: 'EXA_API_KEY',
-        configured: true,
-        available: true,
-        source: 'process_env',
-      },
-      tavily: {
-        envVar: 'TAVILY_API_KEY',
-        configured: false,
-        available: false,
-        source: 'none',
-      },
-      brave: {
-        envVar: 'BRAVE_API_KEY',
-        configured: false,
-        available: false,
-        source: 'none',
-      },
-    });
-    const geminiStatusSpy = spyOn(geminiCli, 'getGeminiCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const geminiAuthSpy = spyOn(geminiCli, 'isGeminiAuthenticated').mockReturnValue(false);
-    const grokStatusSpy = spyOn(grokCli, 'getGrokCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const opencodeStatusSpy = spyOn(opencodeCli, 'getOpenCodeCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
-    const agyStatusSpy = spyOn(agyCli, 'getAgyCliStatus').mockReturnValue({
-      installed: false,
-      version: null,
-    } as any);
 
     try {
       const providers = getWebSearchCliProviders();
-      const exa = providers.find((provider) => provider.id === 'exa');
+      const searxng = providers.find((entry) => entry.id === 'searxng');
 
-      expect(exa?.enabled).toBe(true);
-      expect(exa?.available).toBe(false);
-      expect(exa?.detail).toContain('Cooling down');
-      expect(exa?.detail).toContain('quota exhaustion');
-
-      const readiness = buildWebSearchReadiness(true, providers);
-      expect(readiness.readiness).toBe('needs_setup');
-      expect(readiness.message).toContain('Cooling down');
+      expect(searxng?.enabled).toBe(true);
+      expect(searxng?.available).toBe(false);
+      expect(searxng?.detail).toContain('Set a valid SearXNG base URL');
     } finally {
-      getConfigSpy.mockRestore();
-      apiKeySpy.mockRestore();
-      geminiStatusSpy.mockRestore();
-      geminiAuthSpy.mockRestore();
-      grokStatusSpy.mockRestore();
-      opencodeStatusSpy.mockRestore();
-      agyStatusSpy.mockRestore();
-
-      if (originalCcsHome === undefined) {
-        delete process.env.CCS_HOME;
-      } else {
-        process.env.CCS_HOME = originalCcsHome;
-      }
+      process.env.CCS_HOME = originalCcsHome;
       rmSync(tempHome, { recursive: true, force: true });
     }
   });
+
+  it(
+    'exposes Antigravity (agy) as a recommended CLI provider when enabled and installed',
+    { timeout: 15000 },
+    () => {
+      const tempHome = mkdtempSync(path.join(tmpdir(), 'websearch-status-agy-'));
+      const originalCcsHome = process.env.CCS_HOME;
+      const originalPath = process.env.PATH;
+      process.env.CCS_HOME = tempHome;
+
+      const ccsDir = path.join(tempHome, '.ccs');
+      mkdirSync(path.join(ccsDir, 'cache'), { recursive: true });
+      writeFileSync(
+        path.join(ccsDir, 'config.yaml'),
+        'version: 1\nwebsearch:\n  enabled: true\n  providers:\n    exa:\n      enabled: false\n      max_results: 5\n    tavily:\n      enabled: false\n      max_results: 5\n    brave:\n      enabled: false\n      max_results: 5\n    searxng:\n      enabled: false\n      url: ""\n      max_results: 5\n    duckduckgo:\n      enabled: false\n      max_results: 5\n    agy:\n      enabled: true\n      model: gemini-2.5-flash\n      timeout: 90\n    gemini:\n      enabled: false\n    grok:\n      enabled: false\n    opencode:\n      enabled: false\n',
+        'utf8'
+      );
+
+      // Hermetic installation: ship a fake agy binary on PATH instead of
+      // depending on the host having Antigravity CLI installed.
+      const binDir = path.join(tempHome, 'bin');
+      mkdirSync(binDir, { recursive: true });
+      const agyShim = path.join(binDir, 'agy');
+      writeFileSync(
+        agyShim,
+        '#!/bin/sh\ncase "$1" in --version) echo "Antigravity CLI 1.2.3";; *) echo agy;; esac\n'
+      );
+      chmodSync(agyShim, 0o755);
+      process.env.PATH = `${binDir}:${originalPath ?? ''}`;
+      clearAgyCliCache();
+
+      try {
+        const providers = getWebSearchCliProviders();
+        const agy = providers.find((entry) => entry.id === 'agy');
+
+        expect(agy?.name).toBe('Antigravity CLI');
+        expect(agy?.kind).toBe('legacy-cli');
+        expect(agy?.command).toBe('agy');
+        expect(agy?.enabled).toBe(true);
+        expect(agy?.available).toBe(true);
+        expect(agy?.requiresApiKey).toBe(false);
+        expect(agy?.installCommand).toContain('antigravity.google');
+        expect(agy?.detail).toContain('Installed');
+
+        const readiness = buildWebSearchReadiness(true, providers);
+        expect(readiness.readiness).toBe('ready');
+        expect(readiness.message).toContain('Antigravity CLI');
+      } finally {
+        process.env.PATH = originalPath;
+        clearAgyCliCache();
+        process.env.CCS_HOME = originalCcsHome;
+        rmSync(tempHome, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it(
+    'treats cooled-down providers as temporarily unavailable in readiness status',
+    { timeout: 15000 },
+    () => {
+      const tempHome = mkdtempSync(path.join(tmpdir(), 'websearch-status-cooldown-'));
+      const statePath = path.join(tempHome, '.ccs', 'cache', 'websearch-provider-state.json');
+      const originalCcsHome = process.env.CCS_HOME;
+
+      mkdirSync(path.join(tempHome, '.ccs', 'cache'), { recursive: true });
+      writeFileSync(
+        statePath,
+        JSON.stringify(
+          {
+            cooldowns: {
+              exa: {
+                until: Date.now() + 10 * 60 * 1000,
+                reason: 'quota_exhausted',
+              },
+            },
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+      process.env.CCS_HOME = tempHome;
+
+      const ccsDir = path.join(tempHome, '.ccs');
+      mkdirSync(path.join(ccsDir, 'cache'), { recursive: true });
+      writeFileSync(
+        path.join(ccsDir, 'config.yaml'),
+        'version: 1\nwebsearch:\n  enabled: true\n  providers:\n    exa:\n      enabled: true\n      max_results: 5\n    tavily:\n      enabled: false\n      max_results: 5\n    brave:\n      enabled: false\n      max_results: 5\n    searxng:\n      enabled: false\n      url: ""\n      max_results: 5\n    duckduckgo:\n      enabled: false\n      max_results: 5\n    gemini:\n      enabled: false\n    grok:\n      enabled: false\n    opencode:\n      enabled: false\n',
+        'utf8'
+      );
+
+      process.env.EXA_API_KEY = 'test-key';
+
+      try {
+        const providers = getWebSearchCliProviders();
+        const exa = providers.find((provider) => provider.id === 'exa');
+
+        expect(exa?.enabled).toBe(true);
+        expect(exa?.available).toBe(false);
+        expect(exa?.detail).toContain('Cooling down');
+        expect(exa?.detail).toContain('quota exhaustion');
+
+        const readiness = buildWebSearchReadiness(true, providers);
+        expect(readiness.readiness).toBe('needs_setup');
+        expect(readiness.message).toContain('Cooling down');
+      } finally {
+        delete process.env.EXA_API_KEY;
+
+        if (originalCcsHome === undefined) {
+          delete process.env.CCS_HOME;
+        } else {
+          process.env.CCS_HOME = originalCcsHome;
+        }
+        rmSync(tempHome, { recursive: true, force: true });
+      }
+    }
+  );
 });

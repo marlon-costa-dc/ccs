@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { request as httpRequest } from 'http';
 import { spawn, spawnSync, type ChildProcess } from 'child_process';
+import { once } from 'node:events';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { mutateUnifiedConfig } from '../../../src/config/unified-config-loader';
+import { runWithScopedConfig } from '../../../src/utils/config-manager';
 
 const BROWSER_PROMPT_SNIPPET = 'prefer the CCS MCP Browser tool';
 
@@ -67,12 +69,28 @@ async function waitForDevtoolsVersionEndpoint(port: string, timeoutMs = 5000): P
 }
 
 function runCcs(args: string[], env: NodeJS.ProcessEnv): RunResult {
+  if (!env.CCS_HOME || !env.CCS_CLAUDE_PATH) {
+    throw new Error('CCS launch fixture requires its own HOME and Claude executable');
+  }
+  expect(env.HOME).toBe(env.CCS_HOME);
+  expect(env.USERPROFILE).toBe(env.CCS_HOME);
+  expect(env.CCS_DIR).toBe(path.join(env.CCS_HOME, '.ccs'));
+  expect(fs.realpathSync(env.CCS_CLAUDE_PATH)).toBe(path.join(env.CCS_HOME, 'bin', 'claude'));
+  fs.accessSync(env.CCS_CLAUDE_PATH, fs.constants.X_OK);
   const ccsEntry = path.join(process.cwd(), 'src', 'ccs.ts');
   const result = spawnSync(process.execPath, [ccsEntry, ...args], {
     encoding: 'utf8',
     env,
     timeout: 5000,
   });
+  expect(result.error).toBeUndefined();
+  expect(result.signal).toBeNull();
+  if (result.status === 0) {
+    const launchedEnv = fs.readFileSync(path.join(env.CCS_HOME, 'claude-env.txt'), 'utf8');
+    expect(launchedEnv).toContain(`executable=${env.CCS_CLAUDE_PATH}\n`);
+    expect(launchedEnv).toContain(`home=${env.CCS_HOME}\n`);
+    expect(launchedEnv).toContain(`ccsDir=${env.CCS_DIR}\n`);
+  }
 
   return {
     status: result.status,
@@ -102,13 +120,19 @@ describe('default profile browser launch', () => {
   let devtoolsServer: ChildProcess | undefined;
   let baseEnv: NodeJS.ProcessEnv;
 
+  function mutateTestConfig(mutator: Parameters<typeof mutateUnifiedConfig>[0]) {
+    return runWithScopedConfig({ ccsHome: tmpHome }, () => mutateUnifiedConfig(mutator));
+  }
+
   beforeEach(() => {
     if (process.platform === 'win32') {
       return;
     }
 
     tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-default-browser-launch-'));
-    fakeClaudePath = path.join(tmpHome, 'fake-claude.sh');
+    const binDir = path.join(tmpHome, 'bin');
+    fs.mkdirSync(binDir);
+    fakeClaudePath = path.join(binDir, 'claude');
     claudeArgsLogPath = path.join(tmpHome, 'claude-args.txt');
     claudeEnvLogPath = path.join(tmpHome, 'claude-env.txt');
     browserProfileDir = path.join(tmpHome, 'chrome-user-data');
@@ -118,6 +142,9 @@ describe('default profile browser launch', () => {
       `#!/bin/sh
 printf "%s\n" "$@" > "${claudeArgsLogPath}"
 {
+  printf "executable=%s\n" "$0"
+  printf "home=%s\n" "$HOME"
+  printf "ccsDir=%s\n" "$CCS_DIR"
   printf "userDataDir=%s\n" "$CCS_BROWSER_USER_DATA_DIR"
   printf "legacyProfileDir=%s\n" "$CCS_BROWSER_PROFILE_DIR"
   printf "host=%s\n" "$CCS_BROWSER_DEVTOOLS_HOST"
@@ -136,6 +163,15 @@ exit 0
       CI: '1',
       NO_COLOR: '1',
       CCS_HOME: tmpHome,
+      CCS_DIR: path.join(tmpHome, '.ccs'),
+      HOME: tmpHome,
+      USERPROFILE: tmpHome,
+      XDG_CONFIG_HOME: path.join(tmpHome, '.config'),
+      XDG_CACHE_HOME: path.join(tmpHome, '.cache'),
+      XDG_DATA_HOME: path.join(tmpHome, '.local', 'share'),
+      XDG_STATE_HOME: path.join(tmpHome, '.local', 'state'),
+      CLAUDE_CONFIG_DIR: path.join(tmpHome, '.claude'),
+      PATH: [binDir, process.env.PATH].filter(Boolean).join(path.delimiter),
       CCS_CLAUDE_PATH: fakeClaudePath,
       CCS_DEBUG: '1',
       CCS_BROWSER_USER_DATA_DIR: '',
@@ -146,12 +182,20 @@ exit 0
       CCS_BROWSER_DEVTOOLS_WS_URL: '',
       CCS_BROWSER_EVAL_MODE: '',
     };
+    delete baseEnv.CCS_CONFIG;
+    delete baseEnv.NODE_OPTIONS;
+    delete baseEnv.BUN_OPTIONS;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (devtoolsServer) {
-      devtoolsServer.kill();
+      const child = devtoolsServer;
       devtoolsServer = undefined;
+      if (child.exitCode === null && child.signalCode === null) {
+        const closed = once(child, 'close');
+        child.kill();
+        await closed;
+      }
     }
     if (process.platform === 'win32') {
       return;
@@ -170,6 +214,26 @@ exit 0
     }, 50);
 
     await expect(waitForMockDevtoolsPort(delayedPortFile, 500)).resolves.toBe('43123');
+  });
+
+  it('keeps browser config writes inside the fixture despite an inherited CCS_DIR', () => {
+    if (process.platform === 'win32') return;
+
+    const unrelatedConfigDir = path.join(tmpHome, 'unrelated-config');
+    fs.mkdirSync(unrelatedConfigDir);
+    const originalCcsDir = process.env.CCS_DIR;
+    process.env.CCS_DIR = unrelatedConfigDir;
+    try {
+      mutateTestConfig((config) => {
+        if (!config.browser) throw new Error('Fixture requires the declared browser defaults');
+        config.browser.claude.enabled = false;
+      });
+      expect(fs.existsSync(path.join(tmpHome, '.ccs', 'config.yaml'))).toBe(true);
+      expect(fs.readdirSync(unrelatedConfigDir)).toEqual([]);
+    } finally {
+      if (originalCcsDir === undefined) delete process.env.CCS_DIR;
+      else process.env.CCS_DIR = originalCcsDir;
+    }
   });
 
   it('ignores stale default Chrome DevTools metadata unless browser reuse is explicitly configured', () => {
@@ -298,7 +362,7 @@ server.listen(0, '127.0.0.1', () => {
     process.env.CCS_HOME = tmpHome;
 
     try {
-      mutateUnifiedConfig((config) => {
+      mutateTestConfig((config) => {
         config.browser = {
           claude: {
             enabled: true,
@@ -351,7 +415,7 @@ server.listen(0, '127.0.0.1', () => {
       const managedProfileDir = path.join(tmpHome, '.ccs', 'browser', 'chrome-user-data');
       fs.mkdirSync(managedProfileDir, { recursive: true });
 
-      mutateUnifiedConfig((config) => {
+      mutateTestConfig((config) => {
         config.browser = {
           claude: {
             enabled: true,
@@ -428,7 +492,7 @@ server.listen(0, '127.0.0.1', () => {
         'utf8'
       );
 
-      mutateUnifiedConfig((config) => {
+      mutateTestConfig((config) => {
         config.browser = {
           claude: {
             enabled: true,
@@ -509,7 +573,7 @@ server.listen(0, '127.0.0.1', () => {
     process.env.CCS_HOME = tmpHome;
 
     try {
-      mutateUnifiedConfig((config) => {
+      mutateTestConfig((config) => {
         config.browser = {
           claude: {
             enabled: true,

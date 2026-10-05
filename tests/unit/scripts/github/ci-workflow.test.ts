@@ -18,7 +18,7 @@ describe('pr ci workflow', () => {
 
     expect(workflow).toContain('name: CI');
     expect(workflow).toContain('pull_request:');
-    expect(workflow).toContain('branches: [main]');
+    expect(workflow).toContain('branches: [main, dc-use]');
     expect(workflow).not.toContain('branches: [dev]');
     // 4 jobs: validate (matrix), build, test, compose-parity — each gated
     expect(workflow.split(trustedAuthorGate).length - 1).toBe(4);

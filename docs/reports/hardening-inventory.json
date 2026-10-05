@@ -1,7 +1,7 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2181,
+    "totalOccurrences": 2191,
     "filesAffected": 245,
     "hotpathOccurrences": 1148,
     "hotpathFilesAffected": 152,
@@ -249,6 +249,20 @@
         "markers": []
       },
       {
+        "file": "src/cliproxy/__tests__/session-tracker.test.js",
+        "count": 33,
+        "calls": [
+          "existsSync",
+          "mkdirSync",
+          "readdirSync",
+          "readFileSync",
+          "rmSync",
+          "unlinkSync",
+          "writeFileSync"
+        ],
+        "markers": []
+      },
+      {
         "file": "src/cliproxy/executor/__tests__/variant-port-edge-cases.test.js",
         "count": 33,
         "calls": [
@@ -289,26 +303,12 @@
           "writeFileSync"
         ],
         "markers": []
-      },
-      {
-        "file": "src/cliproxy/__tests__/session-tracker-port.test.js",
-        "count": 31,
-        "calls": [
-          "existsSync",
-          "mkdirSync",
-          "readdirSync",
-          "readFileSync",
-          "rmSync",
-          "unlinkSync",
-          "writeFileSync"
-        ],
-        "markers": []
       }
     ]
   },
   "legacyShim": {
-    "totalMarkers": 382,
-    "filesAffected": 160,
+    "totalMarkers": 388,
+    "filesAffected": 162,
     "topFiles": [
       {
         "file": "src/web-server/usage/native-quota-collector.ts",
@@ -483,11 +483,11 @@
   },
   "maintainability": {
     "typedErrors": {
-      "totalThrows": 551,
-      "typedThrows": 226,
+      "totalThrows": 552,
+      "typedThrows": 227,
       "plainThrows": 247,
       "otherThrows": 78,
-      "adoptionRatio": 0.4102,
+      "adoptionRatio": 0.4112,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
@@ -723,7 +723,7 @@
         },
         {
           "file": "src/config/schemas/model-pipeline.ts",
-          "loc": 1486
+          "loc": 1474
         },
         {
           "file": "src/cliproxy/model-catalog.ts",

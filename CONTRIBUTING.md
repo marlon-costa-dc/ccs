@@ -79,7 +79,7 @@ Rules:
 
 CCS now uses separate automation lanes:
 
-- `CI` runs on pull requests to `main`. This is the review gate for contributor branches.
+- `CI` runs on pull requests to `main` and the fork integration branch `dc-use`. This is the review gate for contributor branches.
 - `Push CI` runs after a merge lands on `main`. This is the code-quality signal for the shared `main` branch.
 
 If `Push CI` stays queued for a long time, it is a maintainer infrastructure issue, not a contributor mistake. Leave a comment on your PR and a maintainer will address it.

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'bun:test';
+import { canonicalJsonSha256Digest } from '../../../utils/canonical-json';
 import { generateYamlWithComments } from '../../loader/yaml-serializer';
 import {
   modelPipelineConfigFixture,
   modelPipelineRequestFixture,
   modelPipelineSnapshotFixture,
+  sharedModelPipelineSnapshotFixture,
 } from './fixtures/model-pipeline-v3-fixture';
 import {
   MODEL_PIPELINE_SCHEMA_VERSION,
@@ -34,9 +36,9 @@ describe('model pipeline v3 config boundary', () => {
     expect(parsed.schema_version).toBe(MODEL_PIPELINE_SCHEMA_VERSION);
     expect(MODEL_PIPELINE_SCHEMA_VERSION).toBe(3);
     expect(parsed.snapshot.generation).toBe(1);
-    expect(parsed.snapshot.snapshot_digest).toBe(
-      'sha256:0780565e95eba6d5fad04ed0fbfc146805aeb1fa3fd75b33625d83c7a85defc4'
-    );
+    expect(parsed.snapshot.snapshot_digest).toBe(modelPipelineSnapshotFixture().snapshot_digest);
+    // CLIProxy's own inventory/routing contract moved to 3 together with the
+    // CLIProxy producer (PRs #44/#45) and the outer AI Hub <-> CCS snapshot.
     expect(parsed.snapshot.inventory.schema_version).toBe(3);
     expect(parsed.snapshot.inventory.routing_schema.version).toBe(3);
     expect(parsed.receipt.active.projection_digest).toBe(`sha256:${'b'.repeat(64)}`);
@@ -78,6 +80,95 @@ describe('model pipeline v3 config boundary', () => {
     // No agent is bound to an unavailable lane; there is no cross-lane fallback.
     const boundTiers = new Set(parsed.snapshot.agent_bindings.map((item) => item.tier_id));
     expect(boundTiers).toEqual(new Set(['balanced']));
+  });
+
+  it('accepts one canonical ModelKey independently eligible in all four v3 lanes', () => {
+    const request = {
+      ...modelPipelineRequestFixture(),
+      snapshot: sharedModelPipelineSnapshotFixture(),
+    };
+    const parsed = parseModelPipelinePublicationRequest(request);
+    const assignments = parsed.snapshot.assignments;
+    expect(assignments).toHaveLength(4);
+    expect(new Set(assignments.map((assignment) => assignment.alias)).size).toBe(4);
+    for (const assignment of assignments) {
+      expect(assignment.selectable).toBe(true);
+      expect(assignment.members[0]!.model_key).toEqual(assignments[0]!.members[0]!.model_key);
+    }
+  });
+
+  it('still rejects duplicate ModelKeys within one lane', () => {
+    const snapshot = sharedModelPipelineSnapshotFixture();
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    const members = assignments[0]!.members as Array<Record<string, unknown>>;
+    members.push({ ...structuredClone(members[0]!), member_rank: members.length + 1 });
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('must contain unique ModelKey values');
+  });
+
+  it('accepts the running dev build’s declared unstamped provenance triple', () => {
+    // Measured live 2026-09-27/28: the deployed proxy serves
+    // {version:'dev',commit:'none',built_at:'unknown'} and its own validator
+    // rejected that publication (HTTP 400, model_pipeline_publication.
+    // snapshot.inventory.binary_provenance.built_at). The provenance built_at
+    // is the declared union: a released build stamps the RFC3339 instant, a
+    // dev build declares the literal 'unknown' — never a fabricated date.
+    const snapshot = modelPipelineSnapshotFixture();
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    inventory.binary_provenance = { version: 'dev', commit: 'none', built_at: 'unknown' };
+    const { snapshot_digest: _ignored, ...semantic } = snapshot;
+    snapshot.snapshot_digest = canonicalJsonSha256Digest(semantic);
+    const parsed = parseModelPipelinePublicationRequest({
+      ...modelPipelineRequestFixture(),
+      snapshot,
+    });
+    expect(parsed.snapshot.inventory.binary_provenance.built_at).toBe('unknown');
+  });
+
+  it('still rejects a fabricated provenance stamp', () => {
+    const snapshot = modelPipelineSnapshotFixture();
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    inventory.binary_provenance = { version: 'dev', commit: 'none', built_at: 'soon' };
+    const { snapshot_digest: _ignored, ...semantic } = snapshot;
+    snapshot.snapshot_digest = canonicalJsonSha256Digest(semantic);
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('binary_provenance.built_at must be a UTC RFC3339 timestamp ending in Z');
+  });
+
+  it('still rejects the sentinel on real observation timestamps', () => {
+    const snapshot = modelPipelineSnapshotFixture();
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    const direct = (inventory.direct_models as Array<Record<string, unknown>>)[0]!;
+    const route = (direct.routes as Array<Record<string, unknown>>)[0]!;
+    (route.health as Record<string, unknown>).observed_at = 'unknown';
+    const { snapshot_digest: _ignored, ...semantic } = snapshot;
+    snapshot.snapshot_digest = canonicalJsonSha256Digest(semantic);
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('observed_at must be a UTC RFC3339 timestamp ending in Z');
+  });
+
+  it('does not borrow another lane eligibility when the same ModelKey is shared', () => {
+    const snapshot = sharedModelPipelineSnapshotFixture();
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    const evaluations = snapshot.evaluations as Array<Record<string, unknown>>;
+    snapshot.evaluations = evaluations.filter(
+      (evaluation) => evaluation.tier_id !== assignments[1]!.tier_id
+    );
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('contains a candidate without an eligible evaluation');
+  });
+
+  it('still rejects repeated aliases when lanes share a ModelKey', () => {
+    const snapshot = sharedModelPipelineSnapshotFixture();
+    const assignments = snapshot.assignments as Array<Record<string, unknown>>;
+    assignments[1]!.alias = assignments[0]!.alias;
+    expect(() =>
+      parseModelPipelinePublicationRequest({ ...modelPipelineRequestFixture(), snapshot })
+    ).toThrow('must contain unique aliases');
   });
 
   it('rejects schema_version 2 with the exact ccs_stage=validation error', () => {
@@ -181,6 +272,8 @@ describe('model pipeline v3 config boundary', () => {
     const models = inventory.direct_models as Array<Record<string, unknown>>;
     models[0]!.catalog_provider_id = 'openai';
     expect(() => parseModelPipelineConfig(flattened)).toThrow(
+      // The mutated field lives inside inventory.direct_models, which is
+      // CLIProxy's own contract, now pinned at schema version 3.
       'catalog_provider_id is not part of schema version 3'
     );
 
