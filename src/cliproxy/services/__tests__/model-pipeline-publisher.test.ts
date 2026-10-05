@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from 'bun:test';
 import { modelPipelineRequestFixture } from '../../../config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
+import { getModelPipelineSnapshotSchemaDigest } from '../../../config/schemas/model-pipeline-contract-artifacts';
 import {
   parseModelPipelinePublicationRequest,
   type ActiveIdentityV3,
@@ -17,7 +18,6 @@ import { sha256Digest } from '../../../utils/canonical-json';
 import type { CLIProxyActivationReceipt } from '../../management/management-api-types';
 import type { ProxyTarget } from '../../proxy/proxy-target-resolver';
 import { projectModelRouting } from '../../config/model-routing-projector';
-import { getModelPipelineSnapshotSchemaDigest } from '../../../config/schemas/model-pipeline-contract-artifacts';
 import {
   ModelPipelineGenerationConflictError,
   ModelPipelinePublisher,

@@ -196,6 +196,29 @@ describe('model pipeline v3 config boundary', () => {
     );
   });
 
+  it('rejects the retired CLIProxy inventory schema version 2', () => {
+    const request = modelPipelineRequestFixture() as Record<string, unknown>;
+    const snapshot = request.snapshot as Record<string, unknown>;
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    inventory.schema_version = 2;
+
+    expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
+      'model_pipeline_publication.snapshot.inventory.schema_version must be a whole number 3 or greater'
+    );
+  });
+
+  it('rejects the retired CLIProxy routing schema version 2', () => {
+    const request = modelPipelineRequestFixture() as Record<string, unknown>;
+    const snapshot = request.snapshot as Record<string, unknown>;
+    const inventory = snapshot.inventory as Record<string, unknown>;
+    const routingSchema = inventory.routing_schema as Record<string, unknown>;
+    routingSchema.version = 2;
+
+    expect(() => parseModelPipelinePublicationRequest(request)).toThrow(
+      'model_pipeline_publication.snapshot.inventory.routing_schema.version must be a whole number 3 or greater'
+    );
+  });
+
   it('requires positive publication ownership values and rejects v1 residue', () => {
     const invalidCases: ReadonlyArray<readonly [string, unknown, string]> = [
       ['request_timeout_seconds', undefined, 'must be a whole number 1 or greater'],
