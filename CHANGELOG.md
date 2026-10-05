@@ -1,3 +1,9 @@
+## [8.9.0-fd.21](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.20...v8.9.0-fd.21) (2026-10-05)
+
+### Bug Fixes
+
+* **management:** add DELETE /api/config/model-pipeline reset for stale CCS provenance ([2badc22](https://github.com/marlon-costa-dc/ccs/commit/2badc228f6a661f9ab712587c889a440360a2958))
+
 ## [8.9.0-fd.20](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.19...v8.9.0-fd.20) (2026-10-05)
 
 ### Bug Fixes
