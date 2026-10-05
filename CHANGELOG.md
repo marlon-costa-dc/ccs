@@ -1,3 +1,19 @@
+## [8.9.0-fd.20](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.19...v8.9.0-fd.20) (2026-10-05)
+
+### Bug Fixes
+
+* **management:** single body read — adopt the failureMessage helper in the dashboard base-movement ([c7bf958](https://github.com/marlon-costa-dc/ccs/commit/c7bf958d3f945ac52b3daf1a1bdccbab60649650))
+* **model-pipeline:** require complete v3 snapshot contract ([3fed7ec](https://github.com/marlon-costa-dc/ccs/commit/3fed7ec99dd28d988f3306b8409e3f9e6fa8742e))
+* **wip:** tipagem do CAS de inventário sem any + formatação ([ab99ed9](https://github.com/marlon-costa-dc/ccs/commit/ab99ed98e0b898d75c6e867fe8ac7fe48747c8c6))
+
+### Reverts
+
+* **governance:** restore the ccs-owned instruction surface (fleet overlay contract) ([fa67343](https://github.com/marlon-costa-dc/ccs/commit/fa673436796bfcbc95b7a4ff30a982f438ce3cef)), closes [#56](https://github.com/marlon-costa-dc/ccs/issues/56) [#56](https://github.com/marlon-costa-dc/ccs/issues/56)
+
+### Tests
+
+* **wip:** CAS de inventário alinhado ao contrato de voláteis do WIP ([065d2e8](https://github.com/marlon-costa-dc/ccs/commit/065d2e89362dac25ee7bdafbab4e2bb5a3c294c4))
+
 ## [8.9.0-fd.18](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.17...v8.9.0-fd.18) (2026-09-23)
 
 ### Bug Fixes
