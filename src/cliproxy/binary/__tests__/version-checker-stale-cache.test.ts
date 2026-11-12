@@ -29,7 +29,7 @@ describe('version-checker stale cache fallback', () => {
 
   it('uses a stale latest-version cache when GitHub lookup fails', async () => {
     const { getVersionCachePath, writeInstalledVersion } = await import('../version-cache');
-    const { VERSION_CACHE_DURATION_MS } = await import('../types');
+    const { VERSION_CACHE_DURATION_MS, getGitHubRepo } = await import('../types');
     const { checkForUpdates } = await import('../version-checker');
     const plusBinDir = path.join(tempHome, '.ccs', 'cliproxy', 'bin', 'plus');
 
@@ -39,7 +39,7 @@ describe('version-checker stale cache fallback', () => {
       getVersionCachePath('plus'),
       JSON.stringify({
         latestVersion: '6.9.23-0',
-        repo: 'marlon-costa-dc/CLIProxyAPI',
+        repo: getGitHubRepo('plus'),
         checkedAt: Date.now() - VERSION_CACHE_DURATION_MS - 1_000,
       }),
       'utf8'
