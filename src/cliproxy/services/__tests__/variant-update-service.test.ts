@@ -7,6 +7,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { updateVariant, validateProviderBackend } from '../variant-service';
+import { CLIPROXY_PLUS_FORK_URL } from '../../binary-manager';
 import { loadOrCreateUnifiedConfig } from '../../../config/unified-config-loader';
 
 describe('updateVariant - provider/model consistency', () => {
@@ -107,7 +108,7 @@ cliproxy:
 
     const error = validateProviderBackend('ghcp');
     expect(error).toContain('`backend: plus`');
-    expect(error).toContain('marlon-costa-dc/CLIProxyAPI');
+    expect(error).toContain(CLIPROXY_PLUS_FORK_URL);
   });
 
   it('leaves the settings file unchanged when a plus-only provider update is rejected', () => {
