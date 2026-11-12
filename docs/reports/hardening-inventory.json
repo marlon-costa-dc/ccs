@@ -483,11 +483,11 @@
   },
   "maintainability": {
     "typedErrors": {
-      "totalThrows": 552,
+      "totalThrows": 556,
       "typedThrows": 227,
       "plainThrows": 247,
-      "otherThrows": 78,
-      "adoptionRatio": 0.4112,
+      "otherThrows": 82,
+      "adoptionRatio": 0.4083,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
@@ -497,7 +497,7 @@
         },
         {
           "subdomain": "cliproxy/services",
-          "count": 69,
+          "count": 73,
           "typed": 50,
           "plain": 3
         },
@@ -707,7 +707,7 @@
     },
     "largeFiles": {
       "countOver400": 88,
-      "countOver600": 41,
+      "countOver600": 42,
       "topOver400": [
         {
           "file": "src/web-server/usage/native-quota-collector.ts",

@@ -56,14 +56,14 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 
 | Metric | Value |
 |---|---:|
-| typed-error adoption (typed/total throws) | 41.1% (227/552) |
+| typed-error adoption (typed/total throws) | 40.8% (227/556) |
 | typed-error adoption (P4 locked subdomains) | 93.3% (28/30), target 40% |
 | hotpath console.error/warn occurrences | 239 (529 total, 290 CLI-UX exempt) |
 | hotpath console.error/warn files | 69 |
 | files with createLogger | 60/722 |
 | subdomains with zero createLogger | 15 (api, bin, channels, cliproxy, cliproxy/accounts, cliproxy/ai-providers, cliproxy/binary, cliproxy/config, cliproxy/management, cliproxy/sync, cliproxy/types, config, dispatcher, shared, types) |
 | files > 400 LOC | 88 |
-| files > 600 LOC | 41 |
+| files > 600 LOC | 42 |
 
 ### Top Hotpath console.error/warn Files
 
