@@ -1,3 +1,13 @@
+## [8.9.0-fd.22](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.21...v8.9.0-fd.22) (2026-11-12)
+
+### Documentation
+
+* **reports:** regenerate the hardening inventory for the plus repo single owner ([2dd5840](https://github.com/marlon-costa-dc/ccs/commit/2dd5840464dcaa33a1cba4925da9a5d317b38232))
+
+### Code Refactoring
+
+* **cliproxy:** BACKEND_CONFIG is the only owner of the plus backend repository ([7e22211](https://github.com/marlon-costa-dc/ccs/commit/7e22211d8e11eb8da825ff63cec059825941e3fe))
+
 ## [8.9.0-fd.21](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.20...v8.9.0-fd.21) (2026-10-05)
 
 ### Bug Fixes
