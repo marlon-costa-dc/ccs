@@ -1,8 +1,8 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2191,
-    "filesAffected": 245,
+    "totalOccurrences": 2195,
+    "filesAffected": 246,
     "hotpathOccurrences": 1148,
     "hotpathFilesAffected": 152,
     "topHotpathFiles": [
@@ -707,7 +707,7 @@
     },
     "largeFiles": {
       "countOver400": 88,
-      "countOver600": 42,
+      "countOver600": 43,
       "topOver400": [
         {
           "file": "src/web-server/usage/native-quota-collector.ts",
