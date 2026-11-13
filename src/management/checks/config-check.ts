@@ -117,7 +117,7 @@ export class ConfigFilesChecker implements IHealthChecker {
             'config.yaml',
             'error',
             `Unloadable model_pipeline block: ${pipelineReason}`,
-            'Run: ccs doctor --fix (clears only the model_pipeline block; republish afterwards)',
+            'Run: ccs doctor --fix-model-pipeline (clears only that block; republish afterwards)',
             { status: 'ERROR', info: 'Unloadable model_pipeline' }
           );
           return;

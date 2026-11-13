@@ -10,6 +10,7 @@ import {
   ConfigFilesChecker,
   clearUnloadableModelPipeline,
 } from '../../../../src/management/checks/config-check';
+import { handleDoctorCommand } from '../../../../src/commands/doctor-command';
 import { loadUnifiedConfig } from '../../../../src/config/config-loader-facade';
 import { modelPipelineConfigFixture } from '../../../../src/config/schemas/__tests__/fixtures/model-pipeline-v3-fixture';
 import { createEmptyUnifiedConfig } from '../../../../src/config/schemas/unified-config';
@@ -236,6 +237,68 @@ describe('ConfigFilesChecker model_pipeline block', () => {
         const after = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>;
         expect(after.model_pipeline).toBeUndefined();
         expect(after.version).toBe(createEmptyUnifiedConfig().version);
+      });
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ccs doctor --fix-model-pipeline clears only the block and runs nothing else', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-config-check-'));
+    try {
+      await runWithScopedCcsHome(tempRoot, async () => {
+        const pipeline = staleReceiptPipeline();
+        const configPath = writeConfig(tempRoot, pipeline);
+        const before = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>;
+        const active = (pipeline.receipt as { active: Record<string, unknown> }).active;
+
+        const run = async (): Promise<string> => {
+          const originalConsoleLog = console.log;
+          const lines: string[] = [];
+          console.log = (...args: unknown[]) => {
+            lines.push(args.map((arg) => String(arg)).join(' '));
+          };
+          try {
+            // The diagnostic and general auto-fix paths always end in
+            // process.exit; the narrow repair returns.
+            await handleDoctorCommand(['--fix-model-pipeline']);
+          } finally {
+            console.log = originalConsoleLog;
+          }
+          return lines.join('\n');
+        };
+
+        const cleared = await run();
+        expect(cleared).toContain(`generation ${active.generation}`);
+        expect(cleared).toContain(`snapshot_digest ${active.snapshot_digest}`);
+        expect(cleared).not.toContain('AUTO-FIX MODE');
+        expect(cleared).not.toContain('Health Check');
+
+        const after = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>;
+        const { model_pipeline: _removed, ...expected } = before;
+        expect(after).toEqual(expected);
+        expect(loadUnifiedConfig()?.model_pipeline).toBeUndefined();
+
+        const settled = fs.readFileSync(configPath, 'utf8');
+        const unchanged = await run();
+        expect(unchanged).toContain('nothing was changed');
+        expect(unchanged).not.toContain('AUTO-FIX MODE');
+        expect(fs.readFileSync(configPath, 'utf8')).toBe(settled);
+      });
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('ccs doctor --fix-model-pipeline propagates a failure to clear', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-config-check-'));
+    try {
+      await runWithScopedCcsHome(tempRoot, async () => {
+        const configPath = writeConfig(tempRoot, staleReceiptPipeline());
+        fs.writeFileSync(configPath, 'version: [unterminated\n');
+
+        await expect(handleDoctorCommand(['--fix-model-pipeline'])).rejects.toThrow();
+        expect(fs.readFileSync(configPath, 'utf8')).toBe('version: [unterminated\n');
       });
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });

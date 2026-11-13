@@ -40,22 +40,17 @@ export async function runAutoRepair(): Promise<void> {
   let fixed = 0;
 
   // Fix 0: Clear a model_pipeline block the config loader rejects. Runs first
-  // because every later fix that loads config.yaml fails until it is gone.
+  // because every later fix that loads config.yaml fails until it is gone. A
+  // failure to clear escapes unchanged: no later fix can succeed on that config.
   const pipelineSpinner = ora('Checking config.yaml model_pipeline block').start();
-  try {
-    const cleared = clearUnloadableModelPipeline();
-    if (cleared !== null) {
-      pipelineSpinner.succeed(
-        `${ok('Fixed')} Cleared unloadable model_pipeline from config.yaml: ${cleared}`
-      );
-      fixed++;
-    } else {
-      pipelineSpinner.succeed(`${ok('OK')} config.yaml model_pipeline block is loadable`);
-    }
-  } catch (err) {
-    pipelineSpinner.fail(
-      `${fail('Error')} Could not clear model_pipeline: ${(err as Error).message}`
+  const cleared = clearUnloadableModelPipeline();
+  if (cleared !== null) {
+    pipelineSpinner.succeed(
+      `${ok('Fixed')} Cleared unloadable model_pipeline from config.yaml: ${cleared}`
     );
+    fixed++;
+  } else {
+    pipelineSpinner.succeed(`${ok('OK')} config.yaml model_pipeline block is loadable`);
   }
 
   // Fix 1: Kill zombie CLIProxy processes

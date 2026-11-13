@@ -357,7 +357,7 @@ export const COMMAND_FLAG_SUGGESTIONS: Readonly<Record<string, readonly string[]
   cleanup: CLEANUP_FLAGS,
   config: ['--help', '-h', '--port', '-p', '--host', '-H', '--dev'],
   cursor: ['--help', '-h'],
-  doctor: ['--fix', '-f', '--help', '-h'],
+  doctor: ['--fix', '-f', '--fix-model-pipeline', '--help', '-h'],
   browser: ['setup', 'status', 'doctor', 'policy', 'enable', 'disable', '--help', '-h'],
   docker: ['--help', '-h', '--host'],
   env: ['--format', '--shell', '--ide', '--help', '-h'],
