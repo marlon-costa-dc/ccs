@@ -1,3 +1,10 @@
+## [8.9.0-fd.26](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.25...v8.9.0-fd.26) (2026-11-13)
+
+### Bug Fixes
+
+* **doctor:** add --fix-model-pipeline and make the model_pipeline repair strict ([e92f7cb](https://github.com/marlon-costa-dc/ccs/commit/e92f7cbeba722263cb15f1db4e12c25310c13cf5))
+* **model-pipeline:** retire a pending intent staged against another CLIProxy binary ([5319f16](https://github.com/marlon-costa-dc/ccs/commit/5319f1631df27e5215ad76c03102846387f29cd3))
+
 ## [8.9.0-fd.25](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.24...v8.9.0-fd.25) (2026-11-13)
 
 ### Bug Fixes
