@@ -275,20 +275,26 @@ export function writeUnifiedConfigWithLockHeld(
   generateYamlHeader: () => string,
   generateYamlWithComments: (config: UnifiedConfig) => string
 ): void {
-  const yamlPath = getConfigYamlPath();
-  const dir = path.dirname(yamlPath);
-
-  // Ensure directory exists
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  }
-
   // Ensure version is set
   config.version = UNIFIED_CONFIG_VERSION;
 
   // Generate YAML with section comments
   const yamlContent = generateYamlWithComments(config);
-  const content = generateYamlHeader() + yamlContent;
+  writeConfigYamlContentWithLockHeld(generateYamlHeader() + yamlContent);
+}
+
+/**
+ * Atomically replace config.yaml with `content`. Caller must hold the config
+ * write lock. The candidate is fsynced before the rename and the directory
+ * after it; a failed write removes the candidate and raises a ConfigError that
+ * carries the original failure.
+ */
+export function writeConfigYamlContentWithLockHeld(content: string): void {
+  const yamlPath = getConfigYamlPath();
+  const dir = path.dirname(yamlPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  }
 
   const tempPath = `${yamlPath}.${process.pid}.candidate`;
   let descriptor: number | undefined;

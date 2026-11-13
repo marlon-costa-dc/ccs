@@ -16,7 +16,10 @@ import { getPortProcess, isCLIProxyProcess } from '../../utils/port-utils';
 import { killProcessOnPort, getPlatformName } from '../../utils/platform-commands';
 import { createSpinner } from '../checks/types';
 import { fixImageAnalysisConfig } from '../checks/image-analysis-check';
-import { clearUnloadableModelPipeline } from '../checks/config-check';
+import {
+  clearUnloadableModelPipeline,
+  describeModelPipelineClearOutcome,
+} from '../checks/config-check';
 import { getCcsDir } from '../../config/config-loader-facade';
 
 const ora = createSpinner();
@@ -43,14 +46,18 @@ export async function runAutoRepair(): Promise<void> {
   // because every later fix that loads config.yaml fails until it is gone. A
   // failure to clear escapes unchanged: no later fix can succeed on that config.
   const pipelineSpinner = ora('Checking config.yaml model_pipeline block').start();
-  const cleared = clearUnloadableModelPipeline();
-  if (cleared !== null) {
-    pipelineSpinner.succeed(
-      `${ok('Fixed')} Cleared unloadable model_pipeline from config.yaml: ${cleared}`
-    );
+  let outcome: ReturnType<typeof clearUnloadableModelPipeline>;
+  try {
+    outcome = clearUnloadableModelPipeline();
+  } catch (error) {
+    pipelineSpinner.fail(`${fail('Failed')} Could not clear the model_pipeline block`);
+    throw error;
+  }
+  if (outcome.kind === 'cleared') {
+    pipelineSpinner.succeed(`${ok('Fixed')} ${describeModelPipelineClearOutcome(outcome)}`);
     fixed++;
   } else {
-    pipelineSpinner.succeed(`${ok('OK')} config.yaml model_pipeline block is loadable`);
+    pipelineSpinner.succeed(`${ok('OK')} ${describeModelPipelineClearOutcome(outcome)}`);
   }
 
   // Fix 1: Kill zombie CLIProxy processes
