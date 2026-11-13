@@ -148,9 +148,8 @@ function normalizedManagementSecret(secret: string, existingSecretKey?: string):
 }
 
 function parseManagementSecretKey(content: string): string | undefined {
-  const parsed = yaml.load(content) as { 'remote-management'?: { 'secret-key'?: unknown } } | null;
-  const value = parsed?.['remote-management']?.['secret-key'];
-  return typeof value === 'string' ? value : undefined;
+  const section = extractYamlSection(content, 'remote-management');
+  return section.match(/^\s+secret-key:\s*"?(\$2[aby]\$[^"\s]+)"?\s*$/m)?.[1];
 }
 
 function quoteYamlString(value: string): string {
