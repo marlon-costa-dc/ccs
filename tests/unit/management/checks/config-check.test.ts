@@ -111,9 +111,7 @@ describe('ClaudeSettingsChecker', () => {
           new ClaudeSettingsChecker().run(results);
 
           expect(results.warnings).toHaveLength(1);
-          expect(results.warnings[0].message).toContain(
-            'hooks.PostToolUse[0].config.endpoint'
-          );
+          expect(results.warnings[0].message).toContain('hooks.PostToolUse[0].config.endpoint');
           expect(results.warnings[0].message).not.toContain(staleUrl);
           expect(capturedLogs.join('\n')).toContain('hooks.PostToolUse[0].config.endpoint');
           expect(capturedLogs.join('\n')).not.toContain(staleUrl);
@@ -192,8 +190,20 @@ describe('ConfigFilesChecker model_pipeline block', () => {
         const before = fs.readFileSync(configPath, 'utf8');
 
         expect(runCheck().errors).toHaveLength(0);
-        expect(clearUnloadableModelPipeline()).toBeNull();
+        expect(clearUnloadableModelPipeline()).toEqual({ kind: 'block-loadable' });
         expect(fs.readFileSync(configPath, 'utf8')).toBe(before);
+      });
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('reports an absent config.yaml without creating one', async () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-config-check-'));
+    try {
+      await runWithScopedCcsHome(tempRoot, async () => {
+        expect(clearUnloadableModelPipeline()).toEqual({ kind: 'config-absent' });
+        expect(fs.existsSync(path.join(tempRoot, '.ccs', 'config.yaml'))).toBe(false);
       });
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -210,7 +220,9 @@ describe('ConfigFilesChecker model_pipeline block', () => {
         expect(() => loadUnifiedConfig()).toThrow('Invalid config format');
 
         const active = (pipeline.receipt as { active: Record<string, unknown> }).active;
-        const cleared = clearUnloadableModelPipeline();
+        const outcome = clearUnloadableModelPipeline();
+        expect(outcome.kind).toBe('cleared');
+        const cleared = outcome.kind === 'cleared' ? outcome.cleared : '';
         expect(cleared).toContain(`generation ${active.generation}`);
         expect(cleared).toContain(`snapshot_digest ${active.snapshot_digest}`);
 
@@ -233,7 +245,10 @@ describe('ConfigFilesChecker model_pipeline block', () => {
       await runWithScopedCcsHome(tempRoot, async () => {
         const configPath = writeConfig(tempRoot, { schema_version: 3 });
 
-        expect(clearUnloadableModelPipeline()).toContain('unparseable block');
+        const outcome = clearUnloadableModelPipeline();
+        expect(outcome.kind === 'cleared' ? outcome.cleared : outcome.kind).toContain(
+          'unparseable block'
+        );
         const after = yaml.load(fs.readFileSync(configPath, 'utf8')) as Record<string, unknown>;
         expect(after.model_pipeline).toBeUndefined();
         expect(after.version).toBe(createEmptyUnifiedConfig().version);
@@ -297,7 +312,9 @@ describe('ConfigFilesChecker model_pipeline block', () => {
         const configPath = writeConfig(tempRoot, staleReceiptPipeline());
         fs.writeFileSync(configPath, 'version: [unterminated\n');
 
-        await expect(handleDoctorCommand(['--fix-model-pipeline'])).rejects.toThrow();
+        await expect(handleDoctorCommand(['--fix-model-pipeline'])).rejects.toThrow(
+          'unexpected end of the stream within a flow collection'
+        );
         expect(fs.readFileSync(configPath, 'utf8')).toBe('version: [unterminated\n');
       });
     } finally {

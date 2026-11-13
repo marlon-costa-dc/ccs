@@ -77,13 +77,10 @@ export async function handleDoctorCommand(args: string[]): Promise<void> {
   // Narrow repair: nothing but the model_pipeline clear runs, so it is safe
   // while CLIProxy is live and works while config.yaml cannot be loaded.
   if (args.includes('--fix-model-pipeline')) {
-    const { clearUnloadableModelPipeline } = await import('../management/checks/config-check');
-    const cleared = clearUnloadableModelPipeline();
-    console.log(
-      cleared !== null
-        ? ok(`Cleared unloadable model_pipeline from config.yaml: ${cleared}`)
-        : ok('config.yaml model_pipeline block is loadable; nothing was changed')
+    const { clearUnloadableModelPipeline, describeModelPipelineClearOutcome } = await import(
+      '../management/checks/config-check'
     );
+    console.log(ok(describeModelPipelineClearOutcome(clearUnloadableModelPipeline())));
     return;
   }
 

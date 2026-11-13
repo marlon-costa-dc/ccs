@@ -9,7 +9,11 @@ import { HealthCheck, IHealthChecker, createSpinner } from './types';
 
 import { getClaudeConfigDir } from '../../utils/claude-config-path';
 import { getCcsDir } from '../../config/config-loader-facade';
-import { getConfigYamlPath, withConfigWriteLock } from '../../config/loader/io-locks';
+import {
+  getConfigYamlPath,
+  withConfigWriteLock,
+  writeConfigYamlContentWithLockHeld,
+} from '../../config/loader/io-locks';
 import { parseModelPipelineConfig } from '../../config/schemas/model-pipeline';
 import {
   CODEX_TRANSLATOR_URL_MARKER,
@@ -47,27 +51,43 @@ function describeClearedModelPipeline(block: unknown): string {
   return 'unparseable block (no readable receipt.active identity)';
 }
 
+/** Result of {@link clearUnloadableModelPipeline}. */
+export type ModelPipelineClearOutcome =
+  | { kind: 'config-absent' }
+  | { kind: 'block-loadable' }
+  | { kind: 'cleared'; cleared: string };
+
 /**
  * Offline equivalent of the publisher's reset for a `model_pipeline` block the
  * config loader rejects: the dashboard cannot start to serve the typed reset
  * while config.yaml fails to load. Removes only the `model_pipeline` key, under
- * the config write lock, and returns what was cleared; returns null when
- * config.yaml is absent or its block loads.
+ * the config write lock, through the same atomic writer as every config write.
  */
-export function clearUnloadableModelPipeline(): string | null {
-  return withConfigWriteLock(() => {
+export function clearUnloadableModelPipeline(): ModelPipelineClearOutcome {
+  return withConfigWriteLock((): ModelPipelineClearOutcome => {
     const yaml = require('js-yaml');
     const yamlPath = getConfigYamlPath();
-    if (!fs.existsSync(yamlPath)) return null;
+    if (!fs.existsSync(yamlPath)) return { kind: 'config-absent' };
     const document: unknown = yaml.load(fs.readFileSync(yamlPath, 'utf8'));
-    if (unloadableModelPipelineReason(document) === null) return null;
+    if (unloadableModelPipelineReason(document) === null) return { kind: 'block-loadable' };
     const { model_pipeline: block, ...remaining } = document as Record<string, unknown>;
-    const content: string = yaml.dump(remaining, { indent: 2, lineWidth: -1, quotingType: '"' });
-    const candidatePath = `${yamlPath}.${process.pid}.candidate`;
-    fs.writeFileSync(candidatePath, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
-    fs.renameSync(candidatePath, yamlPath);
-    return describeClearedModelPipeline(block);
+    writeConfigYamlContentWithLockHeld(
+      yaml.dump(remaining, { indent: 2, lineWidth: -1, quotingType: '"' })
+    );
+    return { kind: 'cleared', cleared: describeClearedModelPipeline(block) };
   });
+}
+
+/** One operator-facing line for a {@link ModelPipelineClearOutcome}. */
+export function describeModelPipelineClearOutcome(outcome: ModelPipelineClearOutcome): string {
+  switch (outcome.kind) {
+    case 'config-absent':
+      return 'config.yaml does not exist; nothing was changed';
+    case 'block-loadable':
+      return 'config.yaml has no unloadable model_pipeline block; nothing was changed';
+    case 'cleared':
+      return `Cleared unloadable model_pipeline from config.yaml: ${outcome.cleared}`;
+  }
 }
 
 /**
