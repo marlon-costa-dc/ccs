@@ -1,3 +1,13 @@
+## [8.9.0-fd.27](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.26...v8.9.0-fd.27) (2026-11-13)
+
+### Bug Fixes
+
+* **doctor:** the model_pipeline clear writes through the atomic config writer and reports a typed outcome ([100d56b](https://github.com/marlon-costa-dc/ccs/commit/100d56bb1643be21dfbabe8e7bcd6ca786985527))
+
+### Documentation
+
+* **reports:** regenerate the hardening inventory for the model_pipeline clear follow-up ([7c6eac0](https://github.com/marlon-costa-dc/ccs/commit/7c6eac002d55537254fc7fbd227b48fe05ac592d))
+
 ## [8.9.0-fd.26](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.25...v8.9.0-fd.26) (2026-11-13)
 
 ### Bug Fixes
