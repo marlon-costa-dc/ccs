@@ -2,6 +2,7 @@ import type { UnifiedConfig } from '../../config/unified-config-types';
 import { loadUnifiedConfig, mutateConfig } from '../../config/config-loader-facade';
 import {
   MODEL_PIPELINE_SCHEMA_VERSION,
+  parseModelPipelineConfig,
   parseModelPipelinePublicationRequest,
   type ActiveIdentityV3,
   type ModelPipelineConfig,
@@ -102,6 +103,9 @@ export function replaceModelPipeline(
   incoming: ModelPipelineConfig,
   expectedActive: ActiveIdentityV3 | null
 ): void {
+  // The config loader rejects the whole file when this block does not parse, so
+  // the single persistence chokepoint refuses anything the loader would refuse.
+  parseModelPipelineConfig(incoming);
   const current = config.model_pipeline;
   if (current && identitiesEqual(current.receipt.active, incoming.receipt.active)) {
     if (!pipelineEqual(current, incoming)) {
@@ -573,6 +577,24 @@ export class ModelPipelinePublisher {
   ): Promise<PublicationReceiptV3> {
     assertNotCancelled(signal);
     let inventory = await client.getModelInventory(signal);
+    // The receipt records the live CLIProxy binary while the persisted block
+    // keeps the snapshot inventory the intent was staged against, and the
+    // config loader requires both to be the same binary. An intent staged
+    // against a different binary can therefore never produce a loadable block:
+    // retire it before any byte reaches CLIProxy or the CCS config, so it stops
+    // poisoning every later read and publish.
+    if (
+      !provenanceEqual(
+        intent.request.snapshot.inventory.binary_provenance,
+        inventory.binary_provenance
+      )
+    ) {
+      store.removeIntent();
+      throw new ModelPipelineGenerationConflictError(
+        'pending publication intent was staged against a different CLIProxy binary; ' +
+          'the intent was retired, publish a snapshot of the current inventory'
+      );
+    }
     let activationReceipt: CLIProxyActivationReceipt | undefined;
     if (identitiesEqual(inventory.active, intent.request.expected_active)) {
       try {

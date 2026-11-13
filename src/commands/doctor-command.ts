@@ -41,6 +41,7 @@ function showHelp(): void {
   console.log(`  ${dim('-')} Free blocked OAuth callback ports`);
   console.log(`  ${dim('-')} Regenerate outdated CLIProxy config`);
   console.log(`  ${dim('-')} Restore broken shared settings symlinks`);
+  console.log(`  ${dim('-')} Clear a model_pipeline block that config.yaml cannot load`);
   console.log('');
 
   console.log(subheader('Examples:'));

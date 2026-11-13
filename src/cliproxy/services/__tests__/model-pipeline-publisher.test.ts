@@ -431,6 +431,115 @@ describe('model pipeline v3 publisher', () => {
     expect(harness.events).not.toContain('persist');
   });
 
+  it('retires a pending intent staged against a different CLIProxy binary', async () => {
+    const interrupted = Object.assign(
+      new Error('CLIProxy management request failed with HTTP 503'),
+      { statusCode: 503 }
+    );
+    const swappedBinary = (): ModelPipelineInventory => {
+      const inventory = initialInventory();
+      inventory.binary_provenance = {
+        ...inventory.binary_provenance,
+        commit: 'swapped-cliproxy-commit',
+      };
+      return inventory;
+    };
+
+    for (const recover of [
+      (publisher: ModelPipelinePublisher) => publisher.read(),
+      (publisher: ModelPipelinePublisher) => publisher.publish(modelPipelineRequestFixture()),
+    ]) {
+      const harness = dependencyHarness({ putFailure: interrupted });
+      const publisher = new ModelPipelinePublisher(harness.dependencies);
+      await expect(publisher.publish(modelPipelineRequestFixture())).rejects.toBe(interrupted);
+      expect(harness.events).toContain('intent:write');
+      expect(harness.events).not.toContain('intent:remove');
+
+      harness.events.length = 0;
+      harness.dependencies.createClient = () => ({
+        async getModelInventory() {
+          harness.events.push('inventory:swapped');
+          return swappedBinary();
+        },
+        async getConfigYaml() {
+          harness.events.push('yaml:swapped');
+          return activeConfigYaml;
+        },
+        async putConfigYaml() {
+          harness.events.push('put');
+          return activationReceipt();
+        },
+      });
+
+      const recovery = recover(publisher);
+      await expect(recovery).rejects.toBeInstanceOf(ModelPipelineGenerationConflictError);
+      await expect(recovery).rejects.toThrow('staged against a different CLIProxy binary');
+      expect(harness.events).toEqual([
+        'intent:read',
+        'load',
+        'target',
+        'inventory:swapped',
+        'intent:remove',
+      ]);
+      expect(harness.getPersisted()).toBeUndefined();
+      expect(harness.config.model_pipeline).toBeUndefined();
+
+      harness.events.length = 0;
+      await expect(publisher.read()).rejects.toBeInstanceOf(ModelPipelineSnapshotNotFoundError);
+      expect(harness.events).toEqual(['intent:read', 'load', 'target']);
+    }
+  });
+
+  it('recovers a pending intent staged against the live CLIProxy binary', async () => {
+    const interrupted = Object.assign(
+      new Error('CLIProxy management request failed with HTTP 503'),
+      { statusCode: 503 }
+    );
+    const harness = dependencyHarness({ putFailure: interrupted });
+    const publisher = new ModelPipelinePublisher(harness.dependencies);
+    await expect(publisher.publish(modelPipelineRequestFixture())).rejects.toBe(interrupted);
+
+    let activated = false;
+    harness.dependencies.createClient = () => ({
+      async getModelInventory() {
+        return activated ? activatedInventory() : initialInventory();
+      },
+      async getConfigYaml() {
+        return stagedConfigYaml;
+      },
+      async putConfigYaml() {
+        activated = true;
+        return activationReceipt();
+      },
+    });
+
+    await expect(publisher.read()).resolves.toEqual(persistedPipeline());
+    expect(activated).toBe(true);
+    expect(harness.getPersisted()).toEqual(persistedPipeline());
+    expect(harness.events.slice(-4)).toEqual(['persist', 'intent:remove', 'load', 'target']);
+  });
+
+  it('refuses to persist a block the config loader rejects', () => {
+    const unloadable = structuredClone(persistedPipeline());
+    unloadable.receipt.cliproxy_binary = {
+      ...unloadable.receipt.cliproxy_binary,
+      commit: 'swapped-cliproxy-commit',
+    };
+
+    const empty = configWith();
+    expect(() => replaceModelPipeline(empty, unloadable, null)).toThrow(
+      'model_pipeline.receipt.cliproxy_binary must equal snapshot.inventory.binary_provenance'
+    );
+    expect(empty.model_pipeline).toBeUndefined();
+
+    const current = persistedPipeline();
+    const populated = configWith(current);
+    expect(() => replaceModelPipeline(populated, unloadable, null)).toThrow(
+      'model_pipeline.receipt.cliproxy_binary must equal snapshot.inventory.binary_provenance'
+    );
+    expect(populated.model_pipeline).toBe(current);
+  });
+
   it('propagates pre-cancellation without creating an intent or external request', async () => {
     const harness = dependencyHarness();
     const controller = new AbortController();
