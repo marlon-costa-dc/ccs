@@ -60,8 +60,9 @@ export const CCS_CONTROL_PANEL_SECRET = 'ccs';
  * v22: Project source-attributed model prices from the unified AI Hub catalog
  * v23: Replace the legacy price list with the canonical model-routing projection
  * v24: Remove generated compatibility aliases; only explicit CCS aliases remain
+ * v25: Persist the management secret as its bcrypt hash (CLIProxy publication contract)
  */
-export const CLIPROXY_CONFIG_VERSION = 24;
+export const CLIPROXY_CONFIG_VERSION = 25;
 
 export const ORIGINAL_MANAGEMENT_PANEL_REPOSITORY =
   'https://github.com/router-for-me/Cli-Proxy-API-Management-Center';
