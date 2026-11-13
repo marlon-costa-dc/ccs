@@ -59,7 +59,10 @@ describe('CLIProxy management secret in the generated config', () => {
     regenerateConfig(8317, { configPath: configPath() });
     const first = writtenSecretKey();
     const config = createEmptyUnifiedConfig();
-    config.cliproxy.auth = { ...(config.cliproxy.auth ?? {}), management_secret: `${SECRET}-rotated` };
+    config.cliproxy.auth = {
+      ...(config.cliproxy.auth ?? {}),
+      management_secret: `${SECRET}-rotated`,
+    };
     saveUnifiedConfig(config);
     regenerateConfig(8317, { configPath: configPath() });
     const rotated = writtenSecretKey();
