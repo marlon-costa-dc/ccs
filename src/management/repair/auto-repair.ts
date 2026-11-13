@@ -16,6 +16,7 @@ import { getPortProcess, isCLIProxyProcess } from '../../utils/port-utils';
 import { killProcessOnPort, getPlatformName } from '../../utils/platform-commands';
 import { createSpinner } from '../checks/types';
 import { fixImageAnalysisConfig } from '../checks/image-analysis-check';
+import { clearUnloadableModelPipeline } from '../checks/config-check';
 import { getCcsDir } from '../../config/config-loader-facade';
 
 const ora = createSpinner();
@@ -27,6 +28,7 @@ const ora = createSpinner();
  * 2. Outdated CLIProxy config files
  * 3. Shared symlinks broken by Claude CLI's atomic writes
  * 4. OAuth callback ports blocked by CLIProxy
+ * 5. model_pipeline block the config loader rejects
  */
 export async function runAutoRepair(): Promise<void> {
   console.log('');
@@ -36,6 +38,20 @@ export async function runAutoRepair(): Promise<void> {
   console.log('');
 
   let fixed = 0;
+
+  // Fix 0: Clear a model_pipeline block the config loader rejects. Runs first
+  // because every later fix that loads config.yaml fails until it is gone. A
+  // failure to clear escapes unchanged: no later fix can succeed on that config.
+  const pipelineSpinner = ora('Checking config.yaml model_pipeline block').start();
+  const cleared = clearUnloadableModelPipeline();
+  if (cleared !== null) {
+    pipelineSpinner.succeed(
+      `${ok('Fixed')} Cleared unloadable model_pipeline from config.yaml: ${cleared}`
+    );
+    fixed++;
+  } else {
+    pipelineSpinner.succeed(`${ok('OK')} config.yaml model_pipeline block is loadable`);
+  }
 
   // Fix 1: Kill zombie CLIProxy processes
   const zombieSpinner = ora('Checking for zombie CLIProxy processes').start();

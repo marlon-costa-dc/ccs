@@ -6,9 +6,9 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 
 | Metric | Value |
 |---|---:|
-| Sync fs occurrences (all) | 2195 |
+| Sync fs occurrences (all) | 2199 |
 | Sync fs files affected (all) | 246 |
-| Sync fs occurrences (runtime hotpaths) | 1148 |
+| Sync fs occurrences (runtime hotpaths) | 1152 |
 | Sync fs files affected (runtime hotpaths) | 152 |
 | Legacy shim markers | 388 |
 | Legacy shim files affected | 162 |
@@ -56,7 +56,7 @@ Scope: `src/**/*.{ts,tsx,js,jsx,mjs,cjs}`
 
 | Metric | Value |
 |---|---:|
-| typed-error adoption (typed/total throws) | 40.8% (227/556) |
+| typed-error adoption (typed/total throws) | 40.8% (227/557) |
 | typed-error adoption (P4 locked subdomains) | 93.3% (28/30), target 40% |
 | hotpath console.error/warn occurrences | 239 (529 total, 290 CLI-UX exempt) |
 | hotpath console.error/warn files | 69 |
