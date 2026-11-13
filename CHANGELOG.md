@@ -1,3 +1,9 @@
+## [8.9.0-fd.25](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.24...v8.9.0-fd.25) (2026-11-13)
+
+### Bug Fixes
+
+* **cliproxy:** config v25 regenerates existing configs with the hashed management secret ([44dd9cf](https://github.com/marlon-costa-dc/ccs/commit/44dd9cfecafc6e959ccde39856f84a25ae976771))
+
 ## [8.9.0-fd.24](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.23...v8.9.0-fd.24) (2026-11-13)
 
 ### Bug Fixes
