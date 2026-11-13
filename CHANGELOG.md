@@ -1,3 +1,18 @@
+## [8.9.0-fd.24](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.23...v8.9.0-fd.24) (2026-11-13)
+
+### Bug Fixes
+
+* **cliproxy:** read the preserved management secret line-wise like the other preserved fields ([f937f5e](https://github.com/marlon-costa-dc/ccs/commit/f937f5e953dcf728f359f2e53133ebda98e8de35))
+* **cliproxy:** the generated config holds the normalized management secret ([78a8fbe](https://github.com/marlon-costa-dc/ccs/commit/78a8fbe7ebd6a0da963c436772d7bbfe1a560b6d))
+
+### Documentation
+
+* **reports:** regenerate the hardening inventory for the secret normalization ([f79ec90](https://github.com/marlon-costa-dc/ccs/commit/f79ec90892ad5fc1ef2f3cf68486aba4644ff0e2))
+
+### Styles
+
+* **cliproxy:** format the management secret normalization test ([a38b26a](https://github.com/marlon-costa-dc/ccs/commit/a38b26a7266729cf2603f4d3de3e34577e67dc09))
+
 ## [8.9.0-fd.23](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.22...v8.9.0-fd.23) (2026-11-13)
 
 ### Bug Fixes
