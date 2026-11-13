@@ -52,6 +52,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
+      actions: write
       contents: write
       issues: write
       pull-requests: write
@@ -87,4 +88,23 @@ jobs:
           HUSKY: 0
           GITHUB_TOKEN: ${{ github.token }}
           GH_TOKEN: ${{ github.token }}
-        run: npx semantic-release
+        run: |
+          set -euo pipefail
+          git tag --list 'v*' | sort > "$RUNNER_TEMP/tags-before"
+          npx semantic-release
+
+      # A tag pushed with the workflow token starts no other workflow, so the
+      # `push: tags` trigger of release.yml never fires for a release cut here:
+      # fd.20 through fd.22 were published without their package asset and no
+      # installer could see them. The release owner dispatches its packaging.
+      - name: Package the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          published="$(git tag --list 'v*' | sort | comm -13 "$RUNNER_TEMP/tags-before" -)"
+          if [ -z "$published" ]; then
+            echo "This run published no release."
+            exit 0
+          fi
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$published" -f tag="$published"
