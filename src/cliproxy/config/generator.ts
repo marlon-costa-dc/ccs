@@ -6,6 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import bcrypt from 'bcrypt';
 import type { CLIProxyBackend, CLIProxyProvider, ProviderConfig } from '../types';
 import { getProviderDisplayName } from '../provider-capabilities';
 import { getModelMappingFromConfig } from '../config/base-config-loader';
@@ -131,6 +132,27 @@ export function getManagementPanelRepository(
   );
 }
 
+// CLIProxy compares the management key against a bcrypt hash and only
+// publishes a model-routing digest over a file that already holds one: a
+// plaintext key is hashed in memory with a fresh salt on every load, so its
+// digest could never be stable. The file therefore carries the hash, and an
+// existing hash that still matches the secret is kept so regeneration is a
+// fixed point.
+const MANAGEMENT_SECRET_BCRYPT_COST = 10;
+
+function normalizedManagementSecret(secret: string, existingSecretKey?: string): string {
+  if (existingSecretKey && /^\$2[aby]\$/.test(existingSecretKey)) {
+    if (bcrypt.compareSync(secret, existingSecretKey)) return existingSecretKey;
+  }
+  return bcrypt.hashSync(secret, MANAGEMENT_SECRET_BCRYPT_COST);
+}
+
+function parseManagementSecretKey(content: string): string | undefined {
+  const parsed = yaml.load(content) as { 'remote-management'?: { 'secret-key'?: unknown } } | null;
+  const value = parsed?.['remote-management']?.['secret-key'];
+  return typeof value === 'string' ? value : undefined;
+}
+
 function quoteYamlString(value: string): string {
   return JSON.stringify(value);
 }
@@ -189,11 +211,13 @@ export function assertLegacyConfigMutationAllowed(config: UnifiedConfig): void {
  * @param port - Server port (default: 8317)
  * @param userApiKeys - User-added API keys to preserve (default: [])
  * @param existingPayload - Existing payload content to merge with structured CCS rules
+ * @param existingSecretKey - secret-key of the config being replaced, if any
  */
 function generateUnifiedConfigContent(
   port: number = CLIPROXY_DEFAULT_PORT,
   userApiKeys: string[] = [],
   existingPayload?: string,
+  existingSecretKey?: string,
   unifiedConfig: UnifiedConfig = loadOrCreateUnifiedConfig()
 ): string {
   assertLegacyConfigMutationAllowed(unifiedConfig);
@@ -211,8 +235,10 @@ function generateUnifiedConfigContent(
 
   // Get effective auth tokens (respects user customization)
   const effectiveApiKey = unifiedConfig.cliproxy.auth?.api_key ?? CCS_INTERNAL_API_KEY;
-  const effectiveSecret =
-    unifiedConfig.cliproxy.auth?.management_secret ?? CCS_CONTROL_PANEL_SECRET;
+  const effectiveSecret = normalizedManagementSecret(
+    unifiedConfig.cliproxy.auth?.management_secret ?? CCS_CONTROL_PANEL_SECRET,
+    existingSecretKey
+  );
 
   // Build api-keys section with internal key + preserved user keys.
   // Docker upgrades may temporarily keep the historical default key as a
@@ -464,6 +490,7 @@ export function regenerateConfig(
   let effectivePort = port;
   let userApiKeys: string[] = [];
   let existingPayload = '';
+  let existingSecretKey: string | undefined;
   const preservedSections: PreservedYamlSection[] = [];
 
   if (fs.existsSync(configPath)) {
@@ -484,6 +511,7 @@ export function regenerateConfig(
     // The payload section is user-owned and must survive regeneration; the
     // generator merges it with the structured CCS rules further down.
     existingPayload = extractYamlSection(content, 'payload');
+    existingSecretKey = parseManagementSecretKey(content);
   }
 
   // Ensure directories exist
@@ -491,7 +519,12 @@ export function regenerateConfig(
   fs.mkdirSync(authDir, { recursive: true, mode: 0o700 });
 
   // Generate fresh config with preserved user API keys and structured settings.
-  let configContent = generateUnifiedConfigContent(effectivePort, userApiKeys, existingPayload);
+  let configContent = generateUnifiedConfigContent(
+    effectivePort,
+    userApiKeys,
+    existingPayload,
+    existingSecretKey
+  );
 
   // Re-append managed top-level sections that are not part of the generated defaults.
   configContent = appendSections(configContent, preservedSections);
