@@ -1,3 +1,9 @@
+## [8.9.0-fd.23](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.22...v8.9.0-fd.23) (2026-11-13)
+
+### Bug Fixes
+
+* **release:** semantic-release dispatches the packaging of the tag it published ([81ecb07](https://github.com/marlon-costa-dc/ccs/commit/81ecb07737f531de7a0cc83888c16e258d9dab31))
+
 ## [8.9.0-fd.22](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.21...v8.9.0-fd.22) (2026-11-12)
 
 ### Documentation
