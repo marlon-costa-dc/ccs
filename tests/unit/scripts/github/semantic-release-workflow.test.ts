@@ -13,10 +13,8 @@ const repoRoot = resolvePath('../../../..');
 describe('semantic-release workflow', () => {
   test('is the sole package release owner on main', () => {
     const workflowPath = resolvePath('../../../../.github/workflows/semantic-release.yml');
-    const oldWorkflowPath = resolvePath('../../../../.github/workflows/dev-release.yml');
 
     expect(fs.existsSync(workflowPath)).toBe(true);
-    expect(fs.existsSync(oldWorkflowPath)).toBe(false);
 
     const workflow = fs.readFileSync(workflowPath, 'utf8');
 

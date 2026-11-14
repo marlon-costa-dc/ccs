@@ -13,6 +13,7 @@ export { DEFAULT_COPILOT_CONFIG, DEFAULT_CURSOR_CONFIG } from './copilot-cursor'
 
 export type {
   ProxyRemoteConfig,
+  ProxyFallbackConfig,
   ProxyLocalConfig,
   OpenAICompatProxyRoutingConfig,
   OpenAICompatProxyConfig,

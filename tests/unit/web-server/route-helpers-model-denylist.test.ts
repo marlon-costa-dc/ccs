@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { CLIPROXY_DEFAULT_PORT } from '../../../src/cliproxy/config/port-manager';
-import { fakeAnthropicKey } from '../../shared/fixtures/synthetic-credentials';
 import {
   createSettingsFile,
   updateSettingsFile,
@@ -33,7 +31,7 @@ describe('route-helpers AGY denylist', () => {
 
   it('rejects denylisted AGY models on settings create', () => {
     expect(() =>
-      createSettingsFile('agy-denied', `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}/api/provider/agy`, 'test-token', {
+      createSettingsFile('agy-denied', 'http://127.0.0.1:8317/api/provider/agy', 'test-token', {
         model: 'claude-sonnet-4.5',
         opusModel: 'claude-opus-4.5',
         sonnetModel: 'claude-sonnet-4.5',
@@ -51,7 +49,7 @@ describe('route-helpers AGY denylist', () => {
       JSON.stringify(
         {
           env: {
-            ANTHROPIC_BASE_URL: `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}/api/provider/agy`,
+            ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317/api/provider/agy',
             ANTHROPIC_AUTH_TOKEN: 'test-token',
             ANTHROPIC_MODEL: 'claude-sonnet-4-6',
             ANTHROPIC_DEFAULT_OPUS_MODEL: 'claude-opus-4-6-thinking',
@@ -78,7 +76,7 @@ describe('route-helpers AGY denylist', () => {
       JSON.stringify(
         {
           env: {
-            ANTHROPIC_BASE_URL: `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}/api/provider/agy`,
+            ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317/api/provider/agy',
             ANTHROPIC_AUTH_TOKEN: 'test-token',
             ANTHROPIC_MODEL: 'claude-sonnet-4-6',
             ANTHROPIC_DEFAULT_OPUS_MODEL: 'claude-opus-4-6-thinking',
@@ -98,7 +96,7 @@ describe('route-helpers AGY denylist', () => {
   });
 
   it('canonicalizes legacy iflow model IDs on settings create', () => {
-    createSettingsFile('iflow-profile', `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}/api/provider/iflow`, 'test-token', {
+    createSettingsFile('iflow-profile', 'http://127.0.0.1:8317/api/provider/iflow', 'test-token', {
       model: 'kimi-k2.5',
       opusModel: 'iflow-default',
       sonnetModel: 'deepseek-v3.2-chat',
@@ -119,7 +117,7 @@ describe('route-helpers AGY denylist', () => {
   it('canonicalizes legacy iflow model IDs on settings create with root URL + provider hint', () => {
     createSettingsFile(
       'iflow-profile-root',
-      `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}`,
+      'http://127.0.0.1:8317',
       'test-token',
       {
         model: 'kimi-k2.5',
@@ -150,7 +148,7 @@ describe('route-helpers AGY denylist', () => {
       JSON.stringify(
         {
           env: {
-            ANTHROPIC_BASE_URL: `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}/api/provider/iflow`,
+            ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317/api/provider/iflow',
             ANTHROPIC_AUTH_TOKEN: 'test-token',
             ANTHROPIC_MODEL: 'qwen3-coder-plus',
             ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3-coder-plus',
@@ -186,7 +184,7 @@ describe('route-helpers AGY denylist', () => {
       JSON.stringify(
         {
           env: {
-            ANTHROPIC_BASE_URL: `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}`,
+            ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
             ANTHROPIC_AUTH_TOKEN: 'test-token',
             ANTHROPIC_MODEL: 'qwen3-coder-plus',
             ANTHROPIC_DEFAULT_OPUS_MODEL: 'qwen3-coder-plus',
@@ -215,8 +213,7 @@ describe('route-helpers AGY denylist', () => {
   });
 
   it('creates native Anthropic settings without base URL', () => {
-    const apiKey = fakeAnthropicKey();
-    createSettingsFile('anthropic-direct', '', apiKey, {
+    createSettingsFile('anthropic-direct', '', 'sk-ant-api03-test', {
       model: 'claude-sonnet-4-5-20250929',
     });
 
@@ -225,7 +222,7 @@ describe('route-helpers AGY denylist', () => {
       env: Record<string, string>;
     };
 
-    expect(persisted.env.ANTHROPIC_API_KEY).toBe(apiKey);
+    expect(persisted.env.ANTHROPIC_API_KEY).toBe('sk-ant-api03-test');
     expect(persisted.env.ANTHROPIC_BASE_URL).toBeUndefined();
     expect(persisted.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
   });
@@ -249,17 +246,16 @@ describe('route-helpers AGY denylist', () => {
       ) + '\n'
     );
 
-    const apiKey = fakeAnthropicKey();
     updateSettingsFile('anthropic-update', {
       baseUrl: '',
-      apiKey,
+      apiKey: 'sk-ant-api03-test',
     });
 
     const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
       env: Record<string, string>;
     };
 
-    expect(persisted.env.ANTHROPIC_API_KEY).toBe(apiKey);
+    expect(persisted.env.ANTHROPIC_API_KEY).toBe('sk-ant-api03-test');
     expect(persisted.env.ANTHROPIC_BASE_URL).toBeUndefined();
     expect(persisted.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
   });

@@ -26,6 +26,7 @@ import {
 } from '../../../cliproxy/provider-capabilities';
 import { fetchAllProviderQuotas } from '../../../cliproxy/quota/quota-fetcher';
 import { initUI, header, subheader, color, dim, ok, fail, warn, info } from '../../../utils/ui';
+import { renderProviderPoolSection, readPoolRoutingSettings } from '../pool-state-renderer';
 import { displayQuotaFailure } from './quota-failure-display';
 import { formatCliAccountLabel, formatQuotaBar } from './format-helpers';
 import { parseProfileArgs } from './profile-args';
@@ -61,6 +62,9 @@ export async function handleQuotaStatus(
 
   console.log('');
 
+  // Pool routing settings are global to the CLIProxy config; read once.
+  const poolSettings = readPoolRoutingSettings();
+
   for (const provider of QUOTA_SUPPORTED_PROVIDER_IDS) {
     if (!shouldFetch(provider)) {
       continue;
@@ -70,6 +74,10 @@ export async function handleQuotaStatus(
     const result = providerResults.get(provider) ?? null;
     if (result !== null && runtime.hasData(result)) {
       runtime.render(result);
+      // Pool context: drain order + per-account state (available/cooling/paused).
+      // QuotaSupportedProvider ids are all valid CLIProxyProvider values.
+      // Async: folds in live in-proxy 429 cooldowns when pool routing is on.
+      await renderProviderPoolSection(provider as CLIProxyProvider, poolSettings);
       continue;
     }
 
@@ -130,7 +138,7 @@ export async function handleDoctor(verbose = false): Promise<void> {
 
     for (const model of quota.models) {
       const bar = formatQuotaBar(model.percentage);
-      console.log(`    ${model.name.padEnd(20)} ${bar} ${model.percentage.toFixed(0)}%`);
+      console.log(`    ${model.name.padEnd(20)} ${bar} ${model.percentage.toFixed(0)}% remaining`);
     }
     console.log('');
   }

@@ -4,7 +4,7 @@
  * Handle doctor command for CCS.
  */
 
-import { initUI, header, dim, color, subheader, ok } from '../utils/ui';
+import { initUI, header, dim, color, subheader } from '../utils/ui';
 import { createLogger } from '../services/logging';
 
 const logger = createLogger('commands:doctor');
@@ -25,9 +25,6 @@ function showHelp(): void {
 
   console.log(subheader('Options:'));
   console.log(`  ${color('--fix, -f', 'command')}     Attempt to auto-fix detected issues`);
-  console.log(
-    `  ${color('--fix-model-pipeline', 'command')}  Only clear a model_pipeline block that config.yaml cannot load`
-  );
   console.log(`  ${color('--help, -h', 'command')}    Show this help message`);
   console.log('');
 
@@ -44,7 +41,6 @@ function showHelp(): void {
   console.log(`  ${dim('-')} Free blocked OAuth callback ports`);
   console.log(`  ${dim('-')} Regenerate outdated CLIProxy config`);
   console.log(`  ${dim('-')} Restore broken shared settings symlinks`);
-  console.log(`  ${dim('-')} Clear a model_pipeline block that config.yaml cannot load`);
   console.log('');
 
   console.log(subheader('Examples:'));
@@ -71,16 +67,6 @@ export async function handleDoctorCommand(args: string[]): Promise<void> {
 
   if (args.includes('--help') || args.includes('-h')) {
     showHelp();
-    return;
-  }
-
-  // Narrow repair: nothing but the model_pipeline clear runs, so it is safe
-  // while CLIProxy is live and works while config.yaml cannot be loaded.
-  if (args.includes('--fix-model-pipeline')) {
-    const { clearUnloadableModelPipeline, describeModelPipelineClearOutcome } = await import(
-      '../management/checks/config-check'
-    );
-    console.log(ok(describeModelPipelineClearOutcome(clearUnloadableModelPipeline())));
     return;
   }
 

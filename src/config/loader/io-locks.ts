@@ -24,7 +24,6 @@ import {
   UNIFIED_CONFIG_VERSION,
 } from '../unified-config-types';
 import type { UnifiedConfig } from '../unified-config-types';
-import { ConfigError } from '../../errors/error-types';
 
 // ---------------------------------------------------------------------------
 // Path constants
@@ -71,11 +70,8 @@ function processExists(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code === 'ESRCH') return false;
-    if (code === 'EPERM') return true;
-    throw new ConfigError(`failed to inspect config lock owner process ${pid}`, undefined, error);
+  } catch {
+    return false;
   }
 }
 
@@ -125,7 +121,7 @@ export function acquireLock(): string | null {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
       return null;
     }
-    throw new ConfigError('failed to acquire CCS config write lock', lockPath, error);
+    return null;
   }
 }
 
@@ -134,15 +130,17 @@ export function acquireLock(): string | null {
  */
 export function releaseLock(lockToken: string): void {
   const lockPath = getLockFilePath();
-  if (!fs.existsSync(lockPath)) {
-    throw new ConfigError('CCS config write lock disappeared before release', lockPath);
+  try {
+    if (fs.existsSync(lockPath)) {
+      const content = fs.readFileSync(lockPath, 'utf8');
+      const fileToken = content.trim().split('\n')[2];
+      if (fileToken === lockToken) {
+        fs.unlinkSync(lockPath);
+      }
+    }
+  } catch {
+    // Ignore cleanup errors
   }
-  const content = fs.readFileSync(lockPath, 'utf8');
-  const fileToken = content.trim().split('\n')[2];
-  if (fileToken !== lockToken) {
-    throw new ConfigError('CCS config write lock ownership changed before release', lockPath);
-  }
-  fs.unlinkSync(lockPath);
 }
 
 // ---------------------------------------------------------------------------
@@ -204,29 +202,15 @@ export function withConfigWriteLock<T>(callback: () => T): T {
   }
 
   if (!lockToken) {
-    throw new ConfigError('Config file is locked by another process. Wait a moment and try again.');
+    throw new Error('Config file is locked by another process. Wait a moment and try again.');
   }
 
-  let result: T | undefined;
-  let operationError: unknown;
   try {
-    result = callback();
-  } catch (error) {
-    operationError = error;
-  }
-  try {
+    return callback();
+  } finally {
+    // Always release lock
     releaseLock(lockToken);
-  } catch (releaseError) {
-    throw new ConfigError(
-      operationError
-        ? 'config mutation and config lock release both failed'
-        : 'config lock release failed',
-      getLockFilePath(),
-      operationError ? { operationError, releaseError } : releaseError
-    );
   }
-  if (operationError) throw operationError;
-  return result as T;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +238,7 @@ export function loadUnifiedConfigWithLockHeld(
   const parsed = yaml.load(content);
 
   if (!isUnifiedConfig(parsed)) {
-    throw new ConfigError(`Invalid config format in ${yamlPath}`, yamlPath);
+    throw new Error(`Invalid config format in ${yamlPath}`);
   }
 
   const merged = mergeWithDefaults(parsed);
@@ -275,94 +259,43 @@ export function writeUnifiedConfigWithLockHeld(
   generateYamlHeader: () => string,
   generateYamlWithComments: (config: UnifiedConfig) => string
 ): void {
+  const yamlPath = getConfigYamlPath();
+  const dir = path.dirname(yamlPath);
+
+  // Ensure directory exists
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  }
+
   // Ensure version is set
   config.version = UNIFIED_CONFIG_VERSION;
 
   // Generate YAML with section comments
   const yamlContent = generateYamlWithComments(config);
-  writeConfigYamlContentWithLockHeld(generateYamlHeader() + yamlContent);
-}
+  const content = generateYamlHeader() + yamlContent;
 
-/**
- * Atomically replace config.yaml with `content`. Caller must hold the config
- * write lock. The candidate is fsynced before the rename and the directory
- * after it; a failed write removes the candidate and raises a ConfigError that
- * carries the original failure.
- */
-export function writeConfigYamlContentWithLockHeld(content: string): void {
-  const yamlPath = getConfigYamlPath();
-  const dir = path.dirname(yamlPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  }
-
-  const tempPath = `${yamlPath}.${process.pid}.candidate`;
-  let descriptor: number | undefined;
+  // Atomic write: write to temp file, then rename
+  const tempPath = `${yamlPath}.tmp.${process.pid}`;
 
   try {
-    descriptor = fs.openSync(tempPath, 'wx', 0o600);
-    fs.writeFileSync(descriptor, content, 'utf8');
-    fs.fsyncSync(descriptor);
-    fs.closeSync(descriptor);
-    descriptor = undefined;
+    fs.writeFileSync(tempPath, content, { mode: 0o600 });
     fs.renameSync(tempPath, yamlPath);
-    const directoryDescriptor = fs.openSync(dir, 'r');
-    let directorySyncError: unknown;
-    try {
-      fs.fsyncSync(directoryDescriptor);
-    } catch (error) {
-      directorySyncError = error;
-    }
-    try {
-      fs.closeSync(directoryDescriptor);
-    } catch (directoryCloseError) {
-      throw new ConfigError(
-        directorySyncError
-          ? 'config directory fsync and descriptor close both failed'
-          : 'config directory descriptor close failed',
-        dir,
-        directorySyncError ? { directorySyncError, directoryCloseError } : directoryCloseError
-      );
-    }
-    if (directorySyncError) {
-      throw new ConfigError('config directory fsync failed', dir, directorySyncError);
-    }
   } catch (error) {
-    let closeError: unknown;
-    if (descriptor !== undefined) {
+    // Clean up temp file on error
+    if (fs.existsSync(tempPath)) {
       try {
-        fs.closeSync(descriptor);
-      } catch (failure) {
-        closeError = failure;
+        fs.unlinkSync(tempPath);
+      } catch {
+        // Ignore cleanup errors
       }
     }
-    let cleanupError: unknown;
-    try {
-      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-    } catch (cleanupFailure) {
-      cleanupError = cleanupFailure;
-    }
+    // Classify filesystem errors
     const err = error as NodeJS.ErrnoException;
     if (err.code === 'ENOSPC') {
-      throw new ConfigError(
-        'Disk full - cannot save config. Free up space and try again.',
-        yamlPath,
-        closeError || cleanupError ? { error, closeError, cleanupError } : error
-      );
+      throw new Error('Disk full - cannot save config. Free up space and try again.');
+    } else if (err.code === 'EROFS' || err.code === 'EACCES') {
+      throw new Error(`Cannot write config - check file permissions: ${err.message}`);
     }
-    if (err.code === 'EROFS' || err.code === 'EACCES') {
-      throw new ConfigError(
-        `Cannot write config - check file permissions: ${err.message}`,
-        yamlPath,
-        closeError || cleanupError ? { error, closeError, cleanupError } : error
-      );
-    }
-    throw new ConfigError(
-      closeError || cleanupError
-        ? 'failed to persist config with additional close or candidate cleanup failure'
-        : 'failed to persist config',
-      yamlPath,
-      closeError || cleanupError ? { error, closeError, cleanupError } : error
-    );
+    throw error;
   }
 }

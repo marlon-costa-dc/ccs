@@ -377,6 +377,13 @@ function resolveEntryIndex(entries: Array<{ id?: string }>, entryId: string): nu
     return matchedIndex;
   }
 
+  if (/^\d+$/.test(normalizedEntryId)) {
+    const legacyIndex = Number(normalizedEntryId);
+    if (legacyIndex >= 0 && legacyIndex < entries.length) {
+      return legacyIndex;
+    }
+  }
+
   throw new ValidationError('Entry not found', 'entryId');
 }
 

@@ -1,10 +1,4 @@
-import {
-  Agent,
-  fetch as undiciFetch,
-  type Dispatcher,
-  type RequestInfo as UndiciRequestInfo,
-  type RequestInit as UndiciRequestInit,
-} from 'undici';
+import { Agent, fetch as undiciFetch, type Dispatcher } from 'undici';
 import type { LogErrorInfo } from '../../services/logging';
 import {
   createGlobalFetchProxyDispatcher,
@@ -58,11 +52,7 @@ export async function fetchWithUpstreamTransport(
   options: { dispatcher?: Dispatcher; insecureTls?: boolean } = {}
 ): Promise<Response> {
   if (!isBunRuntime()) {
-    const response = await undiciFetch(
-      input as unknown as UndiciRequestInfo,
-      init as UndiciRequestInit
-    );
-    return response as unknown as Response;
+    return undiciFetch(input, init as Parameters<typeof undiciFetch>[1]) as Promise<Response>;
   }
 
   const requestUrl = new URL(

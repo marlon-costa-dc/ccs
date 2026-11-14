@@ -10,8 +10,6 @@ export const RESERVED_PROFILE_NAMES = [
   'codex',
   'xai',
   'grok',
-  'zai',
-  'opencode',
   'agy',
   'qwen',
   'iflow',
@@ -27,6 +25,7 @@ export const RESERVED_PROFILE_NAMES = [
   'copilot',
   // Cursor IDE (Cursor proxy daemon)
   'cursor',
+  'legacy-cursor',
   'legacy',
   // CLI commands and special names
   'default',

@@ -1,11 +1,9 @@
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-import { configExists, regenerateConfig } from '../config/config-generator';
-import { getConfigPathForPort } from '../config/path-resolver';
+import { configExists, getCliproxyConfigPath, regenerateConfig } from '../config/config-generator';
 import { getProxyTarget } from '../proxy/proxy-target-resolver';
 import { createManagementClient } from '../management/management-api-client';
-import { ConfigError } from '../../errors/error-types';
 import { rewriteTopLevelYamlSection } from './config-yaml-sections';
 import type {
   AiProviderApiKeyEntry,
@@ -63,14 +61,10 @@ function ensureStableEntryIds<F extends AiProviderFamilyId>(
 }
 
 function ensureLocalConfigPath(): string {
-  const target = getProxyTarget();
-  if (target.isRemote) {
-    throw new ConfigError('Local CLIProxy config path requested for a remote target');
+  if (!configExists()) {
+    regenerateConfig();
   }
-  if (!configExists(target.port)) {
-    regenerateConfig(target.port);
-  }
-  return getConfigPathForPort(target.port);
+  return getCliproxyConfigPath();
 }
 
 function readLocalConfig(): LocalAiProviderConfig {
@@ -79,19 +73,11 @@ function readLocalConfig(): LocalAiProviderConfig {
     return {};
   }
 
-  const content = fs.readFileSync(configPath, 'utf8');
   try {
-    const parsed = yaml.load(content);
-    if (parsed === undefined || parsed === null) return {};
-    if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new ConfigError(`CLIProxy config must be a YAML mapping: ${configPath}`);
-    }
-    return parsed as LocalAiProviderConfig;
-  } catch (error) {
-    if (error instanceof ConfigError) throw error;
-    throw new ConfigError(
-      `Failed to parse CLIProxy config ${configPath}: ${(error as Error).message}`
-    );
+    const content = fs.readFileSync(configPath, 'utf8');
+    return (yaml.load(content) as LocalAiProviderConfig) || {};
+  } catch {
+    return {};
   }
 }
 
@@ -124,7 +110,9 @@ export function getAiProvidersSourceSummary() {
   const managementAuth = target.isRemote
     ? target.managementKey
       ? 'configured'
-      : 'missing'
+      : target.authToken
+        ? 'fallback'
+        : 'missing'
     : 'configured';
 
   return {
@@ -149,20 +137,14 @@ export async function readFamilyEntries<F extends AiProviderFamilyId>(
     }
     return normalized.entries;
   }
-  if (!target.managementKey) {
-    throw new ConfigError('cliproxy_server.remote.management_key is required');
-  }
 
-  const client = createManagementClient(
-    {
-      host: target.host,
-      port: target.port,
-      protocol: target.protocol,
-      management_key: target.managementKey,
-      timeout: target.managementTimeoutMs,
-    },
-    target.allowSelfSigned
-  );
+  const client = createManagementClient({
+    host: target.host,
+    port: target.port,
+    protocol: target.protocol,
+    management_key: target.managementKey,
+    auth_token: target.authToken,
+  });
 
   const entries = (await client.getSection<FamilyEntries<F>[number]>(family)) as FamilyEntries<F>;
   const normalized = ensureStableEntryIds(
@@ -189,20 +171,14 @@ export async function writeFamilyEntries<F extends AiProviderFamilyId>(
     writeLocalFamilySection(family, normalized.entries);
     return;
   }
-  if (!target.managementKey) {
-    throw new ConfigError('cliproxy_server.remote.management_key is required');
-  }
 
-  const client = createManagementClient(
-    {
-      host: target.host,
-      port: target.port,
-      protocol: target.protocol,
-      management_key: target.managementKey,
-      timeout: target.managementTimeoutMs,
-    },
-    target.allowSelfSigned
-  );
+  const client = createManagementClient({
+    host: target.host,
+    port: target.port,
+    protocol: target.protocol,
+    management_key: target.managementKey,
+    auth_token: target.authToken,
+  });
 
   await client.putSection<FamilyEntries<F>[number]>(
     family,

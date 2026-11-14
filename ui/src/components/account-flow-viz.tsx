@@ -8,6 +8,5 @@ export type {
   AccountData,
   ProviderData,
   AccountFlowVizProps,
-  ProviderOption,
   ConnectionEvent,
 } from './account/flow-viz';

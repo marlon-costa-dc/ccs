@@ -181,6 +181,7 @@ cliproxy:
         opus: {
           provider: 'agy',
           model: 'claude-opus-4-6-thinking',
+          fallback: { provider: 'gemini', model: 'gemini-2.5-flash' },
           thinking: 'xhigh',
           account: 'team-a',
         },
@@ -209,6 +210,10 @@ cliproxy:
     expect(result.success).toBe(true);
     expect(result.variant?.tiers?.opus.provider).toBe('gemini');
     expect(result.variant?.tiers?.opus.model).toBe('gemini-2.5-pro');
+    expect(result.variant?.tiers?.opus.fallback).toEqual({
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+    });
     expect(result.variant?.tiers?.opus.thinking).toBe('xhigh');
     expect(result.variant?.tiers?.opus.account).toBe('team-a');
   });
@@ -510,6 +515,49 @@ describe('listVariantsFromConfig - composite variants', () => {
     }
   });
 
+  it('should list composite variants with fallback field', () => {
+    // Create unified config with composite variant that has fallback
+    const configPath = path.join(tmpDir, 'config.yaml');
+    const yamlContent = `version: 2
+accounts: {}
+profiles: {}
+preferences:
+  theme: system
+  telemetry: false
+  auto_update: true
+cliproxy:
+  oauth_accounts: {}
+  providers:
+    - gemini
+    - codex
+    - agy
+  variants:
+    test:
+      type: composite
+      default_tier: sonnet
+      tiers:
+        opus:
+          provider: agy
+          model: claude-opus-4-6-thinking
+          fallback:
+            provider: gemini
+            model: gemini-3-pro-preview
+        sonnet:
+          provider: agy
+          model: claude-sonnet-4-6
+        haiku:
+          provider: agy
+          model: claude-haiku-4-5-20251001
+      settings: cliproxy/composite-test.settings.json
+      port: 8318
+`;
+    fs.writeFileSync(configPath, yamlContent, 'utf-8');
+
+    const variants = listVariantsFromConfig();
+    expect(variants.test).toBeDefined();
+    expect(variants.test.hasFallback).toBe(true);
+  });
+
   it('should list composite variants with thinking field', () => {
     // Create unified config with composite variant that has per-tier thinking
     const configPath = path.join(tmpDir, 'config.yaml');
@@ -555,7 +603,7 @@ cliproxy:
     expect(variants.test.tiers?.haiku.thinking).toBe('off');
   });
 
-  it('does not expose the removed hasFallback compatibility field', () => {
+  it('should have hasFallback=false when no fallbacks configured', () => {
     // Create unified config with composite variant WITHOUT fallback
     const configPath = path.join(tmpDir, 'config.yaml');
     const yamlContent = `version: 2
@@ -592,10 +640,10 @@ cliproxy:
 
     const variants = listVariantsFromConfig();
     expect(variants.test).toBeDefined();
-    expect(variants.test).not.toHaveProperty('hasFallback');
+    expect(variants.test.hasFallback).toBe(false);
   });
 
-  it('fails loudly on a malformed composite variant', () => {
+  it('should skip malformed composite variant and keep valid variants', () => {
     const configPath = path.join(tmpDir, 'config.yaml');
     const yamlContent = `version: 2
 accounts: {}
@@ -630,8 +678,9 @@ cliproxy:
 `;
     fs.writeFileSync(configPath, yamlContent, 'utf-8');
 
-    expect(() => listVariantsFromConfig()).toThrow(
-      "Malformed composite variant 'bad': missing required tier configuration"
-    );
+    const variants = listVariantsFromConfig();
+    expect(variants.bad).toBeUndefined();
+    expect(variants.good).toBeDefined();
+    expect(variants.good.provider).toBe('gemini');
   });
 });

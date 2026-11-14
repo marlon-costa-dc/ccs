@@ -24,7 +24,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { isGeneratedSourceFile, isTestFile } = require('./runtime-source-classifier.js');
+const { isTestFile } = require('./runtime-source-classifier.js');
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
@@ -164,7 +164,7 @@ function walkFiles(dirPath) {
   let entries;
   try {
     entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  } catch {
+  } catch (_err) {
     return output;
   }
   for (const entry of entries) {
@@ -215,7 +215,7 @@ function collectMaintainabilityMetrics(rootDir) {
 
   for (const fullPath of files) {
     const relPath = toPosixPath(path.relative(rootDir, fullPath));
-    if (isGeneratedSourceFile(relPath) || isTestFile(relPath)) continue;
+    if (isTestFile(relPath)) continue;
     const sourceText = fs.readFileSync(fullPath, 'utf8');
     const sub = subdomainOf(relPath);
 

@@ -8,6 +8,7 @@ import type {
   CliproxySessionAffinityState,
 } from '@/lib/api-client';
 import { CliproxyRetryControl } from './cliproxy-retry-control';
+import { ClaudePoolPolicyControl } from './claude-pool-policy-control';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
@@ -190,10 +191,7 @@ export function RoutingGuidanceCard({
           </div>
         ) : null}
 
-        <div
-          {...(poolLocalOnly ? { role: 'status', 'aria-live': 'polite' as const } : {})}
-          className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
-        >
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5">
           <div className="min-w-0">
             <div className="text-[10px] font-medium text-foreground">
               {t('routingGuidance.poolRouting')}
@@ -279,6 +277,7 @@ export function RoutingGuidanceCard({
           </div>
         ) : null}
 
+        <ClaudePoolPolicyControl compact poolEnabled={poolEnabled} manageable={poolManageable} />
         <CliproxyRetryControl />
       </div>
     );
@@ -382,15 +381,6 @@ export function RoutingGuidanceCard({
               {t('routingGuidance.poolRoutingApplyWarning')}
             </p>
           ) : null}
-          {poolLocalOnly ? (
-            <p
-              role="status"
-              aria-live="polite"
-              className="max-w-xs text-[11px] leading-4 text-amber-700 dark:text-amber-400 xl:text-right"
-            >
-              {poolLocalOnlyMessage}
-            </p>
-          ) : null}
         </div>
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground xl:col-span-2">
@@ -446,6 +436,10 @@ export function RoutingGuidanceCard({
               {sessionAffinityState.message}
             </div>
           ) : null}
+        </div>
+
+        <div className="xl:col-span-2">
+          <ClaudePoolPolicyControl poolEnabled={poolEnabled} manageable={poolManageable} />
         </div>
 
         {error ? (

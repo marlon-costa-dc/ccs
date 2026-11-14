@@ -1,3 +1,4 @@
+import { COPILOT_SUBCOMMANDS } from '../copilot/constants';
 import {
   CLIPROXY_PROVIDER_IDS,
   getProviderCLIAliases,
@@ -131,6 +132,12 @@ export const ROOT_COMMAND_CATALOG: readonly RootCommandEntry[] = [
     visibility: 'public',
   },
   {
+    name: 'copilot',
+    summary: 'Run or manage the deprecated GitHub Copilot bridge',
+    group: 'runtime',
+    visibility: 'public',
+  },
+  {
     name: 'docker',
     summary: 'Deploy or operate the bundled Docker stack',
     group: 'operations',
@@ -206,7 +213,7 @@ export const BUILTIN_PROVIDER_SHORTCUTS: readonly ShortcutEntry[] = CLIPROXY_PRO
         qwen: 'Qwen Code via CLIProxy; account linking unsupported',
         iflow: 'iFlow via CLIProxy OAuth',
         kiro: 'Kiro via CLIProxy OAuth',
-        ghcp: 'GitHub Copilot via CLIProxy OAuth',
+        ghcp: 'Deprecated GitHub Copilot via CLIProxy OAuth',
         claude: 'Claude via CLIProxy OAuth',
         kimi: 'Kimi via CLIProxy OAuth',
         cursor: 'Cursor via CLIProxy OAuth',
@@ -357,7 +364,7 @@ export const COMMAND_FLAG_SUGGESTIONS: Readonly<Record<string, readonly string[]
   cleanup: CLEANUP_FLAGS,
   config: ['--help', '-h', '--port', '-p', '--host', '-H', '--dev'],
   cursor: ['--help', '-h'],
-  doctor: ['--fix', '-f', '--fix-model-pipeline', '--help', '-h'],
+  doctor: ['--fix', '-f', '--help', '-h'],
   browser: ['setup', 'status', 'doctor', 'policy', 'enable', 'disable', '--help', '-h'],
   docker: ['--help', '-h', '--host'],
   env: ['--format', '--shell', '--ide', '--help', '-h'],
@@ -365,6 +372,16 @@ export const COMMAND_FLAG_SUGGESTIONS: Readonly<Record<string, readonly string[]
   tokens: TOKENS_FLAGS,
   update: ['--force', '--beta', '--dev', '--help', '-h'],
 };
+
+export const CURSOR_COMPLETION_SUBCOMMANDS = [
+  '--auth',
+  '--accounts',
+  '--config',
+  '--logout',
+  '--help',
+  '-h',
+] as const;
+export const COPILOT_COMPLETION_SUBCOMMANDS = [...COPILOT_SUBCOMMANDS, 'help'] as const;
 
 export function getPublicRootCommands(): readonly RootCommandEntry[] {
   return ROOT_COMMAND_CATALOG.filter((entry) => entry.visibility === 'public');

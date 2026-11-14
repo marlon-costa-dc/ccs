@@ -6,7 +6,6 @@
  * Usage:
  *   ccs tokens                       Show current tokens (masked)
  *   ccs tokens --show                Show tokens unmasked
- *   ccs tokens --api-key-only        Print only the API key for tool helpers
  *   ccs tokens --api-key <key>       Set global API key
  *   ccs tokens --secret <key>        Set management secret
  *   ccs tokens --regenerate-secret   Auto-generate new management secret
@@ -73,7 +72,6 @@ export async function handleTokensCommand(args: string[]): Promise<number> {
   await initUI();
 
   const showFlag = args.includes('--show');
-  const apiKeyOnlyFlag = args.includes('--api-key-only');
   const resetFlag = args.includes('--reset');
   const regenerateSecretFlag = args.includes('--regenerate-secret');
   const helpFlag = args.includes('--help') || args.includes('-h');
@@ -95,9 +93,6 @@ export async function handleTokensCommand(args: string[]): Promise<number> {
     console.log(subheader('Options'));
     console.log(`  ${color('(no args)', 'command')}              Show masked tokens`);
     console.log(`  ${color('--show', 'command')}                 Show tokens unmasked`);
-    console.log(
-      `  ${color('--api-key-only', 'command')}          Print only the API key for tool helpers`
-    );
     console.log(`  ${color('--api-key <key>', 'command')}        Set global API key`);
     console.log(`  ${color('--secret <key>', 'command')}         Set management secret`);
     console.log(`  ${color('--regenerate-secret', 'command')}    Generate new management secret`);
@@ -128,11 +123,6 @@ export async function handleTokensCommand(args: string[]): Promise<number> {
     regenerateConfig();
     console.log(ok('Auth tokens reset to defaults'));
     console.log(info('CLIProxy config regenerated'));
-    return 0;
-  }
-
-  if (apiKeyOnlyFlag) {
-    console.log(getAuthSummary().apiKey.value);
     return 0;
   }
 

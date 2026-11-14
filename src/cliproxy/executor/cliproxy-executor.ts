@@ -6,7 +6,7 @@
  * - executor/index.ts - Main orchestrator
  * - executor/lifecycle-manager.ts - Spawn/kill/poll operations
  * - executor/env-resolver.ts - Environment variable resolution
- * - executor/failure-handler.ts - Terminal network and token failures
+ * - executor/retry-handler.ts - Error recovery and retry logic
  * - executor/session-bridge.ts - Session tracking integration
  *
  * @deprecated Import from './executor' instead

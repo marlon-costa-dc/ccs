@@ -20,6 +20,5 @@
  * Version 12 = Official Channels multi-provider support (Telegram, Discord, iMessage)
  * Version 13 = Browser automation defaults to safe manual/off exposure
  * Version 14 = User-defined CLIProxy OAuth aliases and scoped payload rules
- * Version 15 = Immutable AI Hub model_pipeline snapshot envelope
  */
-export const UNIFIED_CONFIG_VERSION = 15;
+export const UNIFIED_CONFIG_VERSION = 14;

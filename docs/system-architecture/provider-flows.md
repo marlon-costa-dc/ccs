@@ -11,7 +11,7 @@ capabilities are linked to their source registries.
 | Canonical provider IDs, aliases, auth-flow type, callback ports, refresh ownership | [`src/cliproxy/provider-capabilities.ts`](../../src/cliproxy/provider-capabilities.ts) |
 | Original vs Plus backend restrictions | [`src/cliproxy/types/provider-types.ts`](../../src/cliproxy/types/provider-types.ts) |
 | Provider/backend enforcement | [`src/cliproxy/services/variant-service.ts`](../../src/cliproxy/services/variant-service.ts) |
-| Remote proxy precedence and fallback | [`src/cliproxy/proxy/proxy-target-resolver.ts`](../../src/cliproxy/proxy/proxy-target-resolver.ts) |
+| Remote proxy precedence and fallback | [`src/cliproxy/proxy/proxy-config-resolver.ts`](../../src/cliproxy/proxy/proxy-config-resolver.ts) |
 | Provider capability regression tests | [`src/cliproxy/__tests__/provider-capabilities.test.ts`](../../src/cliproxy/__tests__/provider-capabilities.test.ts) |
 
 Do not copy provider inventories, callback ports, or quota-supported lists into
@@ -89,7 +89,7 @@ reachable   unreachable
 ```
 
 Configuration precedence and accepted environment names are implemented in
-[`proxy-target-resolver.ts`](../../src/cliproxy/proxy/proxy-target-resolver.ts).
+[`proxy-config-resolver.ts`](../../src/cliproxy/proxy/proxy-config-resolver.ts).
 The stable behavioral contract is:
 
 - CLI flags override other sources where supported;
@@ -130,10 +130,9 @@ Provider tokens live under the configured CLIProxy auth directory. Documentation
 and examples must use neutral account labels; raw email addresses, token
 filenames, access tokens, and refresh tokens are not architecture data.
 
-Some providers can produce more than one account with the same display email.
-CCS keeps runtime identity tied to the exact registered auth file rather than
-collapsing accounts by display text. The dashboard can show a safe variant
-label without exposing the internal identifier.
+Some providers can produce more than one account with the same display email. CCS keeps runtime identity tied to the exact registered auth file rather than collapsing accounts by display text. Dashboard account cards and selectors show the saved nickname first, falling back to email or account ID when it is absent or blank. Email and variant details remain secondary for disambiguation; privacy mode also masks nicknames and suppresses sensitive hover titles. Nicknames are presentation metadata and never replace action IDs, token filenames, or registry keys. Compact monitor cards give the nickname its own wrapping row; badges and controls remain separate so workspace hashes cannot displace the saved label.
+
+The dashboard's [visual grouping model](../../ui/src/lib/account-visual-groups.ts) retains each variant's nickname when Codex records share an email. A shared group nickname is used only when every member has the same nickname; otherwise the group keeps its email heading and the [flow card](../../ui/src/components/account/flow-viz/account-card.tsx) lists the individual nicknames with their underlying identities. Grouping and quota lookup behavior remain tied to the original account records.
 
 ## API-key profiles
 
@@ -186,6 +185,8 @@ The stable pool contract is:
 6. Persist the cooldown so later launches observe the same state.
 7. Auto-resume only pauses created by CCS quota management; never override a
    user's manual pause.
+
+Claude account health and rotation use only known account-wide 5-hour and weekly windows. Model-specific limits remain independent display rows, and missing general limits remain unknown. See [Claude quota scope](../claude-scoped-quotas.md) for normalization and cache compatibility.
 
 Routing strategy remains an explicit user choice. CCS must not infer
 round-robin or fill-first from account count, plan tier, or quota state.

@@ -52,7 +52,8 @@ describe('release asset packaging workflow', () => {
     const manifest = JSON.parse(
       fs.readFileSync(resolvePath('../../../../package.json'), 'utf8')
     ) as { files: string[] };
-    expect(manifest.files).toContain('schemas/model-pipeline-snapshot-v3.json');
-    expect(manifest.files).not.toContain('schemas/');
+    expect(manifest.files).toContain('config/');
+    expect(manifest.files).toContain('claude-mods/');
+    expect(manifest.files).not.toContain('schemas/model-pipeline-snapshot-v3.json');
   });
 });

@@ -91,14 +91,14 @@ async function importService() {
 // getCcsDir() returns path.join(CCS_HOME, '.ccs') when CCS_HOME is set.
 // Tests must write to tmpDir/.ccs/ to be visible to the service.
 let ccsDir: string;
+let originalHome: string | undefined;
 
 beforeEach(() => {
+  originalHome = process.env.HOME;
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-test-'));
+  process.env.HOME = tmpDir;
   process.env.CCS_HOME = tmpDir;
-  // Hermeticity: the ambient shell may export CODEX_HOME / CCS_CODEX_PROFILE.
-  // Clear them so active-resolution tests start from a clean state.
   delete process.env.CODEX_HOME;
-  delete process.env.CCS_CODEX_PROFILE;
   ccsDir = path.join(tmpDir, '.ccs');
   fs.mkdirSync(ccsDir, { recursive: true });
   // Clear module cache so cache state doesn't bleed between tests
@@ -109,6 +109,11 @@ afterEach(() => {
   delete process.env.CCS_HOME;
   delete process.env.CODEX_HOME;
   delete process.env.CCS_CODEX_PROFILE;
+  if (originalHome === undefined) {
+    delete process.env.HOME;
+  } else {
+    process.env.HOME = originalHome;
+  }
   mock.restore();
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });

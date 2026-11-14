@@ -5,31 +5,20 @@ import type {
   CLIProxyOAuthModelAliasConfig,
   CLIProxyOAuthModelAliasEntry,
 } from '../../config/schemas/cliproxy';
-import { ConfigError } from '../../errors/error-types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function normalizeAliasEntry(value: unknown, path: string): CLIProxyOAuthModelAliasEntry {
+function normalizeAliasEntry(value: unknown): CLIProxyOAuthModelAliasEntry | null {
   if (!isRecord(value) || typeof value.name !== 'string' || typeof value.alias !== 'string') {
-    throw new ConfigError(`${path} requires string name and alias fields`);
-  }
-
-  const unknownKeys = Object.keys(value).filter(
-    (key) => key !== 'name' && key !== 'alias' && key !== 'fork'
-  );
-  if (unknownKeys.length > 0) {
-    throw new ConfigError(`${path}.${unknownKeys[0]} is not supported`);
-  }
-  if (value.fork !== undefined && typeof value.fork !== 'boolean') {
-    throw new ConfigError(`${path}.fork must be a boolean`);
+    return null;
   }
 
   const name = value.name.trim();
   const alias = value.alias.trim();
   if (!name || !alias) {
-    throw new ConfigError(`${path} name and alias must not be empty`);
+    return null;
   }
 
   return {
@@ -48,34 +37,29 @@ export function parseOAuthModelAliasSection(body: string): CLIProxyOAuthModelAli
     return {};
   }
 
-  const parsed = yaml.load(`oauth-model-alias:\n${body}`);
-  if (!isRecord(parsed) || !isRecord(parsed['oauth-model-alias'])) {
-    throw new ConfigError('oauth-model-alias must be an object');
-  }
-
-  const result = Object.create(null) as CLIProxyOAuthModelAliasConfig;
-  for (const [provider, entries] of Object.entries(parsed['oauth-model-alias'])) {
-    if (!provider.trim() || !Array.isArray(entries)) {
-      throw new ConfigError(`oauth-model-alias.${provider || '<empty>'} must be an array`);
+  try {
+    const parsed = yaml.load(`oauth-model-alias:\n${body}`);
+    if (!isRecord(parsed) || !isRecord(parsed['oauth-model-alias'])) {
+      return {};
     }
 
-    const normalized = entries.map((entry, index) =>
-      normalizeAliasEntry(entry, `oauth-model-alias.${provider}[${index}]`)
-    );
-    const aliases = new Set<string>();
-    for (const entry of normalized) {
-      if (aliases.has(entry.alias)) {
-        throw new ConfigError(
-          `oauth-model-alias.${provider} maps alias ${entry.alias} more than once`
-        );
+    const result = Object.create(null) as CLIProxyOAuthModelAliasConfig;
+    for (const [provider, entries] of Object.entries(parsed['oauth-model-alias'])) {
+      if (!provider.trim() || !Array.isArray(entries)) {
+        continue;
       }
-      aliases.add(entry.alias);
+
+      const normalized = entries
+        .map(normalizeAliasEntry)
+        .filter((entry): entry is CLIProxyOAuthModelAliasEntry => entry !== null);
+      if (normalized.length > 0) {
+        result[provider] = normalized;
+      }
     }
-    if (normalized.length > 0) {
-      result[provider] = normalized;
-    }
+    return result;
+  } catch {
+    return {};
   }
-  return result;
 }
 
 export function mergeOAuthModelAliases(
@@ -86,28 +70,27 @@ export function mergeOAuthModelAliases(
 
   for (const [sourceIndex, source] of [existing, configured].entries()) {
     if (!isRecord(source)) {
-      throw new ConfigError('oauth-model-alias source must be an object');
+      continue;
     }
     const replaceMatching = sourceIndex === 1;
     for (const [provider, rawEntries] of Object.entries(source)) {
       if (!provider.trim() || !Array.isArray(rawEntries)) {
-        throw new ConfigError(`oauth-model-alias.${provider || '<empty>'} must be an array`);
+        continue;
       }
 
       const entries = merged[provider] ?? [];
       const indexByKey = new Map(entries.map((entry, index) => [aliasKey(entry), index]));
-      for (const [entryIndex, rawEntry] of rawEntries.entries()) {
-        const entry = normalizeAliasEntry(rawEntry, `oauth-model-alias.${provider}[${entryIndex}]`);
+      for (const rawEntry of rawEntries) {
+        const entry = normalizeAliasEntry(rawEntry);
+        if (!entry) {
+          continue;
+        }
 
         const key = aliasKey(entry);
         const existingIndex = indexByKey.get(key);
         if (existingIndex !== undefined) {
           if (replaceMatching) {
             entries[existingIndex] = entry;
-          } else if (entries[existingIndex].name !== entry.name) {
-            throw new ConfigError(
-              `oauth-model-alias.${provider} maps alias ${entry.alias} more than once`
-            );
           } else if (entry.fork) {
             entries[existingIndex] = { ...entries[existingIndex], fork: true };
           }

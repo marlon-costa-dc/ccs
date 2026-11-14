@@ -50,12 +50,12 @@ describe('CLIProxy user routing config', () => {
     ]);
   });
 
-  it('lets configured aliases replace an existing entry with the same name and alias', () => {
+  it('lets configured aliases replace an existing provider client alias in place', () => {
     const merged = mergeOAuthModelAliases(
       {
         codex: [
           { name: 'first-upstream', alias: 'first-client' },
-          { name: 'gpt-5.6-sol', alias: 'gpt-5.6-sol-fast', fork: true },
+          { name: 'old-upstream', alias: 'gpt-5.6-sol-fast', fork: true },
           { name: 'last-upstream', alias: 'last-client' },
         ],
       },
@@ -69,21 +69,6 @@ describe('CLIProxy user routing config', () => {
       { name: 'gpt-5.6-sol', alias: 'gpt-5.6-sol-fast' },
       { name: 'last-upstream', alias: 'last-client' },
     ]);
-  });
-
-  it('rejects obsolete sequential failover pools for one alias', () => {
-    const body = `  codex:
-    - name: gpt-5
-      alias: g5
-    - name: gpt-5-mini
-      alias: g5
-    - name: gpt-5-nano
-      alias: g5
-`;
-
-    expect(() => parseOAuthModelAliasSection(body)).toThrow(
-      'oauth-model-alias.codex maps alias g5 more than once'
-    );
   });
 
   it('round-trips unknown payload subsections and replaces matching scoped rules', () => {

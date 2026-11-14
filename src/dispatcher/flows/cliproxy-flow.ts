@@ -92,6 +92,15 @@ export async function runCliproxyFlow(ctx: ProfileDispatchContext): Promise<void
       '--kiro-idc-region',
       '--kiro-idc-flow',
       '--backend',
+      '--proxy-host',
+      '--proxy-port',
+      '--proxy-protocol',
+      '--proxy-auth-token',
+      '--proxy-timeout',
+      '--local-proxy',
+      '--remote-only',
+      '--no-fallback',
+      '--allow-self-signed',
       '--1m',
       '--no-1m',
     ];
@@ -211,5 +220,6 @@ export async function runCliproxyFlow(ctx: ProfileDispatchContext): Promise<void
     compositeTiers: profileInfo.compositeTiers,
     compositeDefaultTier: profileInfo.compositeDefaultTier,
     profileName: profileInfo.name,
+    browserLaunchOverride: ctx.claudeBrowserExposure?.override,
   });
 }

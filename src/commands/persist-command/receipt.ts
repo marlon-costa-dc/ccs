@@ -117,6 +117,7 @@ export async function resolveProfileEnvVars(profileName: string): Promise<Resolv
   const typeLabel: Record<string, string> = {
     settings: 'API',
     cliproxy: 'CLIProxy',
+    copilot: 'Copilot',
     account: 'Account',
     default: 'Default',
   };

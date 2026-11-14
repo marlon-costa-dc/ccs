@@ -36,7 +36,7 @@ from this overview; inspect the owning handler and its tests.
 | Shared services | [`src/services/`](../src/services/) | Cross-cutting runtime services, including structured logging |
 | Errors | [`src/errors/`](../src/errors/) | Typed error taxonomy, handling, and exit behavior |
 | Utilities | [`src/utils/`](../src/utils/) | CCS path handling and bounded shared helpers for browser, hooks, web search, image analysis, and UI support |
-| Compatibility | [`src/glmt/`](../src/glmt/) | Legacy GLMT translation behavior |
+| Compatibility | [`src/glmt/`](../src/glmt/), [`src/copilot/`](../src/copilot/), [`src/cursor/`](../src/cursor/) | Legacy translation and integration-specific behavior |
 | Packaging/runtime bins | [`src/bin/`](../src/bin/) | Target-specific packaged entry points |
 
 The table is intentionally domain-level. Use repository search and nearby tests
@@ -150,13 +150,12 @@ evergreen documentation.
 | Bundle verification | [`scripts/verify-bundle.js`](../scripts/verify-bundle.js) |
 | Local CI-equivalent gate | [`scripts/ci-parity-gate.sh`](../scripts/ci-parity-gate.sh) |
 | Commit policy | [`commitlint.config.cjs`](../commitlint.config.cjs) |
-| Package release policy and downstream packaging | [`docs/release-process.md`](./release-process.md) |
-| Semantic-release commit analysis | [`.releaserc.cjs`](../.releaserc.cjs) |
+| Branch-aware releases | [`.releaserc.cjs`](../.releaserc.cjs) |
 | GitHub automation | [`.github/workflows/`](../.github/workflows/) |
 
-Semantic-release owns versions, changelog updates, tags, and GitHub releases.
-This fork does not publish the upstream-owned npm package. Generated `dist/`
-contents and release artifacts are outputs, not architectural source.
+Semantic-release owns versions, changelog updates, tags, npm publication, and
+GitHub releases. Generated `dist/` contents and release artifacts are outputs,
+not architectural source.
 
 ## Documentation Map
 

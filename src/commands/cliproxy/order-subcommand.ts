@@ -12,6 +12,7 @@ import { initUI, header, subheader, color, dim, ok, fail, warn, info } from '../
 import { extractOption, hasAnyFlag } from '../arg-extractor';
 import { saveDrainOrderConfig, clearDrainOrderConfig } from '../../cliproxy/accounts/registry';
 import { getProviderAccounts } from '../../cliproxy/accounts/query';
+import { getConfiguredBackend, getInstalledCliproxyVersion } from '../../cliproxy/binary-manager';
 import {
   computeManualDrainOrder,
   computeTierDrainOrder,
@@ -19,6 +20,8 @@ import {
   resolveEffectiveDrainOrder,
   clearDrainOrderPriorities,
   tieBreakKey,
+  DRAIN_ORDER_MIN_VERSION,
+  isDrainOrderSupported,
   type DrainOrderEntry,
   type DrainOrderInput,
 } from '../../cliproxy/accounts/drain-order';
@@ -28,6 +31,8 @@ import { mapExternalProviderName } from '../../cliproxy/provider-capabilities';
 import type { CLIProxyProvider } from '../../cliproxy/types';
 import type { AccountTier } from '../../cliproxy/accounts/types';
 import { resolveLifecyclePort } from '../../cliproxy/config/port-manager';
+import { loadDrainOrderConfig } from '../../cliproxy/accounts/registry';
+import { getClaudePoolPolicyController } from '../../cliproxy/accounts/claude-pool-policy';
 
 /** Providers where tier metadata is expected and --by-tier is meaningful. */
 const TIER_AWARE_PROVIDERS = new Set<CLIProxyProvider>(['agy', 'gemini']);
@@ -43,6 +48,27 @@ function formatTierLabel(tier: AccountTier | undefined, tierDerived: boolean): s
   const label =
     tier === 'ultra' ? color(tier, 'success') : tier === 'pro' ? color(tier, 'info') : dim(tier);
   return tierDerived ? label : dim(tier);
+}
+
+function ensureDrainOrderBinarySupport(): boolean {
+  const backend = getConfiguredBackend();
+  const installedVersion = getInstalledCliproxyVersion(backend);
+  if (!isDrainOrderSupported(backend, installedVersion)) {
+    const minimumVersion = DRAIN_ORDER_MIN_VERSION[backend];
+    const backendLabel = backend === 'plus' ? 'CLIProxy Plus' : 'CLIProxy';
+    console.log(
+      fail(
+        `${backendLabel} v${installedVersion} does not support drain-order priorities (requires v${minimumVersion} or newer).`
+      )
+    );
+    console.log(
+      info(`Run 'ccs cliproxy --latest' to update, then restart with 'ccs cliproxy restart'.`)
+    );
+    console.log('');
+    process.exitCode = 1;
+    return false;
+  }
+  return true;
 }
 
 function printOrderTable(
@@ -93,6 +119,23 @@ function printOrderTable(
  * Show effective drain order for a provider without making any changes.
  */
 async function handleOrderShow(provider: CLIProxyProvider): Promise<void> {
+  if (provider === 'claude' && loadDrainOrderConfig(provider)?.mode === 'quota') {
+    const status = getClaudePoolPolicyController().getStatus();
+    console.log(`  Mode: quota (${status.status})`);
+    console.log(`  Controller: ${status.controllerActive ? 'running' : 'inactive'}`);
+    if (status.error) console.log(warn(status.error));
+    for (const account of status.accounts) {
+      const age =
+        account.confirmedAt === null
+          ? 'unknown'
+          : `${Math.max(0, Math.floor((Date.now() - account.confirmedAt) / 60000))}m`;
+      console.log(
+        `  ${account.accountId}  ${account.class}  priority ${account.effectivePriority ?? 'unknown'}/${account.desiredPriority}  ${age}  ${account.state}`
+      );
+    }
+    console.log('');
+    return;
+  }
   // Use getProviderAccounts() so auth files not yet in accounts.json
   // (e.g. file-copied fleets) are visible and tier metadata is preserved.
   const allAccounts = getProviderAccounts(provider);
@@ -281,6 +324,9 @@ async function handleOrderByTier(provider: CLIProxyProvider): Promise<void> {
 
   const entries = computeTierDrainOrder(accounts);
 
+  if (!ensureDrainOrderBinarySupport()) {
+    return;
+  }
   console.log(subheader('Computed tier-based drain order:'));
   printOrderTable(entries, false);
   console.log('');
@@ -324,6 +370,7 @@ async function handleOrderByTier(provider: CLIProxyProvider): Promise<void> {
   }
   console.log('');
 
+  if (provider === 'claude') await getClaudePoolPolicyController().relinquishForManualOrder();
   const result = await applyDrainOrder(entries, proxyRunning);
 
   if (result.written.length > 0) {
@@ -404,6 +451,10 @@ async function handleOrderSet(provider: CLIProxyProvider, setArg: string): Promi
     return;
   }
 
+  if (!ensureDrainOrderBinarySupport()) {
+    return;
+  }
+
   console.log(subheader('Computed manual drain order:'));
   printOrderTable(entries, false);
   console.log('');
@@ -445,6 +496,7 @@ async function handleOrderSet(provider: CLIProxyProvider, setArg: string): Promi
   }
   console.log('');
 
+  if (provider === 'claude') await getClaudePoolPolicyController().relinquishForManualOrder();
   const result = await applyDrainOrder(entries, proxyRunning);
 
   if (result.written.length > 0) {
@@ -495,71 +547,43 @@ async function handleOrderSet(provider: CLIProxyProvider, setArg: string): Promi
  * clobbered write.
  */
 async function handleOrderReset(provider: CLIProxyProvider): Promise<void> {
-  const configCleared = clearDrainOrderConfig(provider);
-
-  // Collect the auth files that may carry residual priorities. Use
-  // getProviderAccounts() so file-copied fleets (not yet in accounts.json) are
-  // covered too; clearing is idempotent for files with no priority field.
-  const tokenFiles = getProviderAccounts(provider).map((a) => a.tokenFile);
-
-  if (tokenFiles.length === 0) {
-    if (configCleared) {
-      console.log(ok(`Drain order reset to file order for ${provider}.`));
-    } else {
-      console.log(info(`No drain order config found for ${provider}. Already in file order.`));
-    }
-    console.log('');
-    return;
-  }
-
-  // Remote targets: refuse with guidance - clearing priorities needs management
-  // API access that is not wired for remote proxies in v1.
+  // Validate the target before relinquishing automatic ownership or changing registry state.
   const proxyTarget = getProxyTarget();
   if (proxyTarget.isRemote) {
-    if (configCleared) {
-      console.log(ok(`Drain order config cleared for ${provider} (mode reset to file order).`));
-    } else {
-      console.log(info(`No drain order config found for ${provider}.`));
-    }
     console.log(
-      warn(
-        `Remote proxy target detected. Residual auth-file priorities were NOT cleared;\n` +
-          `    drain order management for remote proxies is not supported in v1. Run this\n` +
-          `    command on the host running CLIProxy to clear them.`
-      )
+      warn('Run drain order reset on the host running CLIProxy; remote management is unsupported.')
     );
     console.log('');
     process.exitCode = 1;
     return;
   }
-
-  const localPort = resolveLifecyclePort();
-  const proxyStatus = await detectRunningProxy(localPort);
-
-  // Ambiguous state: proxy alive but not yet serving HTTP. A direct write could
-  // be clobbered; refuse rather than risk a half-cleared state.
+  const proxyStatus = await detectRunningProxy(resolveLifecyclePort());
   if (proxyStatus.running && !proxyStatus.verified) {
-    if (configCleared) {
-      console.log(ok(`Drain order config cleared for ${provider} (mode reset to file order).`));
-    }
-    console.log(
-      fail(
-        'Proxy state ambiguous - residual priorities not cleared. Retry in a moment or stop the proxy first.'
-      )
-    );
+    console.log(fail('Proxy state ambiguous - retry in a moment or stop the proxy first.'));
     console.log('');
     process.exitCode = 1;
     return;
   }
-
-  const proxyRunning = proxyStatus.running && proxyStatus.verified;
-  if (proxyRunning) {
+  const tokenFiles = getProviderAccounts(provider).map((account) => account.tokenFile);
+  if (provider === 'claude') await getClaudePoolPolicyController().relinquishForManualOrder();
+  const configCleared = clearDrainOrderConfig(provider);
+  if (tokenFiles.length === 0) {
     console.log(
-      info('Proxy is running - clearing priorities via management API (avoids clobber race).')
+      configCleared
+        ? ok(`Drain order reset to file order for ${provider}.`)
+        : info(`No drain order config found for ${provider}. Already in file order.`)
     );
-  } else {
-    console.log(info('Proxy is stopped - clearing priorities directly in auth files.'));
+    console.log('');
+    return;
   }
+  const proxyRunning = proxyStatus.running && proxyStatus.verified;
+  console.log(
+    info(
+      proxyRunning
+        ? 'Proxy is running - clearing priorities via management API (avoids clobber race).'
+        : 'Proxy is stopped - clearing priorities directly in auth files.'
+    )
+  );
 
   const result = await clearDrainOrderPriorities(tokenFiles, proxyRunning);
 
@@ -608,9 +632,15 @@ function printOrderHelp(provider?: string): void {
     `  ${color('--set', 'command')} <ids>  Set manual order (comma-separated account IDs)`
   );
   console.log(`  ${color('--reset', 'command')}      Revert to stable file order`);
+  console.log(`  ${color('--by-quota', 'command')}   Enable automatic Claude quota-class ordering`);
+  console.log(
+    `  ${color('--no-quota', 'command')}   Restore the order preceding Claude quota mode`
+  );
   console.log('');
   console.log(dim('  Tier-based ordering is available for: agy, gemini'));
-  console.log(dim('  Claude accounts have unknown tier; use --set for manual order.'));
+  console.log(
+    dim('  Claude: --by-quota requires pool routing and a persistent local CCS controller.')
+  );
   console.log('');
 }
 
@@ -648,13 +678,48 @@ export async function handleOrderSubcommand(args: string[]): Promise<void> {
 
   const subArgs = args.slice(1);
 
+  const quotaEnable = hasAnyFlag(subArgs, ['--by-quota']);
+  const quotaDisable = hasAnyFlag(subArgs, ['--no-quota']);
+  if (quotaEnable || quotaDisable) {
+    if (
+      provider !== 'claude' ||
+      quotaEnable === quotaDisable ||
+      hasAnyFlag(subArgs, ['--reset', '--by-tier', '--set']) ||
+      extractOption(subArgs, ['--set']).found
+    ) {
+      console.log(
+        fail('Use either --by-quota or --no-quota for Claude, without another order flag.')
+      );
+      process.exitCode = 1;
+      return;
+    }
+    try {
+      const status = await getClaudePoolPolicyController().setEnabled(quotaEnable);
+      if (status.status === 'active' || status.status === 'inactive') {
+        console.log(ok(`Claude quota ordering ${quotaEnable ? 'enabled' : 'disabled'}.`));
+      } else {
+        console.log(warn(status.error || `Claude quota ordering is ${status.status}.`));
+        process.exitCode = 1;
+      }
+    } catch (error) {
+      console.log(fail((error as Error).message));
+      process.exitCode = 1;
+    }
+    console.log('');
+    return;
+  }
+
   if (hasAnyFlag(subArgs, ['--reset'])) {
-    await handleOrderReset(provider);
+    if (provider === 'claude') {
+      await getClaudePoolPolicyController().withManualOrder(() => handleOrderReset(provider));
+    } else await handleOrderReset(provider);
     return;
   }
 
   if (hasAnyFlag(subArgs, ['--by-tier'])) {
-    await handleOrderByTier(provider);
+    if (provider === 'claude') {
+      await getClaudePoolPolicyController().withManualOrder(() => handleOrderByTier(provider));
+    } else await handleOrderByTier(provider);
     return;
   }
 
@@ -666,7 +731,10 @@ export async function handleOrderSubcommand(args: string[]): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    await handleOrderSet(provider, extracted.value);
+    const ids = extracted.value;
+    if (provider === 'claude') {
+      await getClaudePoolPolicyController().withManualOrder(() => handleOrderSet(provider, ids));
+    } else await handleOrderSet(provider, ids);
     return;
   }
 

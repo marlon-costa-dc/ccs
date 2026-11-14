@@ -1,21 +1,26 @@
 /**
  * Version Utility
  *
- * Centralized version and immutable build provenance for CCS.
+ * Centralized version management for CCS.
+ * Reads version from package.json at runtime.
  */
 
-import { BUILD_PROVENANCE } from '../generated/build-provenance';
+import * as path from 'path';
+import * as fs from 'fs';
 
-export interface BuildProvenance {
-  readonly version: string;
-  readonly commit: string;
-  readonly built_at: string;
-}
+// Get version from package.json (relative to dist/ at runtime)
+let cachedVersion: string | null = null;
 
 export function getVersion(): string {
-  return BUILD_PROVENANCE.version;
-}
+  if (cachedVersion) return cachedVersion;
 
-export function getBuildProvenance(): BuildProvenance {
-  return BUILD_PROVENANCE;
+  try {
+    const packageJsonPath = path.join(__dirname, '../../package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    cachedVersion = packageJson.version || '0.0.0';
+  } catch {
+    cachedVersion = '0.0.0';
+  }
+
+  return cachedVersion ?? '0.0.0';
 }

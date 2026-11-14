@@ -1148,9 +1148,7 @@ supports_websockets = false
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('Codex CLI does not support Claude account-based profiles.');
-    expect(result.stderr).toContain(
-      'Use an explicitly configured Codex profile; CCS does not reroute unsupported account profiles.'
-    );
+    expect(result.stderr).toContain('CLIProxy Codex pool: ccs codex --target codex or ccsxp');
     expect(readLoggedCodexCalls(codexArgsLogPath)).toEqual([]);
   });
 

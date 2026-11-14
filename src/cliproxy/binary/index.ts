@@ -5,7 +5,7 @@
 
 // Types
 export type { VersionCache, UpdateCheckResult } from './types';
-export { VERSION_CACHE_DURATION_MS, VERSION_PIN_FILE } from './types';
+export { VERSION_CACHE_DURATION_MS, VERSION_PIN_FILE, GITHUB_API_LATEST_RELEASE } from './types';
 
 // Downloader
 export { downloadFile, downloadWithRetry, fetchText, fetchJson } from './downloader';

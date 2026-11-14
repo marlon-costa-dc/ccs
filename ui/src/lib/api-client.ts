@@ -11,11 +11,12 @@ import type {
 } from '../../../src/cliproxy/ai-providers';
 import type { ProviderEntitlementEvidence } from '../../../src/cliproxy/auth/provider-entitlement-types';
 import type { BrowserRuntimeEnv } from '../../../src/utils/browser/chrome-reuse';
-import type { ModelPipelineConfig } from '../../../src/config/schemas/model-pipeline-types';
+import type { ClaudePoolPolicyStatus } from '@shared/claude-pool-policy';
 
 export const API_BASE_URL = '/api';
 export const API_CONFLICT_ERROR_CODE = 'CONFLICT';
 export type { ProviderEntitlementEvidence };
+export type { ClaudePoolPolicyStatus };
 
 export class ApiConflictError extends Error {
   readonly code = API_CONFLICT_ERROR_CODE;
@@ -776,6 +777,10 @@ export interface CodexQuotaResult {
 
 /** Claude policy limit window */
 export interface ClaudeQuotaWindow {
+  /** Account-wide, model-specific, or unclassified limit. Optional for older clients. */
+  scope?: 'account' | 'model' | 'unknown';
+  cadence?: '5h' | 'weekly';
+  modelLabel?: string;
   /** Source identifier: five_hour, seven_day, seven_day_opus, seven_day_sonnet, overage, ... */
   rateLimitType: string;
   /** Human-friendly label for UI display */
@@ -831,6 +836,8 @@ export interface ClaudeQuotaResult {
   retryable?: boolean;
   /** True if result was served from cache */
   cached?: boolean;
+  /** True when the live usage probe failed and this is the last good result (as of lastUpdated) */
+  stale?: boolean;
 }
 
 /** Gemini CLI bucket (grouped by model series) */
@@ -1333,6 +1340,12 @@ export const api = {
         body: JSON.stringify({ model }),
       }),
     getRoutingStrategy: () => request<CliproxyRoutingState>('/cliproxy/routing/strategy'),
+    getClaudePoolPolicy: () => request<ClaudePoolPolicyStatus>('/cliproxy/routing/claude-quota'),
+    updateClaudePoolPolicy: (enabled: boolean) =>
+      request<ClaudePoolPolicyStatus>('/cliproxy/routing/claude-quota', {
+        method: 'PUT',
+        body: JSON.stringify({ enabled }),
+      }),
     updateRoutingStrategy: (strategy: RoutingStrategy) =>
       request<CliproxyRoutingApplyResult>('/cliproxy/routing/strategy', {
         method: 'PUT',
@@ -1526,9 +1539,6 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ backupPath }),
       }),
-  },
-  modelPipeline: {
-    get: () => request<ModelPipelineConfig>('/config/model-pipeline'),
   },
   /** Model presets for quick model switching */
   presets: {

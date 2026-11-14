@@ -8,7 +8,6 @@ import * as path from 'path';
 import { apiRoutes } from '../../../src/web-server/routes';
 import { mutateConfig, loadOrCreateUnifiedConfig } from '../../../src/config/config-loader-facade';
 import { registerSession, deleteSessionLockForPort } from '../../../src/cliproxy/session-tracker';
-import { CLIPROXY_DEFAULT_PORT } from '../../../src/cliproxy/config/port-manager';
 import {
   authMiddleware,
   createSessionMiddleware,
@@ -213,9 +212,9 @@ trust_level = "trusted"
       if (!config.cliproxy_server) {
         throw new Error('cliproxy_server defaults were not initialized');
       }
-      config.cliproxy_server.local.port = CLIPROXY_DEFAULT_PORT;
+      config.cliproxy_server.local.port = 8317;
     });
-    registerSession(CLIPROXY_DEFAULT_PORT, process.pid);
+    registerSession(8317, process.pid);
 
     try {
       const response = await fetch(`${baseUrl}/api/cliproxy-server`, {
@@ -230,11 +229,11 @@ trust_level = "trusted"
       expect(await response.json()).toEqual({
         error: 'Proxy is running on the current local port. Stop CLIProxy before changing local.port.',
         proxyRunning: true,
-        currentLocalPort: CLIPROXY_DEFAULT_PORT,
+        currentLocalPort: 8317,
       });
-      expect(loadOrCreateUnifiedConfig().cliproxy_server?.local?.port).toBe(CLIPROXY_DEFAULT_PORT);
+      expect(loadOrCreateUnifiedConfig().cliproxy_server?.local?.port).toBe(8317);
     } finally {
-      deleteSessionLockForPort(CLIPROXY_DEFAULT_PORT);
+      deleteSessionLockForPort(8317);
     }
   });
 

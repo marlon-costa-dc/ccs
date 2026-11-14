@@ -50,25 +50,6 @@ describe('main-only repository governance', () => {
     expect(pendingRelease).not.toContain('2>/dev/null');
   });
 
-  test('removes superseded branch, package-release, and hook owners', () => {
-    const removedPaths = [
-      '.github/workflows/dev-release.yml',
-      '.github/workflows/sync-dev-after-release.yml',
-      '.github/workflows/publish-npm.yml.deprecated',
-      'scripts/dev-release.sh',
-      'scripts/bump-version.sh',
-      'scripts/github/stable-release-issue-cleanup.mjs',
-      'scripts/github/stable-release-issue-cleanup-lib.mjs',
-      'tests/unit/github/stable-release-issue-cleanup.test.mjs',
-      '.beads/README.md',
-      '.beads/hooks',
-    ];
-
-    for (const relativePath of removedPaths) {
-      expect(fs.existsSync(path.join(repoRoot, relativePath))).toBe(false);
-    }
-  });
-
   test('keeps public issue intake subordinate to Beads execution', () => {
     const agentGuide = read('CLAUDE.md');
 

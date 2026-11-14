@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, setDefaultTimeout } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -10,14 +10,12 @@ interface RunResult {
   stderr: string;
 }
 
-setDefaultTimeout(30000);
-
 function runCcs(args: string[], env: NodeJS.ProcessEnv): RunResult {
-  const ccsEntry = path.join(process.cwd(), 'dist', 'ccs.js');
-  const result = spawnSync('node', [ccsEntry, ...args], {
+  const ccsEntry = path.join(process.cwd(), 'src', 'ccs.ts');
+  const result = spawnSync(process.execPath, [ccsEntry, ...args], {
     encoding: 'utf8',
     env,
-    timeout: 20000,
+    timeout: 10000,
   });
 
   return {

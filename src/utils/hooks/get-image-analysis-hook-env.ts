@@ -71,8 +71,6 @@ export function resolveImageAnalysisRuntimeConnection(
         host: '127.0.0.1',
         port: options.tunnelPort,
         protocol: 'http',
-        allowSelfSigned: false,
-        managementTimeoutMs: proxyTarget.managementTimeoutMs,
         isRemote: false,
       },
     };

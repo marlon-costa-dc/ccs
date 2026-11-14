@@ -22,10 +22,10 @@ export const BACKEND_CONFIG = {
     fallbackVersion: '6.9.45',
   },
   plus: {
-    repo: 'marlon-costa-dc/cliproxy',
-    binaryPrefix: 'CLIProxyAPI',
+    repo: 'kaitranntt/CLIProxyAPIPlus',
+    binaryPrefix: 'CLIProxyAPIPlus',
     executable: 'cli-proxy-api-plus',
-    fallbackVersion: '7.2.145-dc7',
+    fallbackVersion: '6.9.45-0',
   },
 } as const;
 
@@ -39,9 +39,9 @@ export const BACKEND_CONFIG = {
 export const DEFAULT_BACKEND: CLIProxyBackend = 'original';
 
 /**
- * Plus fallback version (used when GitHub API unavailable).
- * Auto-update fetches latest from GitHub; this is only a safety net.
- * DC fork tags use the v7.2.136-dcN suffix.
+ * CLIProxyAPIPlus fallback version (used when GitHub API unavailable)
+ * Auto-update fetches latest from GitHub; this is only a safety net
+ * Note: CLIProxyAPIPlus uses v6.6.X-0 suffix pattern
  * @deprecated Use getFallbackVersion() or BACKEND_CONFIG instead
  */
 export const CLIPROXY_FALLBACK_VERSION = BACKEND_CONFIG[DEFAULT_BACKEND].fallbackVersion;
@@ -84,46 +84,25 @@ const RELEASE_ARCH_MAP: Record<SupportedArch, SupportedArch> = {
 };
 
 const PLUS_NO_PLUGIN_ASSET_MIN_VERSION = '7.1.68-0';
-const PLUS_AARCH64_ASSET_MIN_VERSION = '7.1.45-1';
-
-/** The dc6 fork release renamed release assets to lowercase (CLIProxyAPI_* -> cliproxy_*). */
-const PLUS_LOWERCASE_ASSET_MIN_VERSION = '7.2.145-dc6';
-
-/**
- * Release asset prefix for one backend at one version. Only the fork's dc6+
- * releases publish lowercase asset names; older fork releases and the
- * upstream original keep the uppercase prefix.
- */
-function binaryPrefixFor(backend: CLIProxyBackend, version: string): string {
-  if (backend === 'plus' && isAtLeastVersion(version, PLUS_LOWERCASE_ASSET_MIN_VERSION)) {
-    return 'cliproxy';
-  }
-  return BACKEND_CONFIG[backend].binaryPrefix;
-}
+const AARCH64_ASSET_MIN_VERSION: Readonly<Record<CLIProxyBackend, string>> = {
+  original: '6.9.48',
+  plus: '6.10.0-0',
+};
 
 export function mapNodeArchToReleaseArch(nodeArch: string): SupportedArch | undefined {
   const arch = ARCH_MAP[nodeArch];
   return arch ? RELEASE_ARCH_MAP[arch] : undefined;
 }
 
-export function parseForkRelease(value: string): number {
-  if (/^\d+$/.test(value)) return parseInt(value, 10) || 0;
-  const dcMatch = value.match(/^dc(\d+)$/i);
-  return dcMatch ? parseInt(dcMatch[1], 10) || 0 : 0;
-}
-
-export const CLIPROXY_VERSION_TAG_PATTERN = /^\d+\.\d+\.\d+(-(dc)?\d+)?$/;
-
 function parseVersionParts(version: string): [number, number, number, number] {
   const [coreVersion, forkRelease = '0'] = version.replace(/^v/, '').split('-', 2);
   const [major = 0, minor = 0, patch = 0] = coreVersion
     .split('.')
     .map((part) => parseInt(part, 10) || 0);
-  return [major, minor, patch, parseForkRelease(forkRelease)];
+  return [major, minor, patch, parseInt(forkRelease, 10) || 0];
 }
 
-/** Compare fork-aware versions: core semver, then the numeric -dcN suffix. */
-export function isAtLeastVersion(version: string, minimum: string): boolean {
+function isAtLeastVersion(version: string, minimum: string): boolean {
   const left = parseVersionParts(version);
   const right = parseVersionParts(minimum);
 
@@ -145,11 +124,7 @@ function getReleaseArchForBackend(
   publicArch: SupportedArch,
   releaseArch: SupportedArch
 ): SupportedArch {
-  if (
-    backend === 'plus' &&
-    publicArch === 'arm64' &&
-    !isAtLeastVersion(version, PLUS_AARCH64_ASSET_MIN_VERSION)
-  ) {
+  if (publicArch === 'arm64' && !isAtLeastVersion(version, AARCH64_ASSET_MIN_VERSION[backend])) {
     return 'arm64';
   }
 
@@ -201,7 +176,7 @@ export function detectPlatform(
     usesOriginalNoPluginAsset || (backend === 'plus' && usesPlusNoPluginAsset(ver, os))
       ? '_no-plugin'
       : '';
-  const binaryName = `${binaryPrefixFor(backend, ver)}_${ver}_${os}_${assetArch}${assetVariant}.${extension}`;
+  const binaryName = `${config.binaryPrefix}_${ver}_${os}_${assetArch}${assetVariant}.${extension}`;
 
   return {
     os,
