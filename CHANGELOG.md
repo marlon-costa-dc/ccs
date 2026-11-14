@@ -1,3 +1,13 @@
+## [8.9.0-fd.29](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.28...v8.9.0-fd.29) (2026-11-14)
+
+### Documentation
+
+* **reports:** regenerate hardening inventory after poolside removal ([5e13683](https://github.com/marlon-costa-dc/ccs/commit/5e13683e810e2c035df82e70547ac06f6d7a217a))
+
+### Code Refactoring
+
+* **cliproxy:** remove the retired Poolside provider ([0f5aed6](https://github.com/marlon-costa-dc/ccs/commit/0f5aed6a297b05b41612d0c1fcaa758196fa1153))
+
 ## [8.9.0-fd.28](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.27...v8.9.0-fd.28) (2026-11-14)
 
 ### Features
