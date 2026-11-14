@@ -48,22 +48,22 @@ fi
 
 CHANGED_FILES="$(git diff --name-only "$DIFF_RANGE")"
 
-if printf '%s\n' "$CHANGED_FILES" | grep -q '^ui/'; then
+if grep -q '^ui/' <<<"$CHANGED_FILES"; then
   echo "[i] UI changes detected, running ui:validate..."
   bun run ui:validate
 fi
 
-if printf '%s\n' "$CHANGED_FILES" | grep -qE '^(\.github/workflows/|scripts/github/|tests/unit/scripts/github/)'; then
+if grep -qE '^(\.github/workflows/|scripts/github/|tests/unit/scripts/github/)' <<<"$CHANGED_FILES"; then
   echo "[i] GitHub workflow changes detected, running workflow tests..."
   bun test tests/unit/scripts/github
 fi
 
-if printf '%s\n' "$CHANGED_FILES" | grep -qE '^(src/commands/update-command.ts|tests/unit/commands/update-command-current-install.test.ts|tests/integration/update-command-install-origin.test.ts)'; then
+if grep -qE '^(src/commands/update-command.ts|tests/unit/commands/update-command-current-install.test.ts|tests/integration/update-command-install-origin.test.ts)' <<<"$CHANGED_FILES"; then
   echo "[i] Update command changes detected, running targeted update tests..."
   bun test tests/unit/commands/update-command-current-install.test.ts tests/integration/update-command-install-origin.test.ts
 fi
 
-if printf '%s\n' "$CHANGED_FILES" | grep -qE '^(src/cursor/cursor-models.ts|tests/unit/cursor/cursor-models.test.ts)'; then
+if grep -qE '^(src/cursor/cursor-models.ts|tests/unit/cursor/cursor-models.test.ts)' <<<"$CHANGED_FILES"; then
   echo "[i] Cursor model changes detected, running targeted cursor model tests..."
   bun test tests/unit/cursor/cursor-models.test.ts
 fi
