@@ -168,7 +168,7 @@ function walkFiles(dirPath) {
     return output;
   }
   for (const entry of entries) {
-    if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+    if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === 'generated') continue;
     const fullPath = path.join(dirPath, entry.name);
     if (entry.isDirectory()) {
       output.push.apply(output, walkFiles(fullPath));
