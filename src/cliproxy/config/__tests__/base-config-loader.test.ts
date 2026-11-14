@@ -10,6 +10,8 @@ describe('base-config-loader new providers', () => {
     ['kilo', '/api/provider/kilo', 'kilo/auto'],
     ['qoder', '/api/provider/qoder', 'qoder/auto'],
     ['xai', '/api/provider/xai', 'grok-build-0.1'],
+    ['opencode', '/api/provider/opencode', 'gpt-5.6-luna'],
+    ['opencode-go', '/api/provider/opencode-go', 'gpt-5.6-luna'],
   ] as const)('loads base settings for %s', (provider, baseUrlPath, defaultModel) => {
     const config = loadBaseConfig(provider);
 
