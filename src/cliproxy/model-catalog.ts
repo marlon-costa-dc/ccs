@@ -1054,55 +1054,6 @@ export const MODEL_CATALOG: Partial<Record<CLIProxyProvider, ProviderCatalog>> =
       },
     ],
   },
-  poolside: {
-    provider: 'poolside',
-    displayName: 'Poolside',
-    defaultModel: 'poolside/laguna-s-2.1',
-    models: [
-      {
-        id: 'poolside/laguna-s-2.1',
-        name: 'Laguna S 2.1',
-        description: 'Poolside — Laguna S 2.1 (proxies to Claude Sonnet 4.6)',
-        contextWindow: 200000,
-        nativeImageInput: true,
-      },
-      {
-        id: 'poolside/laguna-xs-2.1',
-        name: 'Laguna XS 2.1',
-        description: 'Poolside — Laguna XS 2.1 (smaller Laguna 2.1)',
-        contextWindow: 200000,
-        nativeImageInput: true,
-      },
-      {
-        id: 'claude-opus-4-8',
-        name: 'Claude Opus 4.8',
-        description: 'Poolside — Claude Opus 4.8 via Anthropic Messages',
-        contextWindow: 200000,
-        nativeImageInput: true,
-        thinking: {
-          type: 'budget',
-          min: 1024,
-          max: 64000,
-          zeroAllowed: true,
-          dynamicAllowed: true,
-        },
-      },
-      {
-        id: 'claude-sonnet-4-6',
-        name: 'Claude Sonnet 4.6',
-        description: 'Poolside — Claude Sonnet via Anthropic Messages',
-        contextWindow: 200000,
-        nativeImageInput: true,
-        thinking: {
-          type: 'budget',
-          min: 1024,
-          max: 64000,
-          zeroAllowed: true,
-          dynamicAllowed: true,
-        },
-      },
-    ],
-  },
 };
 
 /**

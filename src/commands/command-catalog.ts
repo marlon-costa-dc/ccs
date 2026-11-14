@@ -208,7 +208,6 @@ export const BUILTIN_PROVIDER_SHORTCUTS: readonly ShortcutEntry[] = CLIPROXY_PRO
         zai: 'Z.AI GLM via CLIProxy OAuth',
         opencode: 'OpenCode Zen via CLIProxy API key',
         'opencode-go': 'OpenCode Go via CLIProxy API key',
-        poolside: 'Poolside AI via CLIProxy API key',
         agy: 'Antigravity via CLIProxy OAuth',
         qwen: 'Qwen Code via CLIProxy; account linking unsupported',
         iflow: 'iFlow via CLIProxy OAuth',

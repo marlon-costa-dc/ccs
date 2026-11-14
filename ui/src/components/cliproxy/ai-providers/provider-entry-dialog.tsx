@@ -220,29 +220,6 @@ function getDialogGuide(family: AiProviderFamilyId): DialogGuide {
           'Format: requested=upstream. Add a mapping only when the upstream model name should differ.',
         headersPlaceholder: 'X-Project: internal-routing',
       };
-    case 'poolside-api-key':
-      return {
-        familyName: 'Poolside',
-        description:
-          'Store the Poolside API key here so CLIProxy can route Poolside requests without duplicating the setup in API Profiles.',
-        requiredNow: [
-          'Paste the Poolside API key.',
-          'Leave Base URL empty unless this route should target another endpoint.',
-        ],
-        optionalLater: [
-          'Model mappings only when the upstream model ID differs.',
-          'Headers only when the provider setup requires them.',
-        ],
-        keyLabel: 'Poolside API Key',
-        keyPlaceholder: 'sk-...',
-        keyHelper: 'This is the only field most Poolside setups need.',
-        baseUrlPlaceholder: 'https://inference.poolside.ai/v1',
-        baseUrlHelper: 'Optional. Leave blank to keep the default Poolside endpoint.',
-        aliasesPlaceholder: 'claude-sonnet-4-5=nemotron-4-340b-reward',
-        aliasesHelper:
-          'Format: requested=upstream. Add a mapping only when the upstream model name should differ.',
-        headersPlaceholder: 'X-Project: internal-routing',
-      };
   }
 }
 
