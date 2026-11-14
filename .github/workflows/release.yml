@@ -23,19 +23,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: '1.3.9'
 
@@ -67,12 +67,11 @@ jobs:
             exit 1
           fi
 
-          # A release tag must sit on a declared release lane: main carries the
-          # semantic-release line; dc-use carries the fd fork-integration line.
-          git fetch origin main dc-use --no-tags
-          if ! git merge-base --is-ancestor "$tag_commit" origin/main \
-            && ! git merge-base --is-ancestor "$tag_commit" origin/dc-use; then
-            echo "[X] Tag $TAG does not identify a commit on origin/main or origin/dc-use"
+          # A release tag must sit on the main integration line. The fork is
+          # main-only; dc-use is a stale lane and is not a release surface.
+          git fetch origin main --no-tags
+          if ! git merge-base --is-ancestor "$tag_commit" origin/main; then
+            echo "[X] Tag $TAG does not identify a commit on origin/main"
             exit 1
           fi
 
