@@ -17,6 +17,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# package.json declares VERSION among the packaged files but the repository
+# does not track it. Materialize it from the release version before packing.
+if [[ ! -f VERSION ]]; then
+  node -p "require('./package.json').version" > VERSION
+fi
+
 npm pack --pack-destination "$scratch"
 shopt -s nullglob
 package_tarballs=("$scratch"/*.tgz)
@@ -69,6 +75,7 @@ if (!Array.isArray(manifest.files) || manifest.files.length === 0) {
   throw new Error('package.json files must declare release runtime artifacts');
 }
 const missing = manifest.files
+  .filter((entry) => !entry.startsWith('!'))
   .map((entry) => entry.replace(/\/$/, ''))
   .filter((entry) => !fs.existsSync(path.join(bundle, entry)));
 if (missing.length > 0) {

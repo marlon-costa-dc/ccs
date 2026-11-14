@@ -74,3 +74,4 @@ claude-mods/*/.claude-plugin/types/
 .gc/
 .beads/
 src/generated/
+VERSION
