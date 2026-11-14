@@ -6,38 +6,35 @@ function resolvePath(relativePath: string) {
   return path.resolve(import.meta.dir, relativePath);
 }
 
-describe('release asset packaging workflow', () => {
-  test('packages semantic-release tags without creating or overwriting releases', () => {
-    const workflowPath = resolvePath('../../../../.github/workflows/release.yml');
+describe('dc release workflow', () => {
+  test('creates stable upstream-version-dc releases from dc-use', () => {
+    const workflowPath = resolvePath('../../../../.github/workflows/release-dc-use.yml');
 
     expect(fs.existsSync(workflowPath)).toBe(true);
 
     const workflow = fs.readFileSync(workflowPath, 'utf8');
 
-    expect(workflow).toContain('name: Package GitHub Release Assets');
-    expect(workflow).toContain("tags:");
-    expect(workflow).toContain("- 'v*'");
+    expect(workflow).toContain('name: Release DC-Use');
+    expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('runs-on: ubuntu-latest');
     expect(workflow).not.toContain('runs-on: [self-hosted');
-    expect(workflow).not.toContain('NPM_TOKEN');
-    expect(workflow).not.toContain('npx semantic-release');
-    expect(workflow).toContain('Verify tag, package, and release provenance');
-    expect(workflow).toContain('git merge-base --is-ancestor "$tag_commit" origin/main');
-    expect(workflow).toContain('package_version="$(node -p');
-    expect(workflow).toContain('gh release view "$TAG"');
-    expect(workflow).toContain('ASSET=ccs_${version}_package.tar.gz');
+    expect(workflow).toContain('origin/main');
+    expect(workflow).toContain('-dc.');
+    expect(workflow).toContain('RELEASE_VERSION');
     expect(workflow).toContain('bash scripts/build-release-asset.sh');
-    expect(workflow).not.toContain('-czf "$ASSET"');
-    expect(workflow).toContain('gh release upload "$TAG" "$ASSET" "$CHECKSUMS"');
-    expect(workflow).not.toContain('gh release create');
-    expect(workflow).not.toContain('--clobber');
-    expect(workflow).toContain('GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}');
+    expect(workflow).toContain('bun run validate:ci-parity');
+    expect(workflow).toContain('gh release create');
+    expect(workflow).toContain('--latest');
+    expect(workflow).not.toContain('--prerelease');
+    expect(workflow).not.toContain('semantic-release');
+    expect(workflow).toContain('GH_TOKEN: ${{ github.token }}');
 
     const packer = fs.readFileSync(
       resolvePath('../../../../scripts/build-release-asset.sh'),
-      'utf8'
+      'utf8',
     );
-    expect(packer).toContain('npm pack --pack-destination "$scratch"');
+    expect(packer).toContain('RELEASE_VERSION');
+    expect(packer).toContain('npm pack --ignore-scripts --pack-destination "$scratch"');
     expect(packer).toContain('package_tarballs=("$scratch"/*.tgz)');
     expect(packer).toContain('manifest.files');
     expect(packer).toContain('cp bun.lock "$bundle/bun.lock"');
@@ -50,7 +47,7 @@ describe('release asset packaging workflow', () => {
     expect(packer).toContain('^[A-Za-z0-9][A-Za-z0-9._-]*$');
 
     const manifest = JSON.parse(
-      fs.readFileSync(resolvePath('../../../../package.json'), 'utf8')
+      fs.readFileSync(resolvePath('../../../../package.json'), 'utf8'),
     ) as { files: string[] };
     expect(manifest.files).toContain('config/');
     expect(manifest.files).toContain('claude-mods/');

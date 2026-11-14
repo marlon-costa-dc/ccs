@@ -1,120 +1,115 @@
 # CCS Release Process
 
-Semantic-release is the sole authority for the CCS package version,
-`CHANGELOG.md`, package tag, and package GitHub release. This fork publishes
-only through GitHub. It runs after changes land on `main`. Packaging and
-container workflows consume its immutable tag and release; they do not create a
-competing release.
+This fork keeps `main` as an exact mirror of `kaitranntt/ccs`, isolates every
+datacosmos/ai-hub change on `datacosmos`, and publishes the integrated
+`dc-use` branch as stable `<upstream-version>-dc.N` releases. Upstream
+contributions stay on separate branches and never contain datacosmos code.
+
+## Branch roles
+
+| Branch | Role | Writers |
+| --- | --- | --- |
+| `main` | exact `upstream/main` mirror; no fork commits | `sync-upstream` |
+| `datacosmos` | datacosmos/ai-hub-specific code and automation | reviewed PRs |
+| `dc-use` (default) | `main + datacosmos` integration and consumption line | `integrate-dc-use` |
+| `upstream/<topic>` | one real upstream contribution | PRs to `kaitranntt/ccs` (base `dev`) |
+
+Third-party code and forks are preserved and pinned: `CLIProxyAPIPlus`, the
+`marlon-costa-dc/cliproxy` fork, and the
+`marlon-costa-dc/Cli-Proxy-API-Management-Center` fork, including its
+`plus`/`datacosmos/ai-hub`/`dc-use` branches. They are never deleted, vendored
+over, or replaced by a datacosmos copy.
 
 ## Release lanes
 
-| Source | Workflow | Result |
+| Trigger | Workflow | Result |
 | --- | --- | --- |
-| Push to `main` | [`semantic-release.yml`](../.github/workflows/semantic-release.yml) | Build and validation, then semantic-release when commit history requires a release |
-| Semantic-release tag or operator replay of an existing tag | [`release.yml`](../.github/workflows/release.yml) | Package assets added to the existing GitHub release after provenance checks |
-| Published stable or `rc` GitHub release | [`docker-release.yml`](../.github/workflows/docker-release.yml) | Immutable integrated Docker version tag, signature, and smoke test |
-| Operator-approved stable promotion | [`promote-release.yml`](../.github/workflows/promote-release.yml) | Docker `:latest`, major, and minor aliases |
-| Operator-dispatched CCS Bar publication | [`bar-release.yml`](../.github/workflows/bar-release.yml) | Floating `ccs-bar-latest` assets; no package version or package tag |
+| Schedule (every 6h) or dispatch | [`sync-upstream.yml`](../.github/workflows/sync-upstream.yml) | Fast-forward `main` to `upstream/main`; dispatch integration |
+| Schedule, dispatch or datacosmos push | [`integrate-dc-use.yml`](../.github/workflows/integrate-dc-use.yml) | Merge `main + datacosmos`, run the full gates, push `dc-use`, dispatch release |
+| Dispatch from integration | [`release-dc-use.yml`](../.github/workflows/release-dc-use.yml) | Stable `v<upstream>-dc.N` tag, package asset and checksums, `--latest` release |
+| Push to `datacosmos` | [`dispatch-dc-use-integration.yml`](../.github/workflows/dispatch-dc-use-integration.yml) | Dispatch the integration workflow |
 
-## Package release authority
+Scheduled workflows live on the default branch (`dc-use`) because GitHub
+schedules only from the default branch. `main` stays a pure mirror.
 
-[`semantic-release.yml`](../.github/workflows/semantic-release.yml) runs on
-pushes to `main`. After its build and fast validation gates, it invokes
-semantic-release with [`.releaserc.cjs`](../.releaserc.cjs).
+## Versioning
 
-The configuration analyzes conventional commits since the previous package
-release. `feat` produces at least a minor release; `fix`, `hotfix`, `refactor`,
-and `style` produce patch releases under repository rules; breaking-change
-notation produces the corresponding major release. The explicit `governance`
-scope produces no release, regardless of commit type. Other commits may also
-produce no release.
+- `UPSTREAM_VERSION` is read from `origin/main/package.json` (currently
+  `8.11.0`).
+- `RELEASE_VERSION` is `<UPSTREAM_VERSION>-dc.N`, where `N` is one greater than
+  the highest existing `v<UPSTREAM_VERSION>-dc.*` tag. The first release is
+  `v8.11.0-dc.1`.
+- `release-dc-use` sets the package version, creates the tag on the verified
+  `dc-use` SHA, and publishes a stable GitHub release (`isPrerelease: false`,
+  `isLatest: true`).
+- `fd.*` releases are historical. Semantic-release, `.releaserc.cjs`, and
+  manual version bumps are retired; no other surface creates a package release.
 
-When a release is required, semantic-release updates `CHANGELOG.md` and
-`package.json`, creates the package tag and GitHub release, and pushes its
-generated commit to `main`. The npm plugin runs only to prepare the versioned
-package; `npmPublish: false` prevents registry publication. Never bump a
-version, create a package tag, or create a package GitHub release manually.
+## Gates
 
-## Downstream package assets
-
-[`release.yml`](../.github/workflows/release.yml) packages an existing
-semantic-release tag. Before upload it verifies all of these conditions:
-
-1. the checkout commit is the requested tag commit;
-2. the tag commit belongs to `origin/main`;
-3. the tag version matches `package.json`; and
-4. the non-draft GitHub release already exists.
-
-The workflow builds and validates the tagged source, then uploads versioned
-assets without overwriting existing assets. A provenance mismatch or existing
-asset fails the workflow. It never creates a release or replaces release
-metadata.
-
-## Docker publication and promotion
-
-The supported integrated image is `ghcr.io/kaitranntt/ccs`.
-
-On a published stable `vX.Y.Z` or release-candidate `vX.Y.Z-rc.N` GitHub
-release, [`docker-release.yml`](../.github/workflows/docker-release.yml):
-
-1. validates and checks out the release tag;
-2. builds the integrated image for `linux/amd64` and `linux/arm64`;
-3. publishes only the matching immutable version tag;
-4. signs the image digest with keyless cosign; and
-5. smoke-tests the published image.
-
-Mutable aliases require an explicit operator decision. After verifying the
-immutable image and allowing the desired soak period, dispatch
-`promote-release.yml`:
+The integration and release workflows run, on the exact candidate SHA:
 
 ```bash
-gh workflow run promote-release.yml --field tag=vX.Y.Z
+bash scripts/ensure-deps.sh
+bun run build:all
+bun run validate
+bun run validate:ci-parity
+(cd ui && bun run validate)
 ```
 
-The promotion workflow verifies the stable GitHub release and immutable image,
-then dispatches `docker-release.yml` with `promote_to_latest=true`. That job
-creates `:latest`, `:X`, and `:X.Y` aliases from the immutable image digest.
+A conflict, failing gate, or already-existing tag stops the flow, opens an
+automation issue with the run URL, and never force-pushes or auto-resolves.
 
-The deprecated `ccs-dashboard` image has a sunset compatibility job. Its tag
-behavior is not the contract for the supported integrated image.
+## Assets and verification
 
-## CCS Bar assets
-
-`macos-bar/VERSION` owns the version of the separate CCS Bar asset. Bar version
-changes land through the normal pull-request workflow. An operator then runs
-[`bar-release.yml`](../.github/workflows/bar-release.yml) from `main`.
-
-That workflow is the only publisher for the floating `ccs-bar-latest` release.
-Local packaging commands validate the app; they do not upload assets or edit
-release metadata.
-
-## Non-publishing maintenance
-
-Documentation and governance-only maintenance must use the `governance` scope
-and normally uses a non-releasing conventional commit type, such as
-`chore(governance)`. The semantic-release configuration maps that scope to
-`release: false`, so a corrective commit in the same lane cannot accidentally
-schedule a package release. This path must not dispatch a release workflow,
-change a version, create a tag, or publish an artifact. No other surface may
-publish on semantic-release's behalf.
-
-## Verification
+`release-dc-use` builds `ccs_<version>_package.tar.gz` and
+`ccs_<version>_checksums.txt`. The packer follows `package.json files`,
+materializes `VERSION` from `RELEASE_VERSION`, skips package lifecycle scripts,
+and bundles production dependencies with the committed lockfile.
 
 ```bash
-gh release view vX.Y.Z --repo marlon-costa-dc/ccs
-docker buildx imagetools inspect ghcr.io/kaitranntt/ccs:X.Y.Z
-docker buildx imagetools inspect ghcr.io/kaitranntt/ccs:latest
+gh release view v8.11.0-dc.1 --repo marlon-costa-dc/ccs \
+  --json isPrerelease,isLatest,assets
+sha256sum -c ccs_8.11.0-dc.1_checksums.txt
+MISE_DATA_DIR=$(mktemp -d) HOME=$(mktemp -d) \
+  mise install github:marlon-costa-dc/ccs@8.11.0-dc.1
+ccs --version
 ```
 
-Before announcing a release, verify the workflow run, package version, tag,
-release target, asset checksums, and image digest all identify the same source
-commit.
+## Upstream contributions
+
+Cut one branch per subject from `upstream/main`, open a PR to
+`kaitranntt/ccs` (base `dev`), and run the upstream gates. Do not include
+datacosmos automation, provider catalogs, release assets, or ai-hub code.
+When upstream accepts a change, `sync-upstream` brings it to `main` and the
+datacosmos delta shrinks.
+
+## ai-hub boundary and live cutover
+
+ai-hub uses CCS as-is. No ai-hub model-pipeline endpoint, schema, or policy
+returns to CCS. The ai-hub owner retires its failed `ai-hub-model-pipeline`
+unit and removes its publication consumer.
+
+Before installing a new dc release in ai-hub:
+
+1. back up `~/.ccs/config.yaml`, `~/.ccs/cliproxy/config.yaml` and any pending
+   model-pipeline intent;
+2. stop `ccs-dashboard`, remove the stale intent, and remove the
+   `model_pipeline` block and `profiles.poolside*` with a formatting-preserving
+   YAML edit (validate with a YAML parser);
+3. install the dc release and `mise reshim`;
+4. start `ccs-cliproxy` and `ccs-dashboard`, verify active units, port 8317,
+   dashboard `:3184`, `ccs doctor`, and a 404 for
+   `/api/config/model-pipeline`;
+5. record the command/exit/output evidence and the ai-hub unit state in the
+   bead and coordination thread.
 
 ## Recovery
 
-- For a bad package asset, publish a corrected package release. Do not overwrite
-  an asset attached to an immutable tag.
-- For a bad immutable Docker image, leave its tag unchanged and publish a
-  corrected version.
-- For a bad mutable Docker promotion, promote a known-good immutable digest
-  through the controlled workflow.
+- Bad asset: publish a new `dc.N` release; never overwrite an immutable tag.
+- Bad integration: revert the merge with a new commit on `dc-use`; never reset
+  or force-push a shared branch without a preserved tag.
+- Restore `main` from `dc-legacy-20261114` only as a last resort, and only when
+  the mirror job cannot repair the branch.
+- The `fd.*` releases remain available for rollback; the previous dc release is
+  the preferred rollback target.

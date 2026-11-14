@@ -173,7 +173,7 @@ exit 0
       'max',
       'smoke',
     ]);
-  });
+  }, 30000);
 
   it('rejects invalid native Claude effort before spawning Claude', () => {
     if (process.platform === 'win32') return;

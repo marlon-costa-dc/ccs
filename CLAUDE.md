@@ -10,14 +10,24 @@ Factory Droid, CLIProxy, and compatible provider profiles.
 
 ## Non-Negotiables
 
-- Default branch is `main`. Feature/fix branches start from `main`; production
-  hotfixes start from `main` only when explicitly needed.
+- `main` is an exact mirror of `kaitranntt/ccs`. Never commit to it; the
+  `sync-upstream` job fast-forwards it.
+- `datacosmos` is the only branch for datacosmos/ai-hub-specific code and
+  automation. Feature/fix branches start from `datacosmos`; upstream
+  contributions start from `upstream/main` and are sent to `kaitranntt/ccs`.
+- `dc-use` is the default integration and consumption branch. The
+  `integrate-dc-use` job merges `main` and `datacosmos`; `release-dc-use`
+  publishes the stable `<upstream-version>-dc.N` release.
 - Never touch the user's real `~/.ccs/` or `~/.claude/` in tests. Use
   `getCcsDir()` from `src/utils/config-manager.ts`; it respects `CCS_HOME`.
-- Do not commit directly to `main`.
-- Do not manually bump versions or create release tags. Semantic-release owns
-  versions, changelog, tags, and GitHub releases. This fork does not publish to
-  npm.
+- Do not commit directly to `main` or `dc-use`.
+- Do not manually bump versions or create release tags. `release-dc-use` owns
+  versions, tags and GitHub releases. This fork does not publish to npm.
+- Third-party code and forks stay intact: `CLIProxyAPIPlus`, the
+  `marlon-costa-dc/cliproxy` fork and the
+  `marlon-costa-dc/Cli-Proxy-API-Management-Center` fork (including its
+  `plus`/`datacosmos/ai-hub`/`dc-use` branches) are pinned, never deleted or
+  replaced.
 - CLI terminal output must be ASCII only: `[OK]`, `[!]`, `[X]`, `[i]`.
 - Respect `NO_COLOR` and TTY-aware output.
 
@@ -131,12 +141,15 @@ canonical duplicate.
 
 ## Release Signals
 
-- PR `CI` is the contributor quality gate.
-- `Push CI` is the post-merge signal for `main`.
-- A red `Push CI` is not automatically contributor failure; check PR `CI`
-  first.
-
-Use `feat:` or `fix:` for main promotion PRs so release automation runs.
+- PR `CI` is the contributor quality gate for `datacosmos`/`dc-use` changes.
+- `sync-upstream` fast-forwards `main`; `integrate-dc-use` merges
+  `main + datacosmos` and runs the full gates; `release-dc-use` publishes only
+  the verified integration as a stable `<upstream-version>-dc.N` release.
+- Use `feat:` or `fix:` for datacosmos changes that should flow to consumers.
+  Upstream contributions are separate branches from `upstream/main` and are
+  reviewed by `kaitranntt/ccs`.
+- A red automation job opens an issue and stops the flow; it never force-pushes
+  or resolves a merge conflict.
 
 ## Design Standards
 
@@ -155,7 +168,8 @@ Gas City rig. `gc prime` renders the agent's operating context,
 `bd show <id>` provides its durable requirements and evidence.
 
 Dispatched workers use only the lane the formula created, keep evidence on the
-bead, and land through a reviewed pull request on `main`. Gas City owns branch
+bead, and land through a reviewed pull request on `datacosmos` (or on `dc-use`
+for integration automation). Gas City owns branch
 and worktree creation; remote submission, review, merge, and tracker closure stay
 with this repository's own gates. Generic Git handoff examples in the managed
 Beads section do not replace that lifecycle. External contributors follow

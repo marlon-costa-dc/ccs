@@ -1,0 +1,140 @@
+name: Release DC-Use
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: release-dc-use
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dc-use
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: dc-use
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.9'
+
+      - name: Resolve stable dc version
+        id: version
+        run: |
+          set -euo pipefail
+          git fetch origin main datacosmos --tags
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            echo "[X] dc-use HEAD does not contain origin/main"
+            exit 1
+          fi
+          if ! test -f config/base-opencode.settings.json; then
+            echo "[X] dc-use HEAD does not contain the datacosmos provider delta"
+            exit 1
+          fi
+          git show origin/main:package.json > "$RUNNER_TEMP/upstream-package.json"
+          UPSTREAM_VERSION="$(node -p "require('$RUNNER_TEMP/upstream-package.json').version")"
+          latest_n="$(
+            git tag --list "v${UPSTREAM_VERSION}-dc.*" \
+              | sed -E "s/^v${UPSTREAM_VERSION}-dc\.([0-9]+)$/\1/" \
+              | sort -n \
+              | tail -n 1
+          )"
+          NEXT_N=$(( ${latest_n:-0} + 1 ))
+          RELEASE_VERSION="${UPSTREAM_VERSION}-dc.${NEXT_N}"
+          if git rev-parse -q --verify "refs/tags/v${RELEASE_VERSION}" >/dev/null; then
+            echo "[X] tag v${RELEASE_VERSION} already exists"
+            exit 1
+          fi
+          echo "upstream=${UPSTREAM_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "release=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> "$GITHUB_ENV"
+          echo "[i] releasing v${RELEASE_VERSION} from $(git rev-parse HEAD)"
+
+      - name: Install dependencies
+        run: bash scripts/ensure-deps.sh
+
+      - name: Build and validate
+        run: |
+          set -euo pipefail
+          bun run build:all
+          bun run validate
+          bun run validate:ci-parity
+          (cd ui && bun run validate)
+
+      - name: Package release assets
+        run: |
+          set -euo pipefail
+          node -e "
+            const fs = require('node:fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = process.env.RELEASE_VERSION;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          ASSET="ccs_${RELEASE_VERSION}_package.tar.gz"
+          CHECKSUMS="ccs_${RELEASE_VERSION}_checksums.txt"
+          echo "ASSET=$ASSET" >> "$GITHUB_ENV"
+          echo "CHECKSUMS=$CHECKSUMS" >> "$GITHUB_ENV"
+          bash scripts/build-release-asset.sh
+          sha256sum "$ASSET" > "$CHECKSUMS"
+
+      - name: Create tag and stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          TAG="v${RELEASE_VERSION}"
+          git tag "$TAG" HEAD
+          git push origin "$TAG"
+          NOTES="$RUNNER_TEMP/release-notes.md"
+          {
+            echo "Stable dc-use release v${RELEASE_VERSION}."
+            echo
+            echo "Upstream base: ${RELEASE_VERSION%%-dc.*}."
+            echo
+            echo "Changes since upstream main:"
+            git log --oneline --no-merges -n 50 "origin/main..HEAD"
+          } > "$NOTES"
+          gh release create "$TAG" "$ASSET" "$CHECKSUMS" \
+            --title "v${RELEASE_VERSION}" \
+            --notes-file "$NOTES" \
+            --latest
+
+      - name: Verify stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v${RELEASE_VERSION}"
+          gh release view "$TAG" --json isDraft,isPrerelease,isLatest,assets \
+            --jq '{draft: .isDraft, prerelease: .isPrerelease, latest: .isLatest, assets: [.assets[].name]}'
+          test "$(gh release view "$TAG" --json isDraft --jq .isDraft)" = "false"
+          test "$(gh release view "$TAG" --json isPrerelease --jq .isPrerelease)" = "false"
+          test "$(gh release view "$TAG" --json isLatest --jq .isLatest)" = "true"
+          gh release download "$TAG" --pattern "$CHECKSUMS" --dir "$RUNNER_TEMP"
+          (cd "$RUNNER_TEMP" && sha256sum -c "$CHECKSUMS")
+
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "[automation] dc-use release failed" \
+            --body "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            || true

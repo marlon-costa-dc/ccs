@@ -17,13 +17,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
+release_version="${RELEASE_VERSION:-$(node -p "require('./package.json').version")}"
+
 # package.json declares VERSION among the packaged files but the repository
 # does not track it. Materialize it from the release version before packing.
 if [[ ! -f VERSION ]]; then
-  node -p "require('./package.json').version" > VERSION
+  printf '%s\n' "$release_version" > VERSION
 fi
 
-npm pack --pack-destination "$scratch"
+npm pack --ignore-scripts --pack-destination "$scratch"
 shopt -s nullglob
 package_tarballs=("$scratch"/*.tgz)
 if [[ "${#package_tarballs[@]}" -ne 1 ]]; then

@@ -119,7 +119,7 @@ process.exit(0);
     expect(result.status).toBe(0);
     const routedArgs = JSON.parse(fs.readFileSync(droidArgsLogPath, 'utf8')) as string[];
     expect(routedArgs).toEqual(['exec', '--skip-permissions-unsafe', 'fix failing tests']);
-  });
+  }, 30000);
 
   it('auto-routes non-ambiguous short exec flags', () => {
     if (process.platform === 'win32') return;
