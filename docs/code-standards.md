@@ -12,7 +12,7 @@ and tests take precedence over prose.
 | Root commands and test entry points | [`package.json`](../package.json) |
 | UI commands and dependencies | [`ui/package.json`](../ui/package.json) |
 | Commit syntax | [`commitlint.config.cjs`](../commitlint.config.cjs) |
-| Release effects | [`.releaserc.cjs`](../.releaserc.cjs) |
+| Release effects | [`docs/release-process.md`](./release-process.md) |
 | Repository workflow | [`CLAUDE.md`](../CLAUDE.md) and [`CONTRIBUTING.md`](../CONTRIBUTING.md) |
 
 Update this document when one of those contracts changes. Do not duplicate
@@ -181,10 +181,10 @@ feat(cliproxy): add provider quota check
 docs(contributing): clarify validation
 ```
 
-Semantic-release owns versions, changelog entries, tags, npm publishing, and
-GitHub releases. Do not bump versions, tag, or publish manually. Release effects
-for each branch and commit type are defined in
-[`.releaserc.cjs`](../.releaserc.cjs).
+`release-dc-use` owns versions, tags and GitHub releases on the `dc-use`
+integration line (`<upstream-version>-dc.N`). Do not bump versions, tag, or
+publish manually. The branch model and release effects are defined in
+[`docs/release-process.md`](./release-process.md).
 
 ## Documentation Triggers
 

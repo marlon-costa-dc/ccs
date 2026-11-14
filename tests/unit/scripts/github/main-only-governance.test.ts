@@ -8,12 +8,15 @@ function read(relativePath: string) {
   return fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
 
-describe('main-only repository governance', () => {
+describe('main mirror and dc-use integration governance', () => {
   test('uses main across active CI, release, and pre-push branch surfaces', () => {
     const surfaces = [
       '.github/workflows/ci.yml',
       '.github/workflows/push-ci.yml',
-      '.github/workflows/semantic-release.yml',
+      '.github/workflows/sync-upstream.yml',
+      '.github/workflows/integrate-dc-use.yml',
+      '.github/workflows/release-dc-use.yml',
+      '.github/workflows/dispatch-dc-use-integration.yml',
       '.github/workflows/promote-release.yml',
       '.github/pull_request_template.md',
       '.github/ISSUE_TEMPLATE/bug-report.yml',
@@ -31,7 +34,6 @@ describe('main-only repository governance', () => {
 
     expect(read('.github/workflows/ci.yml')).toContain('branches: [main, dc-use]');
     expect(read('.github/workflows/push-ci.yml')).toContain('branches: [main]');
-    expect(read('.github/workflows/semantic-release.yml')).toContain('branches: [main]');
     const prePush = read('.husky/pre-push');
     expect(prePush).toContain('BASE_BRANCH="main"');
     expect(prePush).not.toContain('CCS_PR_BASE');

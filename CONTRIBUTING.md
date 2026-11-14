@@ -269,11 +269,23 @@ git commit -m "update file"
 
 ## Release Notes
 
-Releases are automated with semantic-release.
+Releases are automated on the `dc-use` integration line.
 
-- Merges to `main` publish the `@latest` channel.
-- Do not manually bump versions or create tags. This fork publishes GitHub
-  releases only.
+- `main` is an exact mirror of `kaitranntt/ccs`; `datacosmos` is the only branch
+  for datacosmos/ai-hub-specific code; `dc-use` is the default integration and
+  consumption branch.
+- `sync-upstream` fast-forwards `main`; `integrate-dc-use` merges `main` and
+  `datacosmos` and runs the full gates; `release-dc-use` publishes the verified
+  integration as a stable `v<upstream-version>-dc.N` release with
+  `ccs_<version>_package.tar.gz` and checksums.
+- Do not manually bump versions or create release tags.
+- Upstream contributions are separate branches cut from `upstream/main` with a
+  pull request to `kaitranntt/ccs` (base `dev`). Never include datacosmos code
+  in an upstream contribution.
+- Third-party forks and their branches are preserved and pinned:
+  `CLIProxyAPIPlus`, the `marlon-costa-dc/cliproxy` fork and the
+  `marlon-costa-dc/Cli-Proxy-API-Management-Center` fork (including its
+  `plus`/`datacosmos/ai-hub`/`dc-use` branches). Never delete or replace them.
 - [`docs/release-process.md`](./docs/release-process.md) is the canonical
   release authority and documents downstream packaging and Docker promotion.
 
