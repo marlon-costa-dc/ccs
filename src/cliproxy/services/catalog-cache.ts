@@ -37,7 +37,6 @@ const CHANNEL_TO_PROVIDER: Record<string, CLIProxyProvider> = {
   zai: 'zai',
   opencode: 'opencode',
   'opencode-go': 'opencode-go',
-  poolside: 'poolside',
   qwen: 'qwen',
   iflow: 'iflow',
   kimi: 'kimi',

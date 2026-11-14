@@ -390,40 +390,6 @@ function getFamilyGuide(family: AiProviderFamilyState): FamilyGuide {
           },
         ],
       };
-    case 'poolside-api-key':
-      return {
-        requiredNow: [
-          'Save the Poolside API key.',
-          'Leave Base URL blank unless this route should target a different endpoint.',
-          'Add mappings only when the upstream model name differs from the requested name.',
-        ],
-        optionalLater: [
-          'Base URL override for a custom gateway.',
-          'Headers for provider-specific routing.',
-          'Mappings such as claude-sonnet-4-5 -> nemotron-4-340b-reward.',
-        ],
-        emptyStateSummary: [
-          `Requests to ${family.routePath} use CLIProxy-managed Poolside credentials.`,
-          'Most setups start with the key only and keep the default endpoint.',
-          'Mappings and headers are optional follow-up steps.',
-        ],
-        profileBoundary:
-          'Use API Profiles when you want a CCS-native Anthropic-compatible profile rather than this CLIProxy-managed Poolside route.',
-        editPrompts: [
-          {
-            label: 'Base URL',
-            hint: 'Use it only for a custom gateway or managed endpoint.',
-          },
-          {
-            label: 'Model mappings',
-            hint: 'Add them only when the requested names need translating upstream.',
-          },
-          {
-            label: 'Headers',
-            hint: 'Keep them empty unless the provider requires extra routing context.',
-          },
-        ],
-      };
   }
 }
 

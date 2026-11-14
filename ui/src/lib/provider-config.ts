@@ -133,7 +133,6 @@ export const PROVIDER_FALLBACK_VISUALS: Record<ProviderVisualId, ProviderFallbac
   zai: { textClass: 'text-purple-600', letter: 'Z' },
   opencode: { textClass: 'text-indigo-600', letter: 'O' },
   'opencode-go': { textClass: 'text-indigo-600', letter: 'O' },
-  poolside: { textClass: 'text-teal-600', letter: 'P' },
   agy: { textClass: 'text-violet-600', letter: 'A' },
   qwen: { textClass: 'text-cyan-600', letter: 'Q' },
   iflow: { textClass: 'text-indigo-600', letter: 'i' },
@@ -169,8 +168,6 @@ export function getAiProviderFamilyVisual(familyId: AiProviderFamilyId): Provide
       return 'opencode';
     case 'opencode-go-api-key':
       return 'opencode-go';
-    case 'poolside-api-key':
-      return 'poolside';
   }
 }
 

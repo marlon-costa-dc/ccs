@@ -257,13 +257,6 @@ export const OAUTH_CONFIGS: Record<CLIProxyProvider, ProviderOAuthConfig> = {
     scopes: [],
     authFlag: '',
   },
-  poolside: {
-    provider: 'poolside',
-    displayName: 'Poolside',
-    authUrl: '',
-    scopes: [],
-    authFlag: '',
-  },
   agy: {
     provider: 'agy',
     displayName: 'Antigravity',

@@ -738,16 +738,16 @@
           "loc": 1510
         },
         {
-          "file": "src/cliproxy/model-catalog.ts",
-          "loc": 1298
-        },
-        {
           "file": "src/cliproxy/config/generator.ts",
           "loc": 1295
         },
         {
           "file": "src/web-server/model-pricing.ts",
           "loc": 1268
+        },
+        {
+          "file": "src/cliproxy/model-catalog.ts",
+          "loc": 1249
         },
         {
           "file": "src/cursor/cursor-executor.ts",

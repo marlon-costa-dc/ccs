@@ -120,21 +120,6 @@ export const PROVIDER_CAPABILITIES: Record<CLIProxyProvider, ProviderCapabilitie
     tokenTypeValues: ['opencode-go'],
     aliases: [],
   },
-  poolside: {
-    displayName: 'Poolside',
-    description: 'Poolside AI inference models (API key only)',
-    oauthFlow: 'device_code',
-    callbackPort: null,
-    callbackProviderName: 'poolside',
-    authUrlProviderName: 'poolside',
-    refreshOwnership: 'unsupported',
-    authStartSupport: 'unsupported',
-    authStartUnsupportedReason:
-      'Poolside uses API key authentication. Configure via AI Providers with your Poolside API key from https://poolside.ai',
-    authFilePrefixes: ['poolside-'],
-    tokenTypeValues: ['poolside'],
-    aliases: [],
-  },
   agy: {
     displayName: 'Antigravity',
     description: 'Antigravity AI models',

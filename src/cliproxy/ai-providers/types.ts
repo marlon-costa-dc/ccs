@@ -6,7 +6,6 @@ export const AI_PROVIDER_FAMILY_IDS = [
   'openai-compatibility',
   'opencode-api-key',
   'opencode-go-api-key',
-  'poolside-api-key',
 ] as const;
 
 export type AiProviderFamilyId = (typeof AI_PROVIDER_FAMILY_IDS)[number];
@@ -133,7 +132,6 @@ export interface LocalAiProviderConfig {
   'openai-compatibility'?: OpenAICompatEntry[];
   'opencode-api-key'?: AiProviderApiKeyEntry[];
   'opencode-go-api-key'?: AiProviderApiKeyEntry[];
-  'poolside-api-key'?: AiProviderApiKeyEntry[];
   [key: string]: unknown;
 }
 
@@ -196,13 +194,5 @@ export const AI_PROVIDER_FAMILY_DEFINITIONS: Record<
     authMode: 'api-key',
     supportsNamedEntries: false,
     routePath: '/api/provider/opencode-go',
-  },
-  'poolside-api-key': {
-    id: 'poolside-api-key',
-    displayName: 'Poolside',
-    description: 'Poolside API key for CLIProxy-managed routing',
-    authMode: 'api-key',
-    supportsNamedEntries: false,
-    routePath: '/api/provider/poolside',
   },
 };
