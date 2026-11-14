@@ -1,3 +1,13 @@
+## [8.9.0-fd.32](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.31...v8.9.0-fd.32) (2026-11-14)
+
+### Documentation
+
+* **reports:** regenerate inventory after provider service reduction ([9b85021](https://github.com/marlon-costa-dc/ccs/commit/9b850218ca13d9d09072f858c24d83a537496849))
+
+### Code Refactoring
+
+* **ai-providers:** use the upstream provider service ([9a78dc2](https://github.com/marlon-costa-dc/ccs/commit/9a78dc26f524993320104bbf9a36cc01655901f6))
+
 ## [8.9.0-fd.31](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.30...v8.9.0-fd.31) (2026-11-14)
 
 ### Bug Fixes
