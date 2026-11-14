@@ -500,11 +500,11 @@
   },
   "maintainability": {
     "typedErrors": {
-      "totalThrows": 492,
-      "typedThrows": 134,
-      "plainThrows": 298,
+      "totalThrows": 484,
+      "typedThrows": 120,
+      "plainThrows": 304,
       "otherThrows": 60,
-      "adoptionRatio": 0.2724,
+      "adoptionRatio": 0.2479,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
@@ -555,15 +555,15 @@
           "plain": 17
         },
         {
-          "subdomain": "cliproxy/ai-providers",
-          "count": 20,
-          "typed": 14,
-          "plain": 6
-        },
-        {
           "subdomain": "cliproxy/auth",
           "count": 16,
           "typed": 16,
+          "plain": 0
+        },
+        {
+          "subdomain": "auth",
+          "count": 12,
+          "typed": 12,
           "plain": 0
         }
       ]
@@ -722,7 +722,7 @@
       ]
     },
     "largeFiles": {
-      "countOver400": 98,
+      "countOver400": 97,
       "countOver600": 44,
       "topOver400": [
         {
