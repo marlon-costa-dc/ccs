@@ -1,3 +1,21 @@
+## [8.9.0-fd.31](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.30...v8.9.0-fd.31) (2026-11-14)
+
+### Bug Fixes
+
+* **release:** materialize VERSION and ignore negated file patterns ([16b2ede](https://github.com/marlon-costa-dc/ccs/commit/16b2ede18aab5f9296bad9bda743e0e2ed29ead6))
+
+### Documentation
+
+* record the fork delta and maintenance contract ([b381e7f](https://github.com/marlon-costa-dc/ccs/commit/b381e7fad801d7c90e4afab3615d820e6970ff76))
+
+### Tests
+
+* **cliproxy:** derive session tracker port from pid ([9634a3a](https://github.com/marlon-costa-dc/ccs/commit/9634a3adeb9e6b9eae8553b61627a2c589658f7e))
+
+### Build System
+
+* **release:** package GitHub assets from a hardened main-only release path ([da6c2fd](https://github.com/marlon-costa-dc/ccs/commit/da6c2fd4290b784f48ebe1fdf97d9242f234a99a))
+
 ## [8.9.0-fd.30](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.29...v8.9.0-fd.30) (2026-11-14)
 
 ### Bug Fixes
