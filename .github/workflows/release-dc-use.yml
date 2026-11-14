@@ -86,6 +86,7 @@ jobs:
           "
           ASSET="ccs_${RELEASE_VERSION}_package.tar.gz"
           CHECKSUMS="ccs_${RELEASE_VERSION}_checksums.txt"
+          export ASSET
           echo "ASSET=$ASSET" >> "$GITHUB_ENV"
           echo "CHECKSUMS=$CHECKSUMS" >> "$GITHUB_ENV"
           bash scripts/build-release-asset.sh
