@@ -14,6 +14,8 @@ export { SharedPage } from './shared';
 
 export { AnalyticsPage } from './analytics';
 
+export { CursorPage } from './cursor';
+
 export { ClaudeExtensionPage } from './claude-extension';
 
 export { UpdatesPage } from './updates';

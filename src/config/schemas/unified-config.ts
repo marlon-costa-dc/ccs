@@ -24,11 +24,11 @@ import type {
 import {
   DEFAULT_COPILOT_CONFIG,
   DEFAULT_CURSOR_CONFIG,
+  DEFAULT_CLIPROXY_SERVER_CONFIG,
   DEFAULT_OPENAI_COMPAT_PROXY_CONFIG,
   DEFAULT_IMAGE_ANALYSIS_CONFIG,
   DEFAULT_GLOBAL_ENV,
 } from './providers';
-import { withCliproxyServerDefaults } from './proxy-server';
 import { UNIFIED_CONFIG_VERSION } from './version';
 import type { QuotaManagementConfig } from './quota';
 import { DEFAULT_QUOTA_MANAGEMENT_CONFIG } from './quota';
@@ -39,8 +39,6 @@ import type { OfficialChannelsConfig } from './channels';
 import { DEFAULT_OFFICIAL_CHANNELS_CONFIG } from './channels';
 import type { BrowserConfig } from './browser';
 import { DEFAULT_BROWSER_CONFIG } from './browser';
-import type { ModelPipelineConfig } from './model-pipeline';
-import { isModelPipelineConfig } from './model-pipeline';
 
 /**
  * Main unified configuration structure.
@@ -59,8 +57,6 @@ export interface UnifiedConfig {
   profiles: Record<string, ProfileConfig>;
   /** CLIProxy configuration */
   cliproxy: CLIProxyConfig;
-  /** Immutable AI Hub model-pipeline snapshot consumed and projected by CCS. */
-  model_pipeline?: ModelPipelineConfig;
   /** OpenAI-compatible local proxy configuration */
   proxy?: OpenAICompatProxyConfig;
   /** CCS-owned structured logging configuration */
@@ -115,6 +111,11 @@ export function createEmptyUnifiedConfig(): UnifiedConfig {
       },
       safety: { ...DEFAULT_CLIPROXY_SAFETY_CONFIG },
       auto_sync: true,
+      routing: {
+        strategy: 'round-robin',
+        session_affinity: false,
+        session_affinity_ttl: '1h',
+      },
     },
     proxy: {
       port: DEFAULT_OPENAI_COMPAT_PROXY_CONFIG.port,
@@ -180,7 +181,7 @@ export function createEmptyUnifiedConfig(): UnifiedConfig {
     },
     copilot: { ...DEFAULT_COPILOT_CONFIG },
     cursor: { ...DEFAULT_CURSOR_CONFIG },
-    cliproxy_server: withCliproxyServerDefaults(),
+    cliproxy_server: { ...DEFAULT_CLIPROXY_SERVER_CONFIG },
     quota_management: { ...DEFAULT_QUOTA_MANAGEMENT_CONFIG },
     thinking: { ...DEFAULT_THINKING_CONFIG },
     channels: { ...DEFAULT_OFFICIAL_CHANNELS_CONFIG },
@@ -203,6 +204,5 @@ export function isUnifiedConfig(obj: unknown): obj is UnifiedConfig {
   const config = obj as Record<string, unknown>;
   // Only require version to be a number >= 1 (allow future versions)
   // Sections are optional - will be merged with defaults in loadOrCreateUnifiedConfig
-  if (typeof config.version !== 'number' || config.version < 1) return false;
-  return config.model_pipeline === undefined || isModelPipelineConfig(config.model_pipeline);
+  return typeof config.version === 'number' && config.version >= 1;
 }

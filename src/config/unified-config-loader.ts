@@ -24,8 +24,6 @@ import {
 } from './unified-config-types';
 import type { UnifiedConfig } from './unified-config-types';
 import { isUnifiedConfigEnabled } from './feature-flags';
-import { parseModelPipelineConfig } from './schemas/model-pipeline';
-import { ConfigError } from '../errors/error-types';
 
 // loadUnifiedConfig() runs several times per invocation (startup migration check,
 // first-time-install check, command handler, doctor checks). A corrupt config.yaml
@@ -154,7 +152,7 @@ export function loadUnifiedConfig(): UnifiedConfig | null {
     const parsed = yaml.load(content);
 
     if (!isUnifiedConfig(parsed)) {
-      throw new ConfigError(`Invalid config format in ${yamlPath}`, yamlPath);
+      throw new Error(`Invalid config format in ${yamlPath}`);
     }
 
     // Auto-upgrade if version is outdated (regenerates YAML with new comments and fields)
@@ -173,9 +171,7 @@ export function loadUnifiedConfig(): UnifiedConfig | null {
       }
     }
 
-    return parsed.model_pipeline === undefined
-      ? parsed
-      : { ...parsed, model_pipeline: parseModelPipelineConfig(parsed.model_pipeline) };
+    return parsed;
   } catch (err) {
     // U3: Provide better context for YAML syntax errors. Print at most once per
     // path per process so repeated loads of a corrupt file do not spam the error.

@@ -1,0 +1,13 @@
+[Unit]
+Description=Reconcile the CCS CLIProxy Docker service
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+RuntimeDirectory=ccs-cliproxy
+RuntimeDirectoryMode=0700
+ExecStart=/opt/cliproxy/ccs-cliproxy-reconcile.sh
+TimeoutStartSec=10min

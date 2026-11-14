@@ -42,8 +42,6 @@ export interface CLIProxyVariantConfig {
  * Per-tier provider+model mapping for composite variants.
  */
 export interface CompositeTierConfig {
-  /** Stable client-visible model alias owned by the control plane. */
-  alias: string;
   /** Provider for this tier */
   provider: CLIProxyProvider;
   /** Model ID to use for this tier */
@@ -56,16 +54,8 @@ export interface CompositeTierConfig {
     model: string;
     account?: string;
   };
-  /** Ordered cross-provider fallback hops after the primary provider+model. */
-  fallback_chain?: readonly CompositeFallbackEntry[];
   /** Per-tier thinking budget override (e.g. 'xhigh', 'medium', 'off') */
   thinking?: string;
-}
-
-export interface CompositeFallbackEntry {
-  readonly provider: CLIProxyProvider;
-  readonly model: string;
-  readonly account?: string;
 }
 
 /**
@@ -135,7 +125,7 @@ export interface CLIProxyRoutingConfig {
 /**
  * CLIProxy request-retry configuration.
  * Controls CLIProxy's own retry-on-transient-error behavior
- * (403, 408, 500, 502, 503, 504). Defaults to disabled (0/0): retrying can
+ * (403, 408, 429, 500, 502, 503, 504). Defaults to disabled (0/0): retrying can
  * burn quota on multi-account pools, so this is opt-in.
  */
 export interface CLIProxyRetryConfig {
@@ -153,8 +143,6 @@ export interface CLIProxyOAuthModelAliasEntry {
   alias: string;
   /** Keep both the upstream name and alias visible when supported upstream. */
   fork?: boolean;
-  /** Zero-based position in an explicitly ordered cross-provider pool. */
-  order?: number;
 }
 
 /** Provider/protocol keyed OAuth model aliases (for example `codex`). */
@@ -191,18 +179,21 @@ export interface CLIProxyPayloadConfig {
   [section: string]: unknown;
 }
 
-/** Exact, source-attributed price for one routed channel/model identity. */
-export interface CLIProxyModelPricingEntry {
-  channel: string;
+/** A candidate target within a fallback chain. */
+export interface CLIProxyFallbackCandidate {
+  provider: string;
   model: string;
-  input_per_million: number;
-  output_per_million: number;
-  cache_read_per_million?: number | null;
-  currency: 'USD';
-  source: string;
-  source_digest: string;
-  fetched_at: string;
 }
+
+/** Configuration for an ordered cross-model fallback chain. */
+export interface CLIProxyFallbackChainEntry {
+  candidates: CLIProxyFallbackCandidate[];
+  sticky_primary?: boolean;
+  exhaustion_cooldown?: string;
+}
+
+/** Map of route model or alias to fallback chain configuration. */
+export type CLIProxyFallbackChainConfig = Record<string, CLIProxyFallbackChainEntry>;
 
 /** Lower bound (inclusive) accepted for CLIProxy retry config fields. */
 export const CLIPROXY_RETRY_MIN_VALUE = 0;
@@ -290,6 +281,6 @@ export interface CLIProxyConfig {
   oauth_model_alias?: CLIProxyOAuthModelAliasConfig;
   /** Scoped payload rules emitted into managed CLIProxy config. */
   payload?: CLIProxyPayloadConfig;
-  /** AI Hub calculated model prices emitted into managed CLIProxy config. */
-  model_pricing?: CLIProxyModelPricingEntry[];
+  /** Ordered cross-model fallback chains on 402/429 exhaustion. */
+  fallback_chain?: CLIProxyFallbackChainConfig;
 }

@@ -3,20 +3,23 @@
  * Covers: parseStringFlag, timeout validation, max-turns validation, agents JSON validation
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 
 // Import the DelegationHandler class
 import { DelegationHandler } from '../../../src/delegation/delegation-handler';
 
 describe('DelegationHandler', () => {
   let handler: DelegationHandler;
+  // Validation warnings are written to stderr (process.stderr.write), not console.error.
+  let consoleErrorSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     handler = new DelegationHandler();
+    consoleErrorSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
-    // no cleanup needed — no mocks to restore
+    consoleErrorSpy.mockRestore();
   });
 
   describe('_extractOptions - timeout validation', () => {
@@ -28,22 +31,26 @@ describe('DelegationHandler', () => {
     it('rejects NaN timeout with warning', () => {
       const options = handler._extractOptions(['glm', '-p', 'test', '--timeout', 'abc']);
       expect(options.timeout).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('rejects negative timeout with warning', () => {
       const options = handler._extractOptions(['glm', '-p', 'test', '--timeout', '-5000']);
       expect(options.timeout).toBeUndefined();
       expect(options.extraArgs).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('rejects zero timeout with warning', () => {
       const options = handler._extractOptions(['glm', '-p', 'test', '--timeout', '0']);
       expect(options.timeout).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('rejects timeout exceeding max (600000ms) with warning', () => {
       const options = handler._extractOptions(['glm', '-p', 'test', '--timeout', '700000']);
       expect(options.timeout).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('ignores missing timeout value at end of args', () => {
@@ -77,22 +84,26 @@ describe('DelegationHandler', () => {
     it('rejects NaN max-turns with warning', () => {
       const options = handler._extractOptions(['glm', '-p', 'test', '--max-turns', 'abc']);
       expect(options.maxTurns).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('rejects negative max-turns with warning', () => {
       const options = handler._extractOptions(['glm', '-p', 'test', '--max-turns', '-5']);
       expect(options.maxTurns).toBeUndefined();
       expect(options.extraArgs).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('rejects zero max-turns with warning', () => {
       const options = handler._extractOptions(['glm', '-p', 'test', '--max-turns', '0']);
       expect(options.maxTurns).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('caps max-turns at 100 when exceeding limit', () => {
       const options = handler._extractOptions(['glm', '-p', 'test', '--max-turns', '500']);
       expect(options.maxTurns).toBe(100);
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('accepts max-turns at exactly 100', () => {
@@ -140,6 +151,7 @@ describe('DelegationHandler', () => {
         '--other-flag',
       ]);
       expect(options.fallbackModel).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('does not forward rejected dash-prefixed fallback-model values', () => {
@@ -157,6 +169,7 @@ describe('DelegationHandler', () => {
         '--channels',
         'plugin:telegram@claude-plugins-official',
       ]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('rejects empty string value', () => {
@@ -214,6 +227,7 @@ describe('DelegationHandler', () => {
         '--channels',
         'plugin:telegram@claude-plugins-official',
       ]);
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
   });
 
@@ -226,6 +240,7 @@ describe('DelegationHandler', () => {
     it('rejects invalid JSON with warning', () => {
       const options = handler._extractOptions(['glm', '-p', 'test', '--agents', '{invalid json}']);
       expect(options.agents).toBeUndefined();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it('rejects dash-prefixed value', () => {
@@ -385,14 +400,15 @@ describe('DelegationHandler', () => {
     });
 
     it('rejects empty inline prompt syntax', () => {
-      const originalExit = process.exit;
-      process.exit = ((code?: number) => {
+      const exitSpy = spyOn(process, 'exit').mockImplementation(((code?: number) => {
         throw new Error(`process.exit(${code})`);
-      }) as typeof process.exit;
+      }) as typeof process.exit);
+
       try {
-        expect(() => handler.route(['glm', '--prompt='])).toThrow('process.exit(1)');
+        expect(() => handler._extractPrompt(['glm', '--prompt='])).toThrow('process.exit(1)');
+        expect(exitSpy).toHaveBeenCalledWith(1);
       } finally {
-        process.exit = originalExit;
+        exitSpy.mockRestore();
       }
     });
   });

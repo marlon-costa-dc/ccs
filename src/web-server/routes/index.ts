@@ -29,8 +29,11 @@ import imageAnalysisRoutes from './image-analysis-routes';
 import browserRoutes from './browser-routes';
 import cliproxyAuthRoutes from './cliproxy-auth-routes';
 import cliproxyStatsRoutes from './cliproxy-stats-routes';
+import cliproxyRoutingRoutes from './cliproxy-routing-routes';
 import cliproxySyncRoutes from './cliproxy-sync-routes';
 import aiProviderRoutes from './ai-provider-routes';
+import copilotRoutes from './copilot-routes';
+import cursorRoutes from './cursor-routes';
 import droidRoutes from './droid-routes';
 import codexRoutes from './codex-routes';
 import miscRoutes from './misc-routes';
@@ -117,6 +120,7 @@ apiRoutes.use('/claude-extension', claudeExtensionRoutes);
 
 // ==================== CLIProxy ====================
 // Variants, auth, accounts, stats, status, models, error logs
+apiRoutes.use('/cliproxy', cliproxyRoutingRoutes);
 apiRoutes.use('/cliproxy', variantRoutes);
 apiRoutes.use('/cliproxy/auth', cliproxyAuthRoutes);
 apiRoutes.use('/cliproxy', cliproxyStatsRoutes);
@@ -129,6 +133,13 @@ apiRoutes.use('/cliproxy/openai-compat', providerRoutes);
 apiRoutes.use('/websearch', websearchRoutes);
 apiRoutes.use('/browser', browserRoutes);
 apiRoutes.use('/image-analysis', imageAnalysisRoutes);
+
+// ==================== Copilot ====================
+apiRoutes.use('/copilot', copilotRoutes);
+
+// ==================== Cursor ====================
+apiRoutes.use('/cursor', cursorRoutes);
+apiRoutes.use('/legacy/cursor', cursorRoutes);
 
 // ==================== Droid ====================
 apiRoutes.use('/droid', droidRoutes);

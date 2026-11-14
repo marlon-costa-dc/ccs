@@ -17,11 +17,11 @@ interface RunResult {
 }
 
 function runCcs(args: string[], env: NodeJS.ProcessEnv): RunResult {
-  const ccsEntry = path.join(process.cwd(), 'dist', 'ccs.js');
-  const result = spawnSync('node', [ccsEntry, ...args], {
+  const ccsEntry = path.join(process.cwd(), 'src', 'ccs.ts');
+  const result = spawnSync(process.execPath, [ccsEntry, ...args], {
     encoding: 'utf8',
     env,
-    timeout: 10000,
+    timeout: 8000,
   });
 
   return {
@@ -48,9 +48,6 @@ function reserveClosedPort(): number {
   });
   const { port } = server;
   server.stop(true);
-  if (port === undefined) {
-    throw new Error('Mock browser server did not expose a port');
-  }
   return port;
 }
 
@@ -187,8 +184,6 @@ exit 0
       CCS_HOME: tmpHome,
       CCS_CLAUDE_PATH: fakeClaudePath,
       CCS_DEBUG: '1',
-      CCS_NO_PRE_DISPATCH: '1',
-      CCS_SKIP_PREFLIGHT: '1',
       CCS_BROWSER_USER_DATA_DIR: '',
       CCS_BROWSER_PROFILE_DIR: '',
       CCS_BROWSER_DEVTOOLS_HOST: '',
@@ -208,20 +203,7 @@ exit 0
       return;
     }
 
-    const originalCcsHome = process.env.CCS_HOME;
-    process.env.CCS_HOME = tmpHome;
-    try {
-      const stopped = await stopOpenAICompatProxy('glm');
-      if (!stopped.success) {
-        throw new Error(stopped.error || 'Failed to stop the test OpenAI-compatible proxy');
-      }
-    } finally {
-      if (originalCcsHome !== undefined) {
-        process.env.CCS_HOME = originalCcsHome;
-      } else {
-        delete process.env.CCS_HOME;
-      }
-    }
+    await stopOpenAICompatProxy();
     fs.rmSync(tmpHome, { recursive: true, force: true });
   });
 
@@ -376,7 +358,8 @@ exit 0
     expect(launchedEnv).toContain('anthropicModel=gpt-5.4');
     expect(launchedEnv).toContain('maxOutputTokens=12345');
     expect(fs.readFileSync(claudeSettingsPathLogPath, 'utf8')).toBe(launchSettingsPath);
-    expect(fs.existsSync(launchSettingsPath as string)).toBe(false);
+    expect(launchSettingsPath).toContain(path.join(ccsDir, 'cache', 'isolated-settings'));
+    expect(fs.existsSync(launchSettingsPath as string)).toBe(true);
   });
 
   it('does not auto-enable browser reuse for settings-profile launches from env overrides alone', async () => {

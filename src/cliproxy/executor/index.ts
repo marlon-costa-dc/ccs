@@ -59,6 +59,7 @@ import {
   resolveSkipLocalAuth,
   runAntigravityGate,
   ensureProviderAuthentication,
+  runPreflightQuotaCheck,
   runAccountSafetyGuards,
   ensureModelConfiguration,
   ensureProviderSettingsFile,
@@ -74,7 +75,6 @@ import { buildProxyChain } from './proxy-chain-builder';
 import { warnBrokenModels } from './model-warnings';
 import { launchClaude } from './claude-launcher';
 import { maybeWarnClaudeShadow, maybeShowClaudeRoutingNotice } from '../claude-shadow-warning';
-import { ProxyError } from '../../errors/error-types';
 
 /** Local alias so internal call sites need no change */
 const resolveRuntimeQuotaMonitorProviders = _resolveRuntimeQuotaMonitorProviders;
@@ -146,11 +146,12 @@ export async function execClaudeWithCLIProxy(
   });
 
   const {
-    browserLaunchOverride,
+    browserLaunchOverride: argsBrowserLaunchOverride,
     argsWithoutBrowserFlags,
     parseFailed: browserLaunchParseFailed,
   } = resolveBrowserLaunchFlags(proxyResolution.argsWithoutProxy);
   if (browserLaunchParseFailed) return;
+  const browserLaunchOverride = cfg.browserLaunchOverride ?? argsBrowserLaunchOverride;
 
   const { proxyConfig, useRemoteProxy, localBackend, binaryPath, argsWithoutProxy } =
     await resolveExecutorProxy(proxyResolution, {
@@ -295,8 +296,12 @@ export async function execClaudeWithCLIProxy(
     await ensureProviderAuthentication(authCtx);
   }
 
-  // 3b. Account safety: enforce cross-provider isolation. Selection and quota
-  // failover belong exclusively to the active CLIProxy model-routing snapshot.
+  // 3b. Preflight quota check (providers with quota-based rotation)
+  if (!skipLocalAuth) {
+    await runPreflightQuotaCheck(provider, compositeProviders);
+  }
+
+  // 3c. Account safety: enforce cross-provider isolation
   if (!skipLocalAuth) {
     runAccountSafetyGuards(provider, compositeProviders);
   }
@@ -374,7 +379,7 @@ export async function execClaudeWithCLIProxy(
         remotePort: proxyConfig.port,
         authToken: proxyConfig.authToken,
         verbose,
-        allowSelfSigned: proxyConfig.allowSelfSigned,
+        allowSelfSigned: proxyConfig.allowSelfSigned ?? false,
       });
       tunnelPort = await httpsTunnel.start();
       log(
@@ -383,31 +388,29 @@ export async function execClaudeWithCLIProxy(
     } catch (error) {
       const err = error as Error;
       process.stderr.write(`${warn(`Failed to start HTTPS tunnel: ${err.message}`)}\n`);
-      throw new ProxyError(`HTTPS tunnel startup failed: ${err.message}`, undefined, error);
+      throw new Error(`HTTPS tunnel startup failed: ${err.message}`);
     }
   } else if (useRemoteProxy && proxyConfig.protocol === 'https' && provider === 'codex') {
     log('HTTPS tunnel skipped for Codex; local proxy chain will connect to remote HTTPS directly');
   }
 
-  const imageAnalysisProxyTarget = useRemoteProxy
-    ? {
-        host: proxyConfig.host,
-        port: proxyConfig.port,
-        protocol: proxyConfig.protocol,
-        authToken: proxyConfig.authToken,
-        managementKey: proxyConfig.managementKey,
-        allowSelfSigned: proxyConfig.allowSelfSigned,
-        managementTimeoutMs: proxyConfig.timeout,
-        isRemote: true as const,
-      }
-    : {
-        host: '127.0.0.1',
-        port: cfg.port,
-        protocol: 'http' as const,
-        allowSelfSigned: false,
-        managementTimeoutMs: proxyConfig.timeout,
-        isRemote: false as const,
-      };
+  const imageAnalysisProxyTarget =
+    useRemoteProxy && proxyConfig.host
+      ? {
+          host: proxyConfig.host,
+          port: proxyConfig.port,
+          protocol: proxyConfig.protocol,
+          authToken: proxyConfig.authToken,
+          managementKey: proxyConfig.managementKey,
+          allowSelfSigned: proxyConfig.allowSelfSigned,
+          isRemote: true as const,
+        }
+      : {
+          host: '127.0.0.1',
+          port: cfg.port,
+          protocol: 'http' as const,
+          isRemote: false as const,
+        };
   const imageAnalysisResolution = await resolveCliproxyImageAnalysisEnv({
     profileName: cfg.profileName || provider,
     provider,

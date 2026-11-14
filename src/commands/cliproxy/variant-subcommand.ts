@@ -149,10 +149,16 @@ function formatModelOption(model: ModelEntry): string {
   return `${model.name}${tierBadge}`;
 }
 
-const CODEX_EFFORTS_IN_ORDER = ['minimal', 'low', 'medium', 'high', 'xhigh'] as const;
+const CODEX_EFFORTS_IN_ORDER = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 type CodexSelectableEffort = (typeof CODEX_EFFORTS_IN_ORDER)[number];
 
 function getCodexSelectableEfforts(model: ModelEntry): CodexSelectableEffort[] {
+  const thinkingLevels = model.thinking?.levels;
+  if (thinkingLevels && thinkingLevels.length > 0) {
+    return thinkingLevels.filter((lvl): lvl is CodexSelectableEffort =>
+      (CODEX_EFFORTS_IN_ORDER as readonly string[]).includes(lvl)
+    );
+  }
   const maxLevel = model.thinking?.maxLevel;
   const maxIndex = CODEX_EFFORTS_IN_ORDER.findIndex((effort) => effort === maxLevel);
   if (maxIndex < 0) return [];
@@ -236,7 +242,6 @@ function formatVariantAccountLabel(account: {
  */
 async function selectTierConfig(
   tierName: string,
-  alias: string,
   verbose: boolean
 ): Promise<CompositeTierConfig | null> {
   console.log(header(`${tierName.charAt(0).toUpperCase() + tierName.slice(1)} Tier`));
@@ -302,7 +307,7 @@ async function selectTierConfig(
   }
 
   console.log('');
-  return { alias, provider, model };
+  return { provider, model };
 }
 
 export async function handleCreate(
@@ -356,15 +361,15 @@ export async function handleCreate(
     console.log('');
 
     const verbose = args.includes('--verbose');
-    const opus = await selectTierConfig('opus', `${name}-opus`, verbose);
+    const opus = await selectTierConfig('opus', verbose);
     if (!opus) {
       return; // User cancelled auth
     }
-    const sonnet = await selectTierConfig('sonnet', `${name}-sonnet`, verbose);
+    const sonnet = await selectTierConfig('sonnet', verbose);
     if (!sonnet) {
       return; // User cancelled auth
     }
-    const haiku = await selectTierConfig('haiku', `${name}-haiku`, verbose);
+    const haiku = await selectTierConfig('haiku', verbose);
     if (!haiku) {
       return; // User cancelled auth
     }
@@ -904,7 +909,7 @@ export async function handleEdit(
       default: false,
     });
     if (shouldEdit) {
-      const newConfig = await selectTierConfig(tierName, variant.tiers[tierName].alias, verbose);
+      const newConfig = await selectTierConfig(tierName, verbose);
       if (!newConfig) {
         console.log(fail('Edit cancelled'));
         process.exit(0);

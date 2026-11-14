@@ -4,7 +4,6 @@ import * as os from 'os';
 import * as path from 'path';
 import * as http from 'http';
 import { execClaudeWithCLIProxy, hasGitLabTokenLoginFlag, readOptionValue } from '../index';
-import { UNIFIED_CONFIG_VERSION } from '../../../config/schemas/version';
 
 describe('readOptionValue', () => {
   it('parses split-token option values', () => {
@@ -72,76 +71,15 @@ describe('execClaudeWithCLIProxy browser flag validation', () => {
     return fs.existsSync(filePath);
   }
 
-  function configureRemoteProxy(port: number, webSearch = false): void {
+  function makeWebSearchProvisioningFail(): void {
     const ccsDir = path.join(tmpHome, '.ccs');
     fs.mkdirSync(ccsDir, { recursive: true });
-    const lines = [
-      `version: ${UNIFIED_CONFIG_VERSION}`,
-      'cliproxy_server:',
-      '  remote:',
-      '    enabled: true',
-      '    host: 127.0.0.1',
-      `    port: ${port}`,
-      '    protocol: http',
-      '    auth_token: SECRET_TOKEN_FOR_VALIDATION',
-      '    management_key: MANAGEMENT_KEY_FOR_VALIDATION',
-    ];
-    if (webSearch) {
-      lines.push(
-        'websearch:',
-        '  enabled: true',
-        '  providers:',
-        '    duckduckgo:',
-        '      enabled: true'
-      );
-    }
-    fs.writeFileSync(path.join(ccsDir, 'config.yaml'), lines.join('\n'), 'utf8');
-  }
-
-  function makeWebSearchProvisioningFail(port: number): void {
-    configureRemoteProxy(port, true);
-    const ccsDir = path.join(tmpHome, '.ccs');
+    fs.writeFileSync(
+      path.join(ccsDir, 'config.yaml'),
+      'version: 13\nwebsearch:\n  enabled: true\n  providers:\n    duckduckgo:\n      enabled: true\n',
+      'utf8'
+    );
     fs.writeFileSync(path.join(ccsDir, 'hooks'), 'not-a-directory', 'utf8');
-  }
-
-  async function startRemoteProxy(): Promise<{
-    readonly port: number;
-    readonly requestCount: () => number;
-    readonly close: () => Promise<void>;
-  }> {
-    let requests = 0;
-    const server = http.createServer((req, res) => {
-      requests += 1;
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(
-        req.url === '/v0/management/auth-files'
-          ? JSON.stringify({
-              files: [
-                {
-                  id: 'gemini-validation',
-                  name: 'gemini-validation',
-                  provider: 'gemini-cli',
-                  status: 'active',
-                },
-              ],
-            })
-          : '{"ok":true}'
-      );
-    });
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-    const address = server.address();
-    if (!address || typeof address === 'string') {
-      server.close();
-      throw new Error('Test server did not bind to a TCP port');
-    }
-    return {
-      port: address.port,
-      requestCount: () => requests,
-      close: () =>
-        new Promise<void>((resolve, reject) => {
-          server.close((error) => (error ? reject(error) : resolve()));
-        }),
-    };
   }
 
   afterEach(() => {
@@ -155,23 +93,57 @@ describe('execClaudeWithCLIProxy browser flag validation', () => {
   });
 
   it('keeps WebSearch provisioning strict for --config settings writes', async () => {
-    const remote = await startRemoteProxy();
-    makeWebSearchProvisioningFail(remote.port);
+    makeWebSearchProvisioningFail();
+
+    let requestCount = 0;
+    const server = http.createServer((_req, res) => {
+      requestCount += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"ok":true}');
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      server.close();
+      throw new Error('Test server did not bind to a TCP port');
+    }
 
     try {
       await expect(
-        execClaudeWithCLIProxy(fakeClaudePath, 'gemini', ['--config'], {})
+        execClaudeWithCLIProxy(
+          fakeClaudePath,
+          'gemini',
+          [
+            '--proxy-host',
+            '127.0.0.1',
+            '--proxy-port',
+            String(address.port),
+            '--proxy-auth-token',
+            'SECRET_TOKEN_FOR_VALIDATION',
+            '--remote-only',
+            '--config',
+          ],
+          {}
+        )
       ).rejects.toThrow(
         'WebSearch is enabled, but CCS could not prepare the local WebSearch tool.'
       );
 
-      expect(remote.requestCount()).toBeGreaterThan(0);
+      expect(requestCount).toBeGreaterThan(0);
     } finally {
-      await remote.close();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
     }
   });
 
   it('fails closed on WebSearch provisioning failures for CLIProxy launches', async () => {
+    makeWebSearchProvisioningFail();
+
     const markerPath = path.join(tmpHome, 'fake-claude-launched');
     fs.writeFileSync(
       fakeClaudePath,
@@ -180,8 +152,22 @@ describe('execClaudeWithCLIProxy browser flag validation', () => {
     );
     fs.chmodSync(fakeClaudePath, 0o755);
 
-    const remote = await startRemoteProxy();
-    makeWebSearchProvisioningFail(remote.port);
+    let requestCount = 0;
+    const server = http.createServer((_req, res) => {
+      requestCount += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"ok":true}');
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      server.close();
+      throw new Error('Test server did not bind to a TCP port');
+    }
 
     const exitSpy = jest
       .spyOn(process, 'exit')
@@ -191,25 +177,56 @@ describe('execClaudeWithCLIProxy browser flag validation', () => {
 
     try {
       await expect(
-        execClaudeWithCLIProxy(fakeClaudePath, 'gemini', ['--print', 'hello'], {})
+        execClaudeWithCLIProxy(
+          fakeClaudePath,
+          'gemini',
+          [
+            '--proxy-host',
+            '127.0.0.1',
+            '--proxy-port',
+            String(address.port),
+            '--proxy-auth-token',
+            'SECRET_TOKEN_FOR_VALIDATION',
+            '--remote-only',
+            '--print',
+            'hello',
+          ],
+          {}
+        )
       ).rejects.toThrow(
         'WebSearch is enabled, but CCS could not prepare the local WebSearch tool.'
       );
 
       expect(await waitForFile(markerPath)).toBe(false);
-      expect(remote.requestCount()).toBeGreaterThan(0);
+      expect(requestCount).toBeGreaterThan(0);
       expect(exitSpy).not.toHaveBeenCalledWith(0);
     } finally {
       exitSpy.mockRestore();
       logSpy.mockRestore();
       errorSpy.mockRestore();
-      await remote.close();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
     }
   });
 
   it('validates conflicting browser launch flags before remote proxy checks', async () => {
-    const remote = await startRemoteProxy();
-    configureRemoteProxy(remote.port);
+    let requestCount = 0;
+    const server = http.createServer((_req, res) => {
+      requestCount += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"ok":true}');
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      server.close();
+      throw new Error('Test server did not bind to a TCP port');
+    }
 
     const exitSpy = jest
       .spyOn(process, 'exit')
@@ -217,17 +234,34 @@ describe('execClaudeWithCLIProxy browser flag validation', () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     try {
-      await execClaudeWithCLIProxy(fakeClaudePath, 'gemini', ['--browser', '--no-browser'], {});
+      await execClaudeWithCLIProxy(
+        fakeClaudePath,
+        'gemini',
+        [
+          '--proxy-host',
+          '127.0.0.1',
+          '--proxy-port',
+          String(address.port),
+          '--proxy-auth-token',
+          'SECRET_TOKEN_FOR_VALIDATION',
+          '--remote-only',
+          '--browser',
+          '--no-browser',
+        ],
+        {}
+      );
 
       expect(exitSpy).toHaveBeenCalledWith(1);
       expect(errorSpy).toHaveBeenCalledWith(
         '[X] Use either `--browser` or `--no-browser`, not both.'
       );
-      expect(remote.requestCount()).toBe(0);
+      expect(requestCount).toBe(0);
     } finally {
       exitSpy.mockRestore();
       errorSpy.mockRestore();
-      await remote.close();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
     }
   });
 
@@ -259,28 +293,68 @@ describe('execClaudeWithCLIProxy browser flag validation', () => {
     );
     fs.chmodSync(fakeClaudePath, 0o755);
 
-    const remote = await startRemoteProxy();
-    configureRemoteProxy(remote.port);
+    let requestCount = 0;
+    const server = http.createServer((_req, res) => {
+      requestCount += 1;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('{"ok":true}');
+    });
 
-    const exitSpy = jest
-      .spyOn(process, 'exit')
-      .mockImplementation((() => undefined as never) as typeof process.exit);
+    await new Promise<void>((resolve) => {
+      server.listen(0, '127.0.0.1', resolve);
+    });
+
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      server.close();
+      throw new Error('Test server did not bind to a TCP port');
+    }
+
+    let observeExit: (code: Parameters<typeof process.exit>[0]) => void = () => {};
+    const exited = new Promise<Parameters<typeof process.exit>[0]>((resolve) => {
+      observeExit = resolve;
+    });
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(((
+      code: Parameters<typeof process.exit>[0]
+    ) => {
+      observeExit(code);
+      return undefined as never;
+    }) as typeof process.exit);
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     try {
       process.exitCode = 1;
 
-      await execClaudeWithCLIProxy(fakeClaudePath, 'gemini', ['--print', 'hello'], {});
+      await execClaudeWithCLIProxy(
+        fakeClaudePath,
+        'gemini',
+        [
+          '--proxy-host',
+          '127.0.0.1',
+          '--proxy-port',
+          String(address.port),
+          '--proxy-auth-token',
+          'SECRET_TOKEN_FOR_VALIDATION',
+          '--remote-only',
+          '--print',
+          'hello',
+        ],
+        {}
+      );
 
       expect(await waitForFile(markerPath)).toBe(true);
-      expect(remote.requestCount()).toBeGreaterThan(0);
+      expect(requestCount).toBeGreaterThan(0);
+      // The marker is written before the child emits its exit event.
+      await expect(exited).resolves.toBe(0);
       expect(exitSpy).toHaveBeenCalledWith(0);
     } finally {
       exitSpy.mockRestore();
       logSpy.mockRestore();
       errorSpy.mockRestore();
-      await remote.close();
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
     }
   });
 });

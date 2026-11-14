@@ -2,7 +2,7 @@
  * Unit tests for JSONL Parser
  */
 
-import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
+import { describe, expect, test, beforeEach, afterEach, spyOn } from 'bun:test';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -77,6 +77,32 @@ const FILE_HISTORY_ENTRY = JSON.stringify({
   messageId: 'some-uuid',
   snapshot: {},
 });
+
+function responseLine(options: {
+  sessionId: string;
+  messageId: string;
+  requestId?: string;
+  timestamp?: string;
+  inputTokens?: number;
+  cacheReadTokens?: number;
+  outputTokens?: number;
+}): string {
+  return JSON.stringify({
+    type: 'assistant',
+    sessionId: options.sessionId,
+    requestId: options.requestId,
+    timestamp: options.timestamp ?? '2025-12-09T10:00:00.000Z',
+    message: {
+      id: options.messageId,
+      model: 'claude-sonnet-4-5',
+      usage: {
+        input_tokens: options.inputTokens ?? 2,
+        cache_read_input_tokens: options.cacheReadTokens ?? 20000,
+        output_tokens: options.outputTokens ?? 400,
+      },
+    },
+  });
+}
 
 // ============================================================================
 // parseUsageEntry Tests
@@ -205,6 +231,19 @@ describe('parseUsageEntry', () => {
 
     expect(parseUsageEntry(withoutTimestamp, '/test')).toBeNull();
   });
+
+  test('derives a dedupe key from the message and request IDs', () => {
+    const withRequest = responseLine({ sessionId: 's', messageId: 'msg_1', requestId: 'req_1' });
+    const anthropicOnly = responseLine({ sessionId: 's', messageId: 'msg_1' });
+    const openaiOnly = responseLine({ sessionId: 's', messageId: 'resp_1' });
+    const placeholderOnly = responseLine({ sessionId: 's', messageId: 'gateway-message' });
+
+    expect(parseUsageEntry(withRequest, '/test')!.dedupeKey).toBe('msg_1:req_1');
+    expect(parseUsageEntry(anthropicOnly, '/test')!.dedupeKey).toBe('msg_1');
+    expect(parseUsageEntry(openaiOnly, '/test')!.dedupeKey).toBe('resp_1');
+    expect(parseUsageEntry(placeholderOnly, '/test')!.dedupeKey).toBeUndefined();
+    expect(parseUsageEntry(VALID_ASSISTANT_ENTRY, '/test')!.dedupeKey).toBeUndefined();
+  });
 });
 
 // ============================================================================
@@ -314,13 +353,18 @@ describe('parseProjectDirectory', () => {
     expect(entries.length).toBe(0);
   });
 
-    test('returns empty array when readdir fails on a non-directory path', async () => {
-      const filePath = path.join(tempDir, 'not-a-directory.jsonl');
-      fs.writeFileSync(filePath, VALID_ASSISTANT_ENTRY);
+  test('returns empty array when directory read fails', async () => {
+    const existsSyncSpy = spyOn(fs, 'existsSync').mockReturnValue(true);
+    const readdirSpy = spyOn(fs.promises, 'readdir').mockRejectedValue(new Error('EACCES'));
 
-      const entries = await parseProjectDirectory(filePath);
+    try {
+      const entries = await parseProjectDirectory('/protected/dir');
       expect(entries).toEqual([]);
-    });
+    } finally {
+      existsSyncSpy.mockRestore();
+      readdirSpy.mockRestore();
+    }
+  });
 
   test('sanitizes derived projectPath from dashed directory names', async () => {
     const projectDir = path.join(tempDir, '-..-etc-passwd');
@@ -533,6 +577,64 @@ describe('scanProjectsDirectory', () => {
     });
 
     expect(entries.length).toBe(4);
+  });
+
+  test('counts one response once across its content-block lines', async () => {
+    const project = path.join(tempDir, '-dedupe-blocks');
+    fs.mkdirSync(project);
+    const block = { sessionId: 's1', messageId: 'msg_1', requestId: 'req_1' };
+    fs.writeFileSync(
+      path.join(project, 's1.jsonl'),
+      [
+        // A streaming proxy may only report final usage on the last block.
+        responseLine({ ...block, inputTokens: 1, cacheReadTokens: 0, outputTokens: 1 }),
+        responseLine(block),
+        responseLine(block),
+        responseLine({ sessionId: 's1', messageId: 'msg_2', requestId: 'req_2' }),
+      ].join('\n')
+    );
+
+    const entries = await scanProjectsDirectory({ projectsDir: tempDir });
+
+    expect(entries.length).toBe(2);
+    expect(entries[0].cacheReadTokens).toBe(20000);
+    expect(entries[0].outputTokens).toBe(400);
+  });
+
+  test('counts a response copied into a resumed session file once', async () => {
+    const project = path.join(tempDir, '-dedupe-resume');
+    fs.mkdirSync(project);
+    fs.writeFileSync(
+      path.join(project, 'original.jsonl'),
+      responseLine({ sessionId: 'original', messageId: 'resp_1' })
+    );
+    fs.writeFileSync(
+      path.join(project, 'resumed.jsonl'),
+      [
+        responseLine({ sessionId: 'resumed', messageId: 'resp_1' }),
+        responseLine({ sessionId: 'resumed', messageId: 'resp_2' }),
+      ].join('\n')
+    );
+
+    const entries = await scanProjectsDirectory({ projectsDir: tempDir });
+
+    expect(entries.map((entry) => entry.dedupeKey).sort()).toEqual(['resp_1', 'resp_2']);
+  });
+
+  test('keeps lines whose message ID may be a gateway placeholder', async () => {
+    const project = path.join(tempDir, '-dedupe-placeholder');
+    fs.mkdirSync(project);
+    fs.writeFileSync(
+      path.join(project, 's1.jsonl'),
+      [
+        responseLine({ sessionId: 's1', messageId: 'gateway-message' }),
+        responseLine({ sessionId: 's1', messageId: 'gateway-message' }),
+      ].join('\n')
+    );
+
+    const entries = await scanProjectsDirectory({ projectsDir: tempDir });
+
+    expect(entries.length).toBe(2);
   });
 });
 

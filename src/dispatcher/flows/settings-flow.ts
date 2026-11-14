@@ -32,7 +32,7 @@ import {
   resolveOptionalBrowserAttachRuntime,
   syncBrowserMcpToConfigDir,
 } from '../../utils/browser';
-import { getGlobalEnvConfig, getImageAnalysisConfig } from '../../config/config-loader-facade';
+import { getGlobalEnvConfig } from '../../config/config-loader-facade';
 import {
   ensureProfileHooks as ensureImageAnalyzerHooks,
   removeImageAnalysisProfileHook,
@@ -82,7 +82,6 @@ export async function runSettingsFlow(ctx: ProfileDispatchContext): Promise<void
     remainingArgs,
   } = ctx;
 
-  const imageAnalysisConfig = getImageAnalysisConfig();
   const imageAnalysisMcpReady =
     resolvedTarget === 'claude' ? ensureImageAnalysisMcpOrThrow() : true;
   const browserAttachRuntime =
@@ -124,12 +123,8 @@ export async function runSettingsFlow(ctx: ProfileDispatchContext): Promise<void
     );
   }
   const inheritedClaudeConfigDir = continuityInheritance.claudeConfigDir;
-  if (webSearchLaunch.enabled) {
-    syncWebSearchMcpToConfigDir(inheritedClaudeConfigDir);
-  }
-  if (imageAnalysisConfig.enabled) {
-    syncImageAnalysisMcpToConfigDir(inheritedClaudeConfigDir);
-  }
+  syncWebSearchMcpToConfigDir(inheritedClaudeConfigDir);
+  syncImageAnalysisMcpToConfigDir(inheritedClaudeConfigDir);
   if (
     browserRuntimeEnv &&
     inheritedClaudeConfigDir &&
@@ -389,7 +384,6 @@ export async function runSettingsFlow(ctx: ProfileDispatchContext): Promise<void
       ),
     };
     delete proxyEnv.ANTHROPIC_API_KEY;
-    const launchSettings = createOpenAICompatLaunchSettings(expandedSettingsPath, settings);
 
     // Claude subcommands reject `--settings` (it flips `agents` to list mode).
     // Routing env vars still flow via proxyEnv. Issue #1218.
@@ -397,6 +391,11 @@ export async function runSettingsFlow(ctx: ProfileDispatchContext): Promise<void
     const subcommandArgs = isSubcommand
       ? stripClaudeSubcommandSessionArgs(browserArgs)
       : browserArgs;
+
+    const launchSettings = isSubcommand
+      ? { settingsPath: expandedSettingsPath, cleanup: () => {} }
+      : createOpenAICompatLaunchSettings(expandedSettingsPath, settings, { durable: true });
+
     const launchArgs = isSubcommand
       ? appendThirdPartyWebSearchToolArgs(subcommandArgs, webSearchLaunch.enabled)
       : [

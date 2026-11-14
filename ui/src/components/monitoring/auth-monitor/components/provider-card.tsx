@@ -37,7 +37,6 @@ export function ProviderCard({
 
   return (
     <button
-      type="button"
       onClick={onSelect}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -62,10 +61,16 @@ export function ProviderCard({
             {stats.displayName}
           </h3>
           <p className="text-[10px] text-muted-foreground">
-            {t('authMonitor.accountsCount', { count: stats.accountCount })}
+            {/* TODO i18n: missing key for account count */}
+            {stats.accountCount} account{stats.accountCount !== 1 ? 's' : ''}
           </p>
         </div>
-        <ChevronRight className="w-4 h-4 ml-auto text-muted-foreground transition-opacity group-hover:opacity-100 opacity-60 shrink-0" />
+        <ChevronRight
+          className={cn(
+            'w-4 h-4 ml-auto text-muted-foreground transition-all',
+            isHovered ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
+          )}
+        />
       </div>
 
       <div className="space-y-2">
@@ -114,7 +119,18 @@ export function ProviderCard({
                 title={
                   privacyMode
                     ? '••••••'
-                    : formatAccountDisplayName(acc.id, acc.email, acc.tokenFile)
+                    : acc.variants?.length
+                      ? acc.variants
+                          .map((variant) =>
+                            formatAccountDisplayName(
+                              variant.id,
+                              variant.email,
+                              variant.tokenFile,
+                              variant.nickname
+                            )
+                          )
+                          .join(' • ')
+                      : formatAccountDisplayName(acc.id, acc.email, acc.tokenFile, acc.nickname)
                 }
               />
               {isMissingProjectId && (
@@ -127,7 +143,7 @@ export function ProviderCard({
                       />
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-xs">
-                      {t('providerCard.missingProjectId')}
+                      {/* TODO i18n: missing key */}Missing Project ID - re-add account to fix
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

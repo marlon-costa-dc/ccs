@@ -22,13 +22,6 @@ export function getOpenAICompatProxyPidPath(profileName: string): string {
   );
 }
 
-export function getOpenAICompatProxyLogPath(profileName: string): string {
-  return path.join(
-    getOpenAICompatProxyDir(),
-    `${getOpenAICompatProxyProfileKey(profileName)}.daemon.log`
-  );
-}
-
 export function getOpenAICompatProxySessionPath(profileName: string): string {
   return path.join(
     getOpenAICompatProxyDir(),

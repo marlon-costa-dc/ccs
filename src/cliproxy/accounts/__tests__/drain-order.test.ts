@@ -933,3 +933,36 @@ describe('fetchProxyAuthCooldowns', () => {
     });
   });
 });
+
+describe('DRAIN_ORDER_MIN_VERSION and isDrainOrderSupported (#1724)', () => {
+  it('defines backend-specific minimum versions for drain-order priorities', async () => {
+    const { DRAIN_ORDER_MIN_VERSION } = await loadDrainOrder();
+    expect(DRAIN_ORDER_MIN_VERSION).toEqual({
+      original: '6.6.106',
+      plus: '6.6.107-0',
+    });
+  });
+
+  it('evaluates original backend boundary correctly', async () => {
+    const { isDrainOrderSupported } = await loadDrainOrder();
+    expect(isDrainOrderSupported('original', '6.6.105')).toBe(false);
+    expect(isDrainOrderSupported('original', '6.6.106')).toBe(true);
+    expect(isDrainOrderSupported('original', '6.7.0')).toBe(true);
+  });
+
+  it('evaluates plus backend boundary with fork suffixes correctly', async () => {
+    const { isDrainOrderSupported } = await loadDrainOrder();
+    expect(isDrainOrderSupported('plus', '6.6.105-9')).toBe(false);
+    expect(isDrainOrderSupported('plus', '6.6.106-0')).toBe(false);
+    expect(isDrainOrderSupported('plus', '6.6.107-0')).toBe(true);
+    expect(isDrainOrderSupported('plus', '7.2.127-7')).toBe(true);
+  });
+
+  it('rejects invalid and empty version strings', async () => {
+    const { isDrainOrderSupported } = await loadDrainOrder();
+    expect(isDrainOrderSupported('original', '')).toBe(false);
+    expect(isDrainOrderSupported('original', 'invalid')).toBe(false);
+    expect(isDrainOrderSupported('plus', '')).toBe(false);
+    expect(isDrainOrderSupported('plus', 'invalid')).toBe(false);
+  });
+});

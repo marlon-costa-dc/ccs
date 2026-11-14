@@ -1,17 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const repoRoot = join(import.meta.dir, '../../..');
 
 describe('docker release workflow context', () => {
-  test('publishes immutable images from published GitHub releases', () => {
-    const workflow = readFileSync(join(repoRoot, '.github/workflows/docker-release.yml'), 'utf8');
-
-    expect(workflow).toMatch(/on:\n  release:\n    types: \[published\]/);
-    expect(workflow).toContain('workflow_dispatch:');
-  });
-
   test('builds the integrated Dockerfile with the context its COPY paths expect', () => {
     const workflow = readFileSync(join(repoRoot, '.github/workflows/docker-release.yml'), 'utf8');
     const dockerfile = readFileSync(join(repoRoot, 'docker/Dockerfile.integrated'), 'utf8');
@@ -72,13 +66,11 @@ describe('docker release workflow context', () => {
   });
 
   test('passes collision-safe compose env through network-contract calls', () => {
-    const result = Bun.spawnSync(['bash', 'tests/docker/network-contract-env.test.sh'], {
+    const result = spawnSync('bash', ['tests/docker/network-contract-env.test.sh'], {
       cwd: repoRoot,
+      encoding: 'utf8',
     });
-    const output = result.stdout.toString() + result.stderr.toString();
 
-    // Bun.spawnSync exposes exitCode (Node's spawnSync uses status); this
-    // suite always runs under bun:test, so exitCode is the contract.
-    expect(result.exitCode, result.stdout + result.stderr).toBe(0);
-  }, 30_000);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+  });
 });

@@ -23,7 +23,7 @@ import { startAutoSyncWatcher, stopAutoSyncWatcher } from '../cliproxy/sync';
 import { shutdownUsageAggregator } from './usage/aggregator';
 import { createLogger } from '../services/logging';
 import { DEFAULT_DASHBOARD_HOST, isLoopbackHost } from '../commands/config-dashboard-host';
-import { ProxyError } from '../errors/error-types';
+import { startClaudePoolPolicyController } from '../cliproxy/accounts/claude-pool-policy';
 
 export interface ServerOptions {
   port: number;
@@ -35,11 +35,8 @@ export interface ServerOptions {
 export interface ServerInstance {
   server: http.Server;
   wss: WebSocketServer;
-  cleanup: () => void;
+  cleanup: () => Promise<void>;
 }
-
-/** Shared DoS boundary for dashboard JSON requests and WebSocket messages. */
-const MAX_DASHBOARD_PAYLOAD_BYTES = 1024 * 1024;
 
 function getListenHost(options: ServerOptions): string {
   return options.host || DEFAULT_DASHBOARD_HOST;
@@ -55,29 +52,19 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
   const server = http.createServer(app);
   const wss = new WebSocketServer({
     noServer: true,
-    maxPayload: MAX_DASHBOARD_PAYLOAD_BYTES,
+    maxPayload: 1024 * 1024, // 1MB hard limit to prevent DoS
     perMessageDeflate: false, // Prevent zip bomb attacks
   });
 
   // JSON body parsing with error handler for malformed JSON
-  app.use(express.json({ limit: MAX_DASHBOARD_PAYLOAD_BYTES }));
+  app.use(express.json());
   app.use(
     (
-      err: Error & { status?: number; type?: string; body?: string },
-      req: express.Request,
+      err: Error & { status?: number; body?: string },
+      _req: express.Request,
       res: express.Response,
       next: express.NextFunction
     ) => {
-      if (err.status === 413 && err.type === 'entity.too.large') {
-        logger.warn('server.request_body_too_large', 'Dashboard request body exceeded limit', {
-          limitBytes: MAX_DASHBOARD_PAYLOAD_BYTES,
-          path: req.path,
-        });
-        res.status(413).json({
-          error: `JSON request body exceeds the ${MAX_DASHBOARD_PAYLOAD_BYTES}-byte limit`,
-        });
-        return;
-      }
       if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
         res.status(400).json({ error: 'Invalid JSON in request body' });
         return;
@@ -183,17 +170,14 @@ export async function startServer(options: ServerOptions): Promise<ServerInstanc
 
   // Start auto-sync watcher (if enabled in config)
   startAutoSyncWatcher();
+  const stopClaudePoolPolicy = startClaudePoolPolicyController();
 
   // Combined cleanup function
-  const cleanup = () => {
+  const cleanup = async () => {
     wsCleanup();
-    stopAutoSyncWatcher().catch((error: unknown) => {
-      const cause = error instanceof Error ? error : new Error(String(error));
-      setImmediate(() => {
-        throw cause;
-      });
-    });
+    stopAutoSyncWatcher().catch(() => {});
     shutdownUsageAggregator();
+    await stopClaudePoolPolicy();
   };
 
   // Start listening
@@ -282,7 +266,7 @@ function assertSafeDashboardBind(
     return;
   }
 
-  throw new ProxyError(
+  throw new Error(
     `Dashboard host ${listenHost} resolved to non-loopback address ${address.address}; pass --host explicitly to allow network exposure.`
   );
 }

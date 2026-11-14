@@ -5,15 +5,7 @@
  * variables without routing CCS loopback traffic back through the proxy.
  */
 
-import {
-  Agent,
-  Dispatcher,
-  ProxyAgent,
-  fetch as undiciFetch,
-  setGlobalDispatcher,
-  type RequestInfo as UndiciRequestInfo,
-  type RequestInit as UndiciRequestInit,
-} from 'undici';
+import { Agent, Dispatcher, ProxyAgent, fetch as undiciFetch, setGlobalDispatcher } from 'undici';
 import { getProxyResolution, shouldBypassProxy } from './proxy-env';
 
 const FETCH_PROXY_PROTOCOLS = ['http:', 'https:'];
@@ -168,19 +160,7 @@ export function applyGlobalFetchProxy(): { enabled: boolean; error?: string } {
     }
 
     setGlobalDispatcher(dispatcher);
-    const proxyFetch = async (
-      input: Parameters<typeof globalThis.fetch>[0],
-      init?: Parameters<typeof globalThis.fetch>[1]
-    ): Promise<Response> => {
-      const response = await undiciFetch(
-        input as unknown as UndiciRequestInfo,
-        init as UndiciRequestInit
-      );
-      return response as unknown as Response;
-    };
-    globalThis.fetch = Object.assign(proxyFetch, {
-      preconnect: globalThis.fetch.preconnect,
-    });
+    globalThis.fetch = undiciFetch as typeof globalThis.fetch;
     return { enabled: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown proxy configuration error';

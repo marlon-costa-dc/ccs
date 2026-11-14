@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { createApiProfile } from '../../../src/api/services/profile-writer';
+import { getPresetById } from '../../../src/api/services/provider-presets';
 
 describe('profile-writer Anthropic direct', () => {
   let tempHome = '';
@@ -15,6 +16,8 @@ describe('profile-writer Anthropic direct', () => {
   });
 
   afterEach(() => {
+    mock.restore();
+
     if (originalCcsHome === undefined) {
       delete process.env.CCS_HOME;
     } else {
@@ -129,10 +132,14 @@ describe('profile-writer Anthropic direct', () => {
     expect(config.profile_targets?.['hf-target-claude']).toBeUndefined();
   });
 
-  it('preserves OpenRouter ANTHROPIC_API_KEY blank behavior', () => {
+  it('preserves OpenRouter ANTHROPIC_API_KEY blank behavior and resolves preset baseUrl without duplicating /v1 (#1728)', () => {
+    const preset = getPresetById('openrouter');
+    expect(preset).toBeDefined();
+    expect(preset?.baseUrl).toBe('https://openrouter.ai/api');
+
     const result = createApiProfile(
       'openrouter-test',
-      'https://openrouter.ai/api/v1',
+      preset!.baseUrl,
       'sk-or-testkey',
       { default: 'anthropic/claude-opus-4.5', opus: 'anthropic/claude-opus-4.5', sonnet: 'anthropic/claude-opus-4.5', haiku: 'anthropic/claude-opus-4.5' }
     );
@@ -142,13 +149,18 @@ describe('profile-writer Anthropic direct', () => {
     const settingsPath = path.join(tempHome, '.ccs', 'openrouter-test.settings.json');
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
 
-    // OpenRouter: proxy mode with ANTHROPIC_API_KEY explicitly blank
-    expect(settings.env.ANTHROPIC_BASE_URL).toBe('https://openrouter.ai/api/v1');
+    // OpenRouter: proxy mode with ANTHROPIC_API_KEY explicitly blank and baseUrl without /v1
+    expect(settings.env.ANTHROPIC_BASE_URL).toBe('https://openrouter.ai/api');
+    expect(`${settings.env.ANTHROPIC_BASE_URL}/v1/messages`).toBe('https://openrouter.ai/api/v1/messages');
     expect(settings.env.ANTHROPIC_AUTH_TOKEN).toBe('sk-or-testkey');
     expect(settings.env.ANTHROPIC_API_KEY).toBe('');
   });
 
-  it('creates profile successfully when local WebSearch tool setup is unavailable', () => {
+  it('rolls back the created settings file when local WebSearch tool setup fails', () => {
+    const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation(() => {
+      throw new Error('copy failed');
+    });
+
     const result = createApiProfile(
       'hook-failure',
       'https://api.z.ai/api/anthropic',
@@ -156,8 +168,10 @@ describe('profile-writer Anthropic direct', () => {
       { default: 'glm-5', opus: 'glm-5', sonnet: 'glm-5', haiku: 'glm-5' }
     );
 
-    expect(result.success).toBe(true);
-    expect(fs.existsSync(path.join(tempHome, '.ccs', 'hook-failure.settings.json'))).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('could not prepare the local WebSearch tool');
+    expect(copyFileSpy).toHaveBeenCalled();
+    expect(fs.existsSync(path.join(tempHome, '.ccs', 'hook-failure.settings.json'))).toBe(false);
   });
 
   it('keeps profile creation non-fatal when WebSearch is disabled', () => {
@@ -168,6 +182,16 @@ describe('profile-writer Anthropic direct', () => {
       'utf8'
     );
 
+    const originalCopyFileSync = fs.copyFileSync.bind(fs);
+    const copyFileSpy = spyOn(fs, 'copyFileSync').mockImplementation((source, destination) => {
+      const sourcePath = String(source);
+      const destinationPath = String(destination);
+      if (sourcePath.includes('websearch') || destinationPath.includes('websearch')) {
+        throw new Error('websearch copy should not run when WebSearch is disabled');
+      }
+      return originalCopyFileSync(source, destination);
+    });
+
     const result = createApiProfile(
       'disabled-websearch',
       'https://api.z.ai/api/anthropic',
@@ -176,6 +200,7 @@ describe('profile-writer Anthropic direct', () => {
     );
 
     expect(result.success).toBe(true);
+    expect(copyFileSpy).toHaveBeenCalled();
     expect(fs.existsSync(path.join(tempHome, '.ccs', 'disabled-websearch.settings.json'))).toBe(
       true
     );

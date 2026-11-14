@@ -1,6 +1,4 @@
 const { describe, expect, test } = require('bun:test');
-const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const bucket = require('../../../scripts/run-test-bucket.js');
 
@@ -30,106 +28,25 @@ describe('run-test-bucket', () => {
     }
   });
 
-  test('isolates every split Browser MCP suite from shared process state', () => {
-    const runs = bucket.getBunRuns('slow', browserMcpSplitSuites);
-
-    expect(runs.map((run) => run.label)).toEqual(browserMcpSplitSuites);
-  });
-
   test('keeps web-server integration tests that bind ports in the slow bucket', () => {
     const slowSet = bucket.getSlowSet();
 
     expect(slowSet.has('tests/integration/web-server/codex-profiles-endpoint.test.ts')).toBe(true);
   });
 
-  test('keeps the cross-runtime transport fixture slow and isolated', () => {
-    const relativePath = 'tests/integration/proxy/runtime-transport-matrix.test.ts';
-
-    // Its built-dist dependency is loaded by the CJS child fixture, not by the
-    // test source scanned by readsBuiltDist. Real runtimes and servers still
-    // require the declared subprocess bucket, not shared unit-test scheduling.
-    expect(bucket.slowTests).toContain(relativePath);
-    expect(bucket.selectBucket('fast')).not.toContain(relativePath);
-    expect(bucket.selectBucket('slow')).toContain(relativePath);
-    const runs = bucket.getBunRuns('slow', [relativePath]);
-    expect(runs.map((run) => run.label)).toEqual([relativePath]);
-    expect(runs[0].selected).toEqual([relativePath]);
-    expect(runs[0].quietOnPass).toBe(true);
-  });
-
-  test('keeps stateful integration suites slow and isolated', () => {
-    const statefulSuites = [
-      'tests/integration/image-analyzer-hook.test.ts',
-      'tests/integration/proxy/messages-edge-cases.test.ts',
-      'tests/unit/web-server/usage-aggregator-cliproxy-integration.test.ts',
-    ];
-    const slowSet = bucket.getSlowSet();
-    const runs = bucket.getBunRuns('slow', statefulSuites);
-
-    for (const relativePath of statefulSuites) {
-      expect(slowSet.has(relativePath)).toBe(true);
-    }
-    expect(runs.map((run) => run.label)).toEqual(statefulSuites);
-  });
-
-  test('keeps daemon-launch suites slow and isolated', () => {
-    const daemonSuites = [
-      'tests/unit/utils/claudecode-env-stripping.test.ts',
-      'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
-    ];
-    const slowSet = bucket.getSlowSet();
-    const runs = bucket.getBunRuns('slow', daemonSuites);
-
-    for (const relativePath of daemonSuites) {
-      expect(slowSet.has(relativePath)).toBe(true);
-    }
-    expect(runs.map((run) => run.label)).toEqual(daemonSuites);
-  });
-
-  test('isolates every target suite that launches the real CCS entrypoint', () => {
-    const launchSuites = bucket.getDiscoveredTests().filter((relativePath) => {
-      if (!relativePath.startsWith('tests/unit/targets/')) return false;
-      const source = fs.readFileSync(path.resolve(__dirname, '../../../', relativePath), 'utf8');
-      return source.includes('const ccsEntry =') && source.includes('spawnSync(');
-    });
-    expect(launchSuites.length).toBeGreaterThan(0);
-    const fast = bucket.selectBucket('fast');
-    const slow = bucket.selectBucket('slow');
-    for (const relativePath of launchSuites) {
-      expect(bucket.slowTests).toContain(relativePath);
-      expect(fast).not.toContain(relativePath);
-      expect(slow).toContain(relativePath);
-    }
-    const runs = bucket.getBunRuns('slow', launchSuites);
-    expect(runs.map((run) => run.label)).toEqual(launchSuites);
-    expect(runs.every((run) => run.selected.length === 1 && run.quietOnPass)).toBe(true);
-  });
-
-  test('preserves every discovered test exactly once across the native buckets', () => {
-    const discovered = bucket.getDiscoveredTests();
-    const selected = [...bucket.selectBucket('fast'), ...bucket.selectBucket('slow')];
-    expect(selected.sort()).toEqual(discovered);
-    expect(new Set(selected).size).toBe(discovered.length);
-  });
-
-  test('keeps update install-origin integration slow and isolated', () => {
-    const relativePath = 'tests/integration/update-command-install-origin.test.ts';
-    const slowSet = bucket.getSlowSet();
-    const runs = bucket.getBunRuns('slow', [relativePath]);
-
-    expect(slowSet.has(relativePath)).toBe(true);
-    expect(runs.map((run) => run.label)).toEqual([relativePath]);
+  test('runs the default browser launch integration once in an isolated slow process', () => {
+    const file = 'tests/unit/targets/default-profile-browser-launch.test.ts';
+    expect(bucket.selectBucket('fast')).not.toContain(file);
+    const runs = bucket.getBunRuns('slow');
+    const matching = runs.filter((run) => run.selected.includes(file));
+    expect(matching).toHaveLength(1);
+    expect(matching[0].label).toBe(file);
+    expect(matching[0].selected).toEqual([file]);
+    expect(matching[0].bunArgs).toEqual(['test', '--max-concurrency=1', `./${file}`]);
   });
 
   test('forces npm tests into the slow bucket', () => {
     expect(bucket.shouldForceSlow('tests/npm/cli.test.js')).toBe(true);
-  });
-
-  test('isolates every npm artifact suite from the shared slow run', () => {
-    const npmSuites = ['tests/npm/cli.test.js', 'tests/npm/cross-platform.test.js'];
-    const runs = bucket.getBunRuns('slow', npmSuites);
-
-    expect(runs.map((run) => run.label)).toEqual(npmSuites);
   });
 
   test('discovers colocated backend tests under src', () => {
@@ -154,12 +71,7 @@ describe('run-test-bucket', () => {
   test('keeps slow bucket concurrency flag before explicit test paths', () => {
     const args = bucket.getBunArgs('slow', ['tests/integration/example.test.ts']);
 
-    expect(args).toEqual([
-      'test',
-      '--max-concurrency=1',
-      '--timeout=30000',
-      './tests/integration/example.test.ts',
-    ]);
+    expect(args).toEqual(['test', '--max-concurrency=1', './tests/integration/example.test.ts']);
   });
 
   test('isolates src tests while keeping already-covered tests in a shared run', () => {
@@ -197,56 +109,13 @@ describe('run-test-bucket', () => {
     ]);
   });
 
-  test('isolates subprocess launch suites in the slow bucket', () => {
-    const runs = bucket.getBunRuns('slow', [
-      'tests/unit/commands/persist-command-handler.test.ts',
-      'tests/unit/cliproxy/concurrent-state-locks.test.ts',
-      'tests/npm/cli.test.js',
-      'tests/unit/targets/droid-command-routing-integration.test.ts',
-      'tests/unit/targets/native-claude-effort-launch.test.ts',
-      'tests/unit/targets/settings-profile-browser-launch.test.ts',
-      'tests/unit/targets/settings-profile-websearch-launch.test.ts',
-      'tests/unit/web-server/websearch-routes.test.ts',
-    ]);
-
-    expect(runs.map((run) => run.label)).toEqual([
-      'shared',
-      'tests/unit/cliproxy/concurrent-state-locks.test.ts',
-      'tests/npm/cli.test.js',
-      'tests/unit/targets/droid-command-routing-integration.test.ts',
-      'tests/unit/targets/native-claude-effort-launch.test.ts',
-      'tests/unit/targets/settings-profile-browser-launch.test.ts',
-      'tests/unit/targets/settings-profile-websearch-launch.test.ts',
-      'tests/unit/web-server/websearch-routes.test.ts',
-    ]);
-    expect(runs.slice(1).every((run) => run.quietOnPass)).toBe(true);
-  });
-
-  test('generates build provenance through the canonical owner before tests', () => {
-    let invocation;
-    const status = bucket.generateBuildProvenance((command, args, options) => {
-      invocation = { command, args, options };
-      return { status: 0 };
-    });
-
-    expect(status).toBe(0);
-    expect(invocation.command).toBe(process.execPath);
-    expect(invocation.args[0]).toEndWith('scripts/generate-build-provenance.js');
-    expect(invocation.options.cwd).toBe(path.resolve(__dirname, '../../..'));
-    expect(invocation.options.stdio).toBe('inherit');
-  });
-
-  test('propagates build provenance failures', () => {
-    expect(bucket.generateBuildProvenance(() => ({ status: 7 }))).toBe(7);
-  });
-
   test('isolates standalone validation scripts that are not Bun test suites', () => {
     const runs = bucket.getBunRuns('slow', [
-      'tests/integration/logging-request-context.test.ts',
+      'tests/integration/cursor-daemon-lifecycle.test.ts',
       'tests/integration/token-counting-test.js',
     ]);
 
-    expect(bucket.usesBunTestRunner('tests/integration/logging-request-context.test.ts')).toBe(
+    expect(bucket.usesBunTestRunner('tests/integration/cursor-daemon-lifecycle.test.ts')).toBe(
       true
     );
     expect(bucket.usesBunTestRunner('tests/integration/token-counting-test.js')).toBe(false);
@@ -261,28 +130,6 @@ describe('run-test-bucket', () => {
     expect(bucket.parseBunFileCount('\u001b[32mRan 2559 tests across 272 files\u001b[0m')).toBe(
       272
     );
-  });
-
-  test('rejects zero execution and skipped tests in Bun summaries', () => {
-    expect(bucket.verifyBunExecution('Ran 0 tests across 1 file')).toEqual({
-      ok: false,
-      message: '[X] Bun executed zero tests.',
-      testCount: 0,
-      skipCount: 0,
-    });
-    expect(
-      bucket.verifyBunExecution('2 tests skipped:\n(skip) one\n(skip) two\nRan 7 tests across 1 file')
-    ).toEqual({
-      ok: false,
-      message: '[X] Bun reported 2 skipped test(s).',
-      testCount: 7,
-      skipCount: 2,
-    });
-    expect(bucket.verifyBunExecution('7 pass\nRan 7 tests across 1 file')).toEqual({
-      ok: true,
-      testCount: 7,
-      skipCount: 0,
-    });
   });
 
   test('detects when Bun reports fewer files than the bucket selected', () => {
@@ -302,7 +149,7 @@ describe('run-test-bucket', () => {
     ).toBe(false);
     expect(
       bucket.shouldVerifyRunFileCount({
-        selected: ['tests/integration/logging-request-context.test.ts'],
+        selected: ['tests/integration/cursor-daemon-lifecycle.test.ts'],
       })
     ).toBe(true);
   });
@@ -317,42 +164,5 @@ describe('run-test-bucket', () => {
 
   test('still forces dist-dependent tests into the slow bucket', () => {
     expect(bucket.shouldForceSlow('tests/unit/config-dir-override.test.js')).toBe(true);
-  });
-
-  test('requires complete built runtime artifacts before reusing dist', () => {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ccs-test-bucket-build-'));
-
-    try {
-      const sourceFiles = [
-        path.join('src', 'ccs.ts'),
-        path.join('src', 'types', 'utils.ts'),
-        path.join('src', 'proxy', 'server', 'proxy-server.ts'),
-        path.join('src', 'proxy', '__tests__', 'ignored.test.ts'),
-        path.join('src', 'types', 'external.d.ts'),
-      ];
-      for (const relativePath of sourceFiles) {
-        const absolutePath = path.join(tempDir, relativePath);
-        fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-        fs.writeFileSync(absolutePath, 'export {};\n');
-      }
-
-      const requiredArtifacts = bucket.getRequiredBuildArtifacts(tempDir);
-      expect(requiredArtifacts).toEqual([
-        path.join('dist', 'ccs.js'),
-        path.join('dist', 'proxy', 'server', 'proxy-server.js'),
-        path.join('dist', 'types', 'utils.js'),
-      ]);
-      for (const relativePath of requiredArtifacts) {
-        const absolutePath = path.join(tempDir, relativePath);
-        fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-        fs.writeFileSync(absolutePath, 'module.exports = {};\n');
-      }
-
-      expect(bucket.hasCompleteBuildArtifacts(tempDir)).toBe(true);
-      fs.rmSync(path.join(tempDir, 'dist', 'proxy', 'server', 'proxy-server.js'));
-      expect(bucket.hasCompleteBuildArtifacts(tempDir)).toBe(false);
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
   });
 });

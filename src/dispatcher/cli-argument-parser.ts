@@ -7,11 +7,12 @@
  * Also contains bootstrapAndParseEarlyCli() — the Phase A bootstrap extracted
  * from main() (lines 128-232 of the original). Handles: adapter registration,
  * UI init, --config-dir flag, cloud-sync warnings, completion short-circuit,
- * resolveBrowserLaunchFlagResolution and codex passthrough.
+ * normalizeLegacyCursorArgs, resolveBrowserLaunchFlagResolution, codex passthrough.
  */
 
 import * as fs from 'fs';
 import { fail, warn, info } from '../utils/ui';
+import { LEGACY_CURSOR_PROFILE_NAME } from '../cursor/constants';
 import { resolveTargetType, stripTargetFlag } from '../targets/target-resolver';
 import { resolveDroidReasoningRuntime } from '../targets/droid-reasoning-runtime';
 import type { ProfileDetectionResult } from '../auth/profile-detector';
@@ -129,6 +130,7 @@ export async function bootstrapAndParseEarlyCli(rawArgs: string[]): Promise<Disp
     return { args, isCompletionCommand, browserLaunchOverride: undefined, exitNow: true };
   }
 
+  args = normalizeLegacyCursorArgs(args);
   let browserLaunchOverride: BrowserLaunchOverride | undefined;
   try {
     const browserLaunchFlags = resolveBrowserLaunchFlagResolution(args);
@@ -217,6 +219,29 @@ export function detectProfile(args: string[]): DetectedProfile {
     // First arg doesn't start with '-' → treat as profile name
     return { profile: args[0], remainingArgs: args.slice(1) };
   }
+}
+
+export function normalizeLegacyCursorArgs(args: string[]): string[] {
+  if (args[0] === 'legacy' && args[1] === 'cursor') {
+    return [LEGACY_CURSOR_PROFILE_NAME, ...args.slice(2)];
+  }
+
+  return args;
+}
+
+export function printCursorLegacySubcommandDeprecation(subcommand: string): void {
+  process.stderr.write(
+    String(warn(`\`ccs cursor ${subcommand}\` is deprecated for the legacy Cursor IDE bridge.`)) +
+      '\n'
+  );
+  process.stderr.write(
+    String(
+      warn(
+        `Use \`ccs legacy cursor ${subcommand}\` for the old bridge, or \`ccs cursor --auth|--accounts|--config\` for the CLIProxy provider.`
+      )
+    ) + '\n'
+  );
+  process.stderr.write('\n');
 }
 
 // ========== Runtime Reasoning Flags ==========

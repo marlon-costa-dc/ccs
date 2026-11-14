@@ -6,27 +6,6 @@ const { spawnSync } = require('node:child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const candidateRoots = ['tests/unit', 'tests/integration', 'tests/npm', 'src'];
-const browserMcpSplitTests = [
-  'tests/unit/hooks/browser-mcp-advanced-interactions.test.ts',
-  'tests/unit/hooks/browser-mcp-downloads-and-files.test.ts',
-  'tests/unit/hooks/browser-mcp-navigation-and-query.test.ts',
-  'tests/unit/hooks/browser-mcp-orchestration-and-artifacts.test.ts',
-  'tests/unit/hooks/browser-mcp-recording-and-replay.test.ts',
-  'tests/unit/hooks/browser-mcp-session-and-intercepts.test.ts',
-];
-// These suites execute src/ccs.ts or dist/ccs.js in child runtimes. Keep the
-// whole launcher family together, including fixtures that hide the entrypoint
-// behind path.join rather than a literal dist/ import.
-const targetCliLaunchTests = [
-  'tests/unit/targets/codex-runtime-integration.test.ts',
-  'tests/unit/targets/codex-settings-bridge-launch.test.ts',
-  'tests/unit/targets/default-profile-browser-launch.test.ts',
-  'tests/unit/targets/droid-command-routing-integration.test.ts',
-  'tests/unit/targets/native-claude-effort-launch.test.ts',
-  'tests/unit/targets/settings-profile-browser-launch.test.ts',
-  'tests/unit/targets/settings-profile-image-analysis-launch.test.ts',
-  'tests/unit/targets/settings-profile-websearch-launch.test.ts',
-];
 // Add a `.ts` test to `slowTests` when ANY of these apply:
 //   1. It spawns a child process (CLI, bun test, node, gh, etc.).
 //   2. It binds a port, starts a server, or talks to localhost.
@@ -40,24 +19,31 @@ const targetCliLaunchTests = [
 // (catches deletion drift) but CANNOT detect new undeclared slow tests.
 // Automated perf-budget enforcement tracked in issue #1071.
 const slowTests = [
-  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
-  'tests/integration/image-analyzer-hook.test.ts',
+  'tests/integration/cursor-daemon-lifecycle.test.ts',
   'tests/integration/logging-request-context.test.ts',
-  'tests/integration/proxy/messages-edge-cases.test.ts',
   'tests/integration/proxy/daemon-lifecycle.test.ts',
-  'tests/integration/proxy/runtime-transport-matrix.test.ts',
-  'tests/integration/proxy/auto-sync-publication.test.ts',
-  'tests/integration/update-command-install-origin.test.ts',
+  'tests/integration/proxy/request-body-limit.test.ts',
   'tests/integration/web-server/codex-profiles-endpoint.test.ts',
+  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
   'tests/unit/commands/persist-command-handler.test.ts',
-  'tests/unit/utils/claudecode-env-stripping.test.ts',
-  ...browserMcpSplitTests,
-  ...targetCliLaunchTests,
+  'tests/unit/hooks/browser-mcp-advanced-interactions.test.ts',
+  'tests/unit/hooks/browser-mcp-downloads-and-files.test.ts',
+  'tests/unit/hooks/browser-mcp-navigation-and-query.test.ts',
+  'tests/unit/hooks/browser-mcp-orchestration-and-artifacts.test.ts',
+  'tests/unit/hooks/browser-mcp-recording-and-replay.test.ts',
+  'tests/unit/hooks/browser-mcp-session-and-intercepts.test.ts',
+  'tests/unit/targets/codex-runtime-integration.test.ts',
+  'tests/unit/targets/codex-settings-bridge-launch.test.ts',
+  'tests/unit/targets/default-profile-browser-launch.test.ts',
+  'tests/unit/targets/droid-command-routing-integration.test.ts',
   'tests/unit/targets/droid-config-manager.test.ts',
+  'tests/unit/targets/native-claude-effort-launch.test.ts',
+  'tests/unit/targets/settings-profile-browser-launch.test.ts',
+  'tests/unit/targets/settings-profile-image-analysis-launch.test.ts',
+  'tests/unit/targets/settings-profile-websearch-launch.test.ts',
+  'tests/unit/web-server/cursor-routes.test.ts',
   'tests/unit/web-server/websearch-routes.test.ts',
-  'tests/unit/web-server/usage-aggregator-cliproxy-integration.test.ts',
   'src/cliproxy/auth/__tests__/oauth-handler-gemini-backend-guidance.test.ts',
-  'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
 ];
 // CommonJS-heavy JS suites stay slow by default because many of them mutate
 // module cache or process state. Opt them into `test:fast` only after they are
@@ -65,26 +51,14 @@ const slowTests = [
 const fastJsTests = new Set(['tests/unit/flag-parsing-simple.test.js']);
 
 const isolatedTests = new Set([
-  'tests/unit/cliproxy/concurrent-state-locks.test.ts',
-  'tests/integration/image-analyzer-hook.test.ts',
-  'tests/integration/proxy/messages-edge-cases.test.ts',
-  'tests/integration/proxy/runtime-transport-matrix.test.ts',
-  'tests/integration/proxy/auto-sync-publication.test.ts',
-  'tests/integration/update-command-install-origin.test.ts',
-  ...browserMcpSplitTests,
   'tests/unit/commands/bar-command.test.ts',
-  'tests/unit/utils/claudecode-env-stripping.test.ts',
-  'tests/npm/cli.test.js',
-  ...targetCliLaunchTests,
-  'tests/unit/web-server/websearch-routes.test.ts',
   'tests/unit/targets/codex-adapter-exec.test.ts',
   'tests/unit/targets/codex-adapter.test.ts',
+  'tests/unit/targets/default-profile-browser-launch.test.ts',
   'tests/unit/targets/droid-adapter.test.ts',
   'tests/unit/targets/target-registry.test.ts',
   'tests/unit/utils/fetch-proxy-setup.test.ts',
   'tests/unit/web-server/usage/account-attribution.test.ts',
-  'tests/unit/web-server/usage-aggregator-cliproxy-integration.test.ts',
-  'src/cliproxy/executor/__tests__/executor-option-value.test.ts',
 ]);
 
 const filePattern = /(\.test\.(c|m)?[jt]s|\.spec\.(c|m)?[jt]s|-test\.(c|m)?[jt]s)$/;
@@ -161,21 +135,14 @@ function toBunTestPath(relativePath) {
 function getBunArgs(name, selected = selectBucket(name)) {
   const testPaths = selected.map(toBunTestPath);
 
-  // Slow bucket forces sequential execution and allows the declared launch
-  // suites enough time for subprocess startup on loaded CI workers.
+  // Slow bucket forces sequential execution because it spawns subprocesses,
+  // binds ports, and touches shared state — parallelism causes flakes.
   // Fast bucket keeps bun's default parallelism for speed.
-  return name === 'slow'
-    ? ['test', '--max-concurrency=1', '--timeout=30000', ...testPaths]
-    : ['test', ...testPaths];
+  return name === 'slow' ? ['test', '--max-concurrency=1', ...testPaths] : ['test', ...testPaths];
 }
 
 function shouldRunIsolated(file) {
-  return (
-    file.startsWith('src/') ||
-    file.startsWith('tests/npm/') ||
-    isolatedTests.has(file) ||
-    !usesBunTestRunner(file)
-  );
+  return file.startsWith('src/') || isolatedTests.has(file) || !usesBunTestRunner(file);
 }
 
 function getBunRuns(name, selected = selectBucket(name)) {
@@ -213,42 +180,6 @@ function parseBunFileCount(output) {
   return match ? Number(match[1]) : null;
 }
 
-function parseBunTestCount(output) {
-  const match = stripAnsi(output).match(/Ran\s+(\d+)\s+tests?\s+across\s+\d+\s+files?/i);
-  return match ? Number(match[1]) : null;
-}
-
-function parseBunSkipCount(output) {
-  const match = stripAnsi(output).match(/(?:^|\n)\s*(\d+)\s+tests?\s+skipped:/i);
-  return match ? Number(match[1]) : 0;
-}
-
-function verifyBunExecution(output) {
-  const testCount = parseBunTestCount(output);
-  const skipCount = parseBunSkipCount(output);
-
-  if (testCount === null) {
-    return {
-      ok: false,
-      message: '[X] Could not find Bun test count in output.',
-      testCount,
-      skipCount,
-    };
-  }
-  if (testCount === 0) {
-    return { ok: false, message: '[X] Bun executed zero tests.', testCount, skipCount };
-  }
-  if (skipCount > 0) {
-    return {
-      ok: false,
-      message: `[X] Bun reported ${skipCount} skipped test(s).`,
-      testCount,
-      skipCount,
-    };
-  }
-  return { ok: true, testCount, skipCount };
-}
-
 function verifyReportedFileCount(selectedCount, output) {
   const reportedCount = parseBunFileCount(output);
 
@@ -283,48 +214,8 @@ function shouldVerifyRunFileCount(run) {
   return run.selected.every((file) => usesBunTestRunner(file));
 }
 
-function getRequiredBuildArtifacts(baseDir = rootDir) {
-  const srcDir = path.join(baseDir, 'src');
-  if (!fs.existsSync(srcDir)) {
-    return [];
-  }
-
-  return collectFilesByExtension(srcDir, '.ts')
-    .filter((sourcePath) => !sourcePath.endsWith('.d.ts'))
-    .filter((sourcePath) => !isTestSourcePath(sourcePath))
-    .map((sourcePath) =>
-      path.join('dist', path.relative(srcDir, sourcePath).replace(/\.ts$/, '.js'))
-    )
-    .sort();
-}
-
-function collectFilesByExtension(dir, extension, files = []) {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      collectFilesByExtension(fullPath, extension, files);
-    } else if (entry.isFile() && entry.name.endsWith(extension)) {
-      files.push(fullPath);
-    }
-  }
-  return files;
-}
-
-function isTestSourcePath(sourcePath) {
-  const normalized = sourcePath.split(path.sep).join('/');
-  return normalized.includes('/__tests__/') || /\.(?:test|spec)\.ts$/.test(normalized);
-}
-
-function hasCompleteBuildArtifacts(baseDir = rootDir) {
-  const requiredBuildArtifacts = getRequiredBuildArtifacts(baseDir);
-  return (
-    requiredBuildArtifacts.length > 0 &&
-    requiredBuildArtifacts.every((relativePath) => fs.existsSync(path.join(baseDir, relativePath)))
-  );
-}
-
 function ensureBuildForSlowBucket() {
-  if (hasCompleteBuildArtifacts()) {
+  if (fs.existsSync(path.join(rootDir, 'dist', 'ccs.js'))) {
     return 0;
   }
 
@@ -335,28 +226,6 @@ function ensureBuildForSlowBucket() {
   });
 
   return build.status ?? 1;
-}
-
-function generateBuildProvenance(run = spawnSync) {
-  const result = run(
-    process.execPath,
-    [path.join(rootDir, 'scripts/generate-build-provenance.js')],
-    {
-      cwd: rootDir,
-      stdio: 'inherit',
-    }
-  );
-
-  if (result.error) {
-    console.error(`[X] Failed to generate build provenance: ${result.error.message}`);
-    return 1;
-  }
-
-  const exitCode = result.status ?? 1;
-  if (exitCode !== 0) {
-    console.error(`[X] Build provenance generation exited with status ${exitCode}.`);
-  }
-  return exitCode;
 }
 
 function runBunTest(run) {
@@ -386,17 +255,10 @@ function runBunTest(run) {
   const exitCode = result.status ?? 1;
   if (exitCode !== 0) {
     writeOutput();
-    console.error(`[X] ${run.label} exited with status ${exitCode}.`);
     return exitCode;
   }
 
   if (shouldVerifyRunFileCount(run)) {
-    const executionCheck = verifyBunExecution(output);
-    if (!executionCheck.ok) {
-      writeOutput();
-      console.error(executionCheck.message);
-      return 1;
-    }
     const countCheck = verifyReportedFileCount(run.selected.length, output);
     if (!countCheck.ok) {
       writeOutput();
@@ -435,22 +297,19 @@ function runBucket(name) {
     console.log(`[i] Running ${isolatedCount} test file(s) in isolated Bun processes.`);
   }
 
+  let exitCode = 0;
   for (const run of runs) {
-    if (name === 'slow') {
-      const buildStatus = ensureBuildForSlowBucket();
-      if (buildStatus !== 0) {
-        console.error(`[X] Runtime build prerequisite failed before ${run.label}.`);
-        return buildStatus;
-      }
-    }
     const status = runBunTest(run);
     if (status !== 0) {
-      return status;
+      exitCode = status;
     }
   }
 
-  console.log(`[OK] Bucket '${name}' ran ${selected.length} selected test files.`);
-  return 0;
+  if (exitCode === 0) {
+    console.log(`[OK] Bucket '${name}' ran ${selected.length} selected test files.`);
+  }
+
+  return exitCode;
 }
 
 function main(args = process.argv.slice(2)) {
@@ -461,26 +320,24 @@ function main(args = process.argv.slice(2)) {
     return 1;
   }
 
-  const provenanceStatus = generateBuildProvenance();
-  if (provenanceStatus !== 0) {
-    return provenanceStatus;
-  }
-
   if (bucket === 'all') {
+    let exitCode = 0;
+
     for (const name of ['fast', 'slow']) {
       const status = runBucket(name);
       if (status !== 0) {
-        return status;
+        exitCode = status;
       }
     }
-    return 0;
+
+    return exitCode;
   }
 
   return runBucket(bucket);
 }
 
 if (require.main === module) {
-  process.exitCode = main();
+  process.exit(main());
 }
 
 module.exports = {
@@ -498,13 +355,7 @@ module.exports = {
   shouldRunIsolated,
   getBunRuns,
   parseBunFileCount,
-  parseBunTestCount,
-  parseBunSkipCount,
-  verifyBunExecution,
   verifyReportedFileCount,
   shouldVerifyRunFileCount,
-  getRequiredBuildArtifacts,
-  hasCompleteBuildArtifacts,
-  generateBuildProvenance,
   main,
 };

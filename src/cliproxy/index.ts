@@ -16,6 +16,7 @@ export type {
   ChecksumResult,
   DownloadResult,
   CLIProxyProvider,
+  CliproxyRoutingStrategy,
   CLIProxyConfig,
   ExecutorConfig,
   ProviderConfig,

@@ -17,11 +17,11 @@ import { UpdateCheckResult, VersionListResult, getGitHubApiUrls } from './types'
 import {
   CLIPROXY_MAX_STABLE_VERSION,
   CLIPROXY_FAULTY_RANGE,
-  CLIPROXY_VERSION_TAG_PATTERN,
   DEFAULT_BACKEND,
-  parseForkRelease,
 } from '../binary/platform-detector';
 import type { CLIProxyBackend } from '../types';
+
+export type CLIProxyBackendMinVersions = Readonly<Record<CLIProxyBackend, string>>;
 
 interface FetchLatestVersionDeps {
   fetchJsonFn?: typeof fetchJson;
@@ -48,7 +48,7 @@ function parseCliproxyVersion(version: string): ParsedCliproxyVersion {
   const [major = 0, minor = 0, patch = 0] = coreVersion
     .split('.')
     .map((part) => parseInt(part, 10) || 0);
-  const forkRelease = parseForkRelease(forkReleaseValue);
+  const forkRelease = /^\d+$/.test(forkReleaseValue) ? parseInt(forkReleaseValue, 10) || 0 : 0;
 
   return { major, minor, patch, forkRelease };
 }
@@ -78,6 +78,14 @@ export function compareCliproxyVersions(a: string, b: string): number {
  */
 export function isNewerVersion(latest: string, current: string): boolean {
   return compareCliproxyVersions(latest, current) > 0;
+}
+
+export function meetsBackendMinimumVersion(
+  installedVersion: string,
+  backend: CLIProxyBackend,
+  minimumByBackend: CLIProxyBackendMinVersions
+): boolean {
+  return compareCliproxyVersions(installedVersion, minimumByBackend[backend]) >= 0;
 }
 
 /**
@@ -205,7 +213,7 @@ export async function fetchAllVersions(
     const releases = response as unknown as Array<{ tag_name: string }>;
     const versions = releases
       .map((r) => r.tag_name.replace(/^v/, ''))
-      .filter((v) => CLIPROXY_VERSION_TAG_PATTERN.test(v));
+      .filter((v) => /^\d+\.\d+\.\d+(-\d+)?$/.test(v)); // Valid semver only
 
     const latest = versions[0] || '';
 

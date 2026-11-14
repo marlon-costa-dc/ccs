@@ -3,10 +3,6 @@ import {
   renderCapturedLines,
   useDockerSubcommandConsoleCapture,
 } from './docker-subcommand-test-helpers';
-import {
-  DOCKER_DEFAULT_DASHBOARD_PORT,
-  DOCKER_DEFAULT_PROXY_PORT,
-} from '../../../src/docker/docker-assets';
 
 const capture = useDockerSubcommandConsoleCapture();
 
@@ -36,8 +32,8 @@ describe('docker config subcommand', () => {
         remoteDeployDir: '~/.ccs/docker',
         composeService: 'ccs-cliproxy',
         containerName: 'ccs-cliproxy',
-        dashboardPort: DOCKER_DEFAULT_DASHBOARD_PORT,
-        proxyPort: DOCKER_DEFAULT_PROXY_PORT,
+        dashboardPort: 3000,
+        proxyPort: 8317,
       };
     };
 

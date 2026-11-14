@@ -89,10 +89,6 @@ function runCli(
 }
 
 beforeAll(() => {
-  if (process.env.CCS_E2E_SKIP_BUILD === '1') {
-    expect(fs.existsSync(DIST_ENTRY)).toBe(true);
-    return;
-  }
   const result = spawnSync(process.execPath, ['run', 'build'], {
     encoding: 'utf8',
     env: process.env,
@@ -170,8 +166,8 @@ const fs = require('fs');
     fs.writeFileSync(
       fakeClaudePath,
       process.platform === 'win32'
-        ? `@echo off\r\n"${process.execPath}" "%~dp0fake-claude.cjs" %*\r\n`
-        : `#!/bin/sh\nexec "${process.execPath}" "$(dirname "$0")/fake-claude.cjs" "$@"\n`,
+        ? '@echo off\r\nnode "%~dp0fake-claude.cjs" %*\r\n'
+        : '#!/bin/sh\nexec node "$(dirname "$0")/fake-claude.cjs" "$@"\n',
       { mode: 0o755 }
     );
 
@@ -179,10 +175,12 @@ const fs = require('fs');
       ...process.env,
       CCS_HOME: tempDir,
       CCS_E2E_OUTPUT: outputPath,
+      // Pin the fake claude: an inherited CCS_CLAUDE_PATH outranks the PATH lookup below.
+      CCS_CLAUDE_PATH: fakeClaudePath,
       PATH: `${binDir}${path.delimiter}${process.env.PATH || ''}`,
     });
 
-    expect(result.code, `${result.stderr}\n${result.stdout}`).toBe(0);
+    expect(result.code).toBe(0);
     const payload = JSON.parse(fs.readFileSync(outputPath, 'utf8')) as {
       status: number;
       baseUrl: string;

@@ -27,8 +27,10 @@ option lists when a source link can remain accurate.
 | Repository domains and source entry points | [Codebase summary](./codebase-summary.md) |
 | Coding, testing, error, and size conventions | [Code standards](./code-standards.md) |
 | System boundaries and data flow | [System architecture](./system-architecture/index.md) |
-| Live work and planning pointers | [Project roadmap](./project-roadmap.md) |
+| Current maintenance direction | [Project roadmap](./project-roadmap.md) |
 | Release mechanics | [Release process](./release-process.md) |
+| Claude quota scope and cache compatibility | [Scoped Claude quotas](./claude-scoped-quotas.md) |
+| Claude pool ordering, controller ownership and recovery | [Claude pool quota priority](./claude-pool-priority.md) |
 | Dashboard localization | [Dashboard i18n](./i18n-dashboard.md) |
 | Test layout and commands | [Test suite](../tests/README.md) |
 | Dashboard development | [UI guide](../ui/README.md) |
@@ -48,9 +50,9 @@ Update the owning documentation in the same change when any of these move:
 Pure refactors need documentation changes only when they invalidate a
 maintainer decision or navigation link. Public behavior changes also require a
 matching update in the separate `kaitranntt/ccs-docs` repository on the same
-target branch. In governed workspaces, use the related-repository checkout
-declared by workspace configuration. Fork contributors can use their own
-checkout and coordinate the matching docs change in the PR.
+target branch. Maintainers using the standard CloudPersonal checkout may have
+that repository at `/Users/kaitran/CloudPersonal/ccs/docs`; fork contributors
+can use their own checkout and coordinate the matching docs change in the PR.
 
 ## Validation
 
@@ -58,10 +60,10 @@ Before review:
 
 ```bash
 bash tests/docs/quickstart-parity.sh
-node tests/docs/documentation-freshness.js
 git diff --check
 ```
 
-The freshness check validates retained documentation contracts and relative
-links. Run the focused validation command for any code or workflow the document
-describes.
+The repository-owned docs test currently checks the canonical quickstart
+snippet only. For other changed Markdown, verify each relative link and
+referenced path directly, then run the focused validation command for any code
+or workflow the document describes.

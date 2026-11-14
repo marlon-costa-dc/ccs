@@ -15,7 +15,7 @@ import * as path from 'path';
 import { fail, info, warn, color, ok } from '../../utils/ui';
 import { createLogger } from '../../services/logging';
 import { ensureCLIProxyBinary, getConfiguredBackend } from '../binary-manager';
-import { generateConfig, CLIPROXY_DEFAULT_PORT } from '../config/config-generator';
+import { generateConfig } from '../config/config-generator';
 import { AuthError, BinaryError, ConfigError } from '../../errors/error-types';
 import { CLIProxyBackend, CLIProxyProvider } from '../types';
 import {
@@ -81,9 +81,10 @@ import {
   warnOAuthBanRisk,
   warnPossible403Ban,
 } from '../accounts/account-safety';
+import { maybeOfferPoolRouting } from '../routing/pool-opt-in-prompt';
 import { checkCrossLaneEmailOverlap } from '../accounts/account-safety-cross-lane';
 import { ensureCliAntigravityResponsibility } from '../auth/antigravity-responsibility';
-import { getOAuthFlowType, getUnsupportedAuthStartReason } from '../provider-capabilities';
+import { getUnsupportedAuthStartReason } from '../provider-capabilities';
 import { InteractivePrompt } from '../../utils/prompt';
 import { getCcsDir } from '../../utils/config-manager';
 import { generateSessionId } from './project-selection-handler';
@@ -1167,6 +1168,8 @@ export async function triggerOAuth(
 
   // Check for existing accounts
   const existingAccounts = getProviderAccounts(provider);
+  // Capture count before registration for 1->2 transition detection
+  const accountCountBeforeAdd = existingAccounts.length;
   const existingNameMatch = nickname ? findAccountNameMatch(existingAccounts, nickname) : null;
   const targetAccountId = options.expectedAccountId || existingNameMatch?.id;
   const nicknameError = !fromUI
@@ -1202,7 +1205,7 @@ export async function triggerOAuth(
   const isDeviceCodeFlow =
     provider === 'kiro'
       ? isKiroDeviceCodeMethod(resolvedKiroMethod, { idcFlow: resolvedKiroIDCFlow })
-      : getOAuthFlowType(provider) === 'device_code';
+      : callbackPort === null;
   let selectedPasteCallback = options.pasteCallback === true;
 
   if (provider === 'kiro' && !isKiroCLIAuthMethod(resolvedKiroMethod)) {
@@ -1340,16 +1343,6 @@ export async function triggerOAuth(
     if (killed && verbose) {
       console.error(`[auth] Freed port ${localCallbackPort} for OAuth callback`);
     }
-  } else if (isDeviceCodeFlow) {
-    // Device code flows still need the CLIProxy API server on the default port.
-    // If a CLIProxy daemon is already bound to 8317, free it so the auth binary
-    // can start its own instance for the duration of the OAuth flow.
-    // This happens both when running from the dashboard (fromUI=true) and from
-    // the CLI when a daemon is already running.
-    const killedDefaultPort = killProcessOnPort(CLIPROXY_DEFAULT_PORT, verbose);
-    if (killedDefaultPort && verbose) {
-      console.error(`[auth] Freed port ${CLIPROXY_DEFAULT_PORT} for OAuth device code flow`);
-    }
   }
 
   const processHeadless = selectedPasteCallback && provider === 'kiro' ? true : headless;
@@ -1435,6 +1428,32 @@ export async function triggerOAuth(
     // in native Claude profiles (same account in two lanes is the documented ban vector).
     if (account.email) {
       checkCrossLaneEmailOverlap(provider, account.email);
+    }
+
+    // Pool routing opt-in: offer at the 1->2 account-add transition for verified providers.
+    // Only runs for local CLI sessions — skip when fromUI is true because the dashboard
+    // calls triggerOAuth from an HTTP request handler; the server may be running in a
+    // foreground terminal (ccs api / ccs dashboard) where process.stdin.isTTY is true,
+    // so reaching InteractivePrompt.confirm would block the HTTP request on the server's
+    // stdin and show the consent prompt to the wrong audience.
+    // Dashboard parity for the opt-in belongs to Phase 6.
+    if (!fromUI) {
+      try {
+        await maybeOfferPoolRouting(provider, accountCountBeforeAdd);
+      } catch (promptErr) {
+        // A regenerateConfig or prompt failure must not fail triggerOAuth after a
+        // successful account registration — the account is already registered.
+        logger.stage(
+          'auth',
+          'cliproxy.pool-prompt.error',
+          'Pool routing prompt failed (non-fatal)',
+          { provider },
+          { level: 'warn' }
+        );
+        if (process.env.CCS_DEBUG) {
+          console.error('[!] Pool routing prompt error (non-fatal):', promptErr);
+        }
+      }
     }
 
     logger.stage(

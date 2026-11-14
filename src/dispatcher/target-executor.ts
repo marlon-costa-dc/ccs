@@ -13,6 +13,8 @@ import { fail, info } from '../utils/ui';
 import { getTarget } from '../targets';
 import { getNativeCodexPassthroughArgs } from './cli-argument-parser';
 import { runCliproxyFlow } from './flows/cliproxy-flow';
+import { runCopilotFlow } from './flows/copilot-flow';
+import { runCursorFlow } from './flows/cursor-flow';
 import { runSettingsFlow } from './flows/settings-flow';
 import { runAccountFlow } from './flows/account-flow';
 import { runDefaultFlow } from './flows/default-flow';
@@ -78,6 +80,10 @@ export async function dispatchProfile(ctx: ProfileDispatchContext): Promise<void
   switch (profileInfo.type) {
     case 'cliproxy':
       return runCliproxyFlow(ctx);
+    case 'copilot':
+      return runCopilotFlow(ctx);
+    case 'cursor':
+      return runCursorFlow(ctx);
     case 'settings':
       return runSettingsFlow(ctx);
     case 'account':

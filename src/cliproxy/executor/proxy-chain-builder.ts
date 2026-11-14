@@ -20,6 +20,7 @@
  */
 
 import * as path from 'path';
+import { warn } from '../../utils/ui';
 import { getCcsDir } from '../../config/config-loader-facade';
 import {
   ToolSanitizationProxy,
@@ -33,7 +34,6 @@ import { shouldDisableCodexReasoning } from './thinking-override-resolver';
 import type { CLIProxyProvider, ExecutorConfig, ResolvedProxyConfig } from '../types';
 import type { ThinkingConfig } from '../../config/unified-config-types';
 import { buildCliproxyProviderPath } from '../config/provider-route';
-import { ProxyError } from '../../errors/error-types';
 
 // ── Proxy constructor types (for dependency injection in tests) ───────────────
 
@@ -81,8 +81,8 @@ export interface ProxyChainResult {
 
 /**
  * Build and start the two env-dependent proxy layers (tool-sanitization and
- * codex-reasoning). Any failed layer startup aborts the session and preserves
- * the causal error; a degraded proxy chain is not a valid runtime.
+ * codex-reasoning).  Each layer is started independently; a failed start is
+ * swallowed with a verbose warning so the session can continue degraded.
  *
  * Note: HttpsTunnelProxy is started inline in the orchestrator (index.ts)
  * before this function is called, because tunnelPort is required for
@@ -114,18 +114,21 @@ export async function buildProxyChain(context: ProxyChainContext): Promise<Proxy
         upstreamBaseUrl: initialEnvVars.ANTHROPIC_BASE_URL,
         verbose,
         warnOnSanitize: true,
-        allowSelfSigned: useRemoteProxy ? proxyConfig.allowSelfSigned : false,
+        allowSelfSigned: useRemoteProxy ? (proxyConfig.allowSelfSigned ?? false) : false,
+        // Single-provider Claude reaches Anthropic, which accepts full JSON Schema.
+        // Composite tiers may route to Gemini; CLIProxy also cleans schemas itself
+        // when a Claude-format request lands on a Gemini/Antigravity backend.
+        sanitizeSchemas: !(provider === 'claude' && !cfg.isComposite),
       });
       toolSanitizationPort = await toolSanitizationProxy.start();
       log(`Tool sanitization proxy active on port ${toolSanitizationPort}`);
     } catch (error) {
+      const err = error as Error;
       toolSanitizationProxy = null;
       toolSanitizationPort = null;
-      throw new ProxyError(
-        `Tool sanitization proxy startup failed: ${error instanceof Error ? error.message : String(error)}`,
-        undefined,
-        error
-      );
+      if (verbose) {
+        console.error(warn(`Tool sanitization proxy disabled: ${err.message}`));
+      }
     }
   }
 
@@ -154,7 +157,7 @@ export async function buildProxyChain(context: ProxyChainContext): Promise<Proxy
           defaultEffort: 'medium',
           disableEffort: codexThinkingOff,
           traceFilePath: traceEnabled ? path.join(getCcsDir(), 'codex-reasoning-proxy.log') : '',
-          allowSelfSigned: useRemoteProxy ? proxyConfig.allowSelfSigned : false,
+          allowSelfSigned: useRemoteProxy ? (proxyConfig.allowSelfSigned ?? false) : false,
           modelMap: {
             defaultModel: initialEnvVars.ANTHROPIC_MODEL,
             opusModel: initialEnvVars.ANTHROPIC_DEFAULT_OPUS_MODEL,
@@ -169,13 +172,12 @@ export async function buildProxyChain(context: ProxyChainContext): Promise<Proxy
           : buildCliproxyProviderPath('codex');
         log(`Codex reasoning proxy active: http://127.0.0.1:${codexReasoningPort}${providerPath}`);
       } catch (error) {
+        const err = error as Error;
         codexReasoningProxy = null;
         codexReasoningPort = null;
-        throw new ProxyError(
-          `Codex reasoning proxy startup failed: ${error instanceof Error ? error.message : String(error)}`,
-          undefined,
-          error
-        );
+        if (verbose) {
+          console.error(warn(`Codex reasoning proxy disabled: ${err.message}`));
+        }
       }
     }
   }

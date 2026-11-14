@@ -7,10 +7,13 @@ import {
   getCliproxyRoutingTarget,
   getRoutingErrorMessage,
 } from './routing-strategy-http';
-import type { CliproxyRoutingStrategy } from '../types';
+import type { CLIProxyBackend, CliproxyRoutingStrategy } from '../types';
 import { loadOrCreateUnifiedConfig, mutateConfig } from '../../config/config-loader-facade';
-import { getInstalledCliproxyVersion } from '../binary-manager';
-import { compareVersions } from '../../utils/update-checker';
+import { getConfiguredBackend, getInstalledCliproxyVersion } from '../binary-manager';
+import {
+  type CLIProxyBackendMinVersions,
+  meetsBackendMinimumVersion,
+} from '../binary/version-checker';
 import { getConfigYamlPath } from '../../config/loader/io-locks';
 import { createLogger } from '../../services/logging';
 
@@ -46,12 +49,18 @@ export const POOL_ROUTING_VERIFIED_PROVIDERS = new Set(['claude', 'agy']);
  * max-retry-credentials and the cooling flip.
  * Older binaries silently ignore unknown keys — pool rails would appear active
  * but have no effect.  Warn the user at enable time if below this version.
- *
- * NOTE: Update this constant when upstream first ships these keys.
- * Current best estimate based on spec; adjust after spike Test D confirms.
  */
-export const POOL_ROUTING_MIN_VERSION = '6.9.45';
+export const POOL_ROUTING_MIN_VERSION: CLIProxyBackendMinVersions = {
+  original: '6.8.34',
+  plus: '6.8.34-0',
+};
 
+export function isPoolRoutingSupported(
+  backend: CLIProxyBackend,
+  installedVersion: string
+): boolean {
+  return meetsBackendMinimumVersion(installedVersion, backend, POOL_ROUTING_MIN_VERSION);
+}
 /**
  * Pool-active override warning text.  When pool routing is enabled the generator
  * forces fill-first/affinity/cooling and ignores the stored strategy/affinity, so
@@ -205,20 +214,21 @@ export function enablePoolRouting(
 
   const preservedExplicitSetting = hasExplicitRoutingStrategy() || hasExplicitSessionAffinity();
 
-  // Spec step 3 / architecture: assert minimum CLIProxy version at enable time.
-  // Stale binaries silently ignore max-retry-credentials and the cooling flip,
-  // so pool rails would appear active but have no effect.  Warn and proceed.
   try {
-    const installedVersion = getInstalledCliproxyVersion();
-    if (compareVersions(installedVersion, POOL_ROUTING_MIN_VERSION) < 0) {
+    const backend = getConfiguredBackend();
+    const installedVersion = getInstalledCliproxyVersion(backend);
+    if (!isPoolRoutingSupported(backend, installedVersion)) {
+      const minimumVersion = POOL_ROUTING_MIN_VERSION[backend];
+      const backendLabel = backend === 'plus' ? 'CLIProxy Plus' : 'CLIProxy';
       logger.warn(
         'pool_routing.binary_below_minimum',
-        `CLIProxy v${installedVersion} is older than the pool routing minimum (v${POOL_ROUTING_MIN_VERSION}). ` +
+        `${backendLabel} v${installedVersion} is older than the pool routing minimum (v${minimumVersion}). ` +
           `The max-retry-credentials and cooling keys may be silently ignored by the running binary. ` +
           `Run 'ccs cliproxy --latest' to update CLIProxy, then restart with 'ccs cliproxy restart'.`,
         {
+          backend,
           installedVersion,
-          minimumVersion: POOL_ROUTING_MIN_VERSION,
+          minimumVersion,
         }
       );
     }

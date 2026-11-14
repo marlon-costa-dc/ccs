@@ -80,8 +80,7 @@ describe('completion backend', () => {
     expect(values).toContain('tokens');
     expect(values).toContain('migrate');
     expect(values).toContain('cursor');
-    expect(values).toContain('ghcp');
-    expect(values).not.toContain('copilot');
+    expect(values).toContain('copilot');
     expect(values).toContain('gemini');
     expect(values).toContain('xai');
     expect(values).toContain('grok');

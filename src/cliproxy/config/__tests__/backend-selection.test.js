@@ -55,10 +55,10 @@ describe('Backend Selection', () => {
 
     it('has correct configuration for plus backend', () => {
       const config = platformDetector.BACKEND_CONFIG.plus;
-      assert.strictEqual(config.repo, 'marlon-costa-dc/cliproxy');
-      assert.strictEqual(config.binaryPrefix, 'CLIProxyAPI');
+      assert.strictEqual(config.repo, 'kaitranntt/CLIProxyAPIPlus');
+      assert.strictEqual(config.binaryPrefix, 'CLIProxyAPIPlus');
       assert.strictEqual(config.executable, 'cli-proxy-api-plus');
-      assert(config.fallbackVersion.match(/^\d+\.\d+\.\d+-dc\d+$/), 'plus version has -dcN suffix');
+      assert(config.fallbackVersion.match(/^\d+\.\d+\.\d+-\d+$/), 'plus version has -0 suffix');
     });
   });
 
@@ -86,13 +86,102 @@ describe('Backend Selection', () => {
         );
       });
     });
-
     it('generates correct binary name for original backend', () => {
       const info = platformDetector.detectPlatform('6.6.51', 'original');
       assert(info.binaryName.startsWith('CLIProxyAPI_6.6.51_'));
       assert(!info.binaryName.includes('CLIProxyAPIPlus'));
     });
 
+    it('selects arm64 vs aarch64 release assets across original and plus boundaries', () => {
+      // Original pre-rename boundaries (<= 6.9.47) use arm64
+      for (const version of [undefined, '6.9.45', '6.9.47']) {
+        const effectiveVersion =
+          version || platformDetector.BACKEND_CONFIG.original.fallbackVersion;
+        withMockedProcessPlatform('darwin', 'arm64', () => {
+          const info = platformDetector.detectPlatform(version, 'original');
+          assert.strictEqual(info.arch, 'arm64');
+          assert.strictEqual(
+            info.binaryName,
+            `CLIProxyAPI_${effectiveVersion}_darwin_arm64.tar.gz`
+          );
+          assert.strictEqual(
+            platformDetector.getDownloadUrl(version, 'original'),
+            `https://github.com/router-for-me/CLIProxyAPI/releases/download/v${effectiveVersion}/CLIProxyAPI_${effectiveVersion}_darwin_arm64.tar.gz`
+          );
+        });
+
+        withMockedProcessPlatform('linux', 'arm64', () => {
+          const info = platformDetector.detectPlatform(version, 'original');
+          assert.strictEqual(info.arch, 'arm64');
+          assert.strictEqual(info.binaryName, `CLIProxyAPI_${effectiveVersion}_linux_arm64.tar.gz`);
+          assert.strictEqual(
+            platformDetector.getDownloadUrl(version, 'original'),
+            `https://github.com/router-for-me/CLIProxyAPI/releases/download/v${effectiveVersion}/CLIProxyAPI_${effectiveVersion}_linux_arm64.tar.gz`
+          );
+        });
+
+        withMockedProcessPlatform('win32', 'arm64', () => {
+          const info = platformDetector.detectPlatform(version, 'original');
+          assert.strictEqual(info.arch, 'arm64');
+          assert.strictEqual(info.binaryName, `CLIProxyAPI_${effectiveVersion}_windows_arm64.zip`);
+          assert.strictEqual(
+            platformDetector.getDownloadUrl(version, 'original'),
+            `https://github.com/router-for-me/CLIProxyAPI/releases/download/v${effectiveVersion}/CLIProxyAPI_${effectiveVersion}_windows_arm64.zip`
+          );
+        });
+      }
+
+      // Original post-rename boundary (>= 6.9.48) uses aarch64 while public arch remains arm64
+      withMockedProcessPlatform('darwin', 'arm64', () => {
+        const info = platformDetector.detectPlatform('6.9.48', 'original');
+        assert.strictEqual(info.arch, 'arm64');
+        assert.strictEqual(info.binaryName, 'CLIProxyAPI_6.9.48_darwin_aarch64.tar.gz');
+        assert.strictEqual(
+          platformDetector.getDownloadUrl('6.9.48', 'original'),
+          'https://github.com/router-for-me/CLIProxyAPI/releases/download/v6.9.48/CLIProxyAPI_6.9.48_darwin_aarch64.tar.gz'
+        );
+      });
+
+      // Plus fallback (undefined) and explicit pre-rename (< 6.10.0-0) use arm64
+      for (const version of [undefined, '6.9.45-0']) {
+        const effectiveVersion = version || platformDetector.BACKEND_CONFIG.plus.fallbackVersion;
+        withMockedProcessPlatform('darwin', 'arm64', () => {
+          const info = platformDetector.detectPlatform(version, 'plus');
+          assert.strictEqual(info.arch, 'arm64');
+          assert.strictEqual(
+            info.binaryName,
+            `CLIProxyAPIPlus_${effectiveVersion}_darwin_arm64.tar.gz`
+          );
+          assert.strictEqual(
+            platformDetector.getDownloadUrl(version, 'plus'),
+            `https://github.com/kaitranntt/CLIProxyAPIPlus/releases/download/v${effectiveVersion}/CLIProxyAPIPlus_${effectiveVersion}_darwin_arm64.tar.gz`
+          );
+        });
+      }
+
+      // Plus post-rename (>= 6.10.0-0) uses aarch64
+      withMockedProcessPlatform('darwin', 'arm64', () => {
+        const info = platformDetector.detectPlatform('6.10.0-0', 'plus');
+        assert.strictEqual(info.arch, 'arm64');
+        assert.strictEqual(info.binaryName, 'CLIProxyAPIPlus_6.10.0-0_darwin_aarch64.tar.gz');
+        assert.strictEqual(
+          platformDetector.getDownloadUrl('6.10.0-0', 'plus'),
+          'https://github.com/kaitranntt/CLIProxyAPIPlus/releases/download/v6.10.0-0/CLIProxyAPIPlus_6.10.0-0_darwin_aarch64.tar.gz'
+        );
+      });
+
+      // x64 remains amd64 for both backends
+      withMockedProcessPlatform('linux', 'x64', () => {
+        assert.strictEqual(
+          platformDetector.detectPlatform('6.9.45', 'original').binaryName,
+          'CLIProxyAPI_6.9.45_linux_amd64.tar.gz'
+        );
+        assert.strictEqual(
+          platformDetector.detectPlatform('6.9.45-0', 'plus').binaryName,
+          'CLIProxyAPIPlus_6.9.45-0_linux_amd64.tar.gz'
+        );
+      });
+    });
     it('uses static no-plugin assets when the integrated Linux image opts in', () => {
       withEnvironmentVariable('CCS_CLIPROXY_NO_PLUGIN_ASSET', '1', () => {
         withMockedProcessPlatform('linux', 'x64', () => {
@@ -153,11 +242,11 @@ describe('Backend Selection', () => {
       withMockedProcessPlatform('darwin', 'arm64', () => {
         assert.strictEqual(
           platformDetector.detectPlatform('6.9.45-0', 'plus').binaryName,
-          'CLIProxyAPI_6.9.45-0_darwin_arm64.tar.gz'
+          'CLIProxyAPIPlus_6.9.45-0_darwin_arm64.tar.gz'
         );
         assert.strictEqual(
           platformDetector.detectPlatform('7.1.45-1', 'plus').binaryName,
-          'CLIProxyAPI_7.1.45-1_darwin_aarch64.tar.gz'
+          'CLIProxyAPIPlus_7.1.45-1_darwin_aarch64.tar.gz'
         );
       });
     });
@@ -166,29 +255,32 @@ describe('Backend Selection', () => {
       withMockedProcessPlatform('darwin', 'arm64', () => {
         assert.strictEqual(
           platformDetector.detectPlatform('7.1.68-0', 'plus').binaryName,
-          'CLIProxyAPI_7.1.68-0_darwin_aarch64_no-plugin.tar.gz'
+          'CLIProxyAPIPlus_7.1.68-0_darwin_aarch64_no-plugin.tar.gz'
         );
-        const info = platformDetector.detectPlatform('7.2.136-dc6', 'plus');
+        const info = platformDetector.detectPlatform('7.1.68-2', 'plus');
         assert.strictEqual(
           info.binaryName,
-          'CLIProxyAPI_7.2.136-dc6_darwin_aarch64_no-plugin.tar.gz'
+          'CLIProxyAPIPlus_7.1.68-2_darwin_aarch64_no-plugin.tar.gz'
         );
         assert.strictEqual(
-          platformDetector.getDownloadUrl('7.2.136-dc6', 'plus'),
-          'https://github.com/marlon-costa-dc/cliproxy/releases/download/v7.2.136-dc6/CLIProxyAPI_7.2.136-dc6_darwin_aarch64_no-plugin.tar.gz'
+          platformDetector.getDownloadUrl('7.1.68-2', 'plus'),
+          'https://github.com/kaitranntt/CLIProxyAPIPlus/releases/download/v7.1.68-2/CLIProxyAPIPlus_7.1.68-2_darwin_aarch64_no-plugin.tar.gz'
         );
       });
 
       withMockedProcessPlatform('linux', 'x64', () => {
-        const info = platformDetector.detectPlatform('7.2.136-dc6', 'plus');
-        assert.strictEqual(info.binaryName, 'CLIProxyAPI_7.2.136-dc6_linux_amd64_no-plugin.tar.gz');
+        const info = platformDetector.detectPlatform('7.1.68-2', 'plus');
+        assert.strictEqual(
+          info.binaryName,
+          'CLIProxyAPIPlus_7.1.68-2_linux_amd64_no-plugin.tar.gz'
+        );
       });
     });
 
     it('does not add no-plugin suffix to plus Windows archives', () => {
       withMockedProcessPlatform('win32', 'x64', () => {
-        const info = platformDetector.detectPlatform('7.2.136-dc6', 'plus');
-        assert.strictEqual(info.binaryName, 'CLIProxyAPI_7.2.136-dc6_windows_amd64.zip');
+        const info = platformDetector.detectPlatform('7.1.68-2', 'plus');
+        assert.strictEqual(info.binaryName, 'CLIProxyAPIPlus_7.1.68-2_windows_amd64.zip');
       });
     });
 
@@ -239,8 +331,8 @@ describe('Backend Selection', () => {
     });
 
     it('uses correct repo for plus backend', () => {
-      const url = platformDetector.getDownloadUrl('7.2.136-dc6', 'plus');
-      assert(url.includes('marlon-costa-dc/cliproxy/releases'));
+      const url = platformDetector.getDownloadUrl('6.6.51-0', 'plus');
+      assert(url.includes('kaitranntt/CLIProxyAPIPlus/releases'));
     });
 
     it('defaults to original backend', () => {

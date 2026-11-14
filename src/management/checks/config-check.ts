@@ -10,85 +10,12 @@ import { HealthCheck, IHealthChecker, createSpinner } from './types';
 import { getClaudeConfigDir } from '../../utils/claude-config-path';
 import { getCcsDir } from '../../config/config-loader-facade';
 import {
-  getConfigYamlPath,
-  withConfigWriteLock,
-  writeConfigYamlContentWithLockHeld,
-} from '../../config/loader/io-locks';
-import { parseModelPipelineConfig } from '../../config/schemas/model-pipeline';
-import {
   CODEX_TRANSLATOR_URL_MARKER,
   findCodexTranslatorUrlPaths,
   formatSettingsPathList,
 } from '../../shared/stale-codex-translator-settings';
 
 const ora = createSpinner();
-
-/**
- * Parser message for a `model_pipeline` block the config loader rejects, or
- * null when the document has no such block or the block loads.
- */
-function unloadableModelPipelineReason(document: unknown): string | null {
-  if (typeof document !== 'object' || document === null) return null;
-  const block = (document as Record<string, unknown>).model_pipeline;
-  if (block === undefined) return null;
-  try {
-    parseModelPipelineConfig(block);
-    return null;
-  } catch (e) {
-    return (e as Error).message;
-  }
-}
-
-function describeClearedModelPipeline(block: unknown): string {
-  const receipt = (block as { receipt?: unknown } | null)?.receipt;
-  const active = (receipt as { active?: unknown } | null | undefined)?.active as
-    | { generation?: unknown; snapshot_digest?: unknown }
-    | null
-    | undefined;
-  if (typeof active?.generation === 'number' && typeof active.snapshot_digest === 'string') {
-    return `generation ${active.generation}, snapshot_digest ${active.snapshot_digest}`;
-  }
-  return 'unparseable block (no readable receipt.active identity)';
-}
-
-/** Result of {@link clearUnloadableModelPipeline}. */
-export type ModelPipelineClearOutcome =
-  | { kind: 'config-absent' }
-  | { kind: 'block-loadable' }
-  | { kind: 'cleared'; cleared: string };
-
-/**
- * Offline equivalent of the publisher's reset for a `model_pipeline` block the
- * config loader rejects: the dashboard cannot start to serve the typed reset
- * while config.yaml fails to load. Removes only the `model_pipeline` key, under
- * the config write lock, through the same atomic writer as every config write.
- */
-export function clearUnloadableModelPipeline(): ModelPipelineClearOutcome {
-  return withConfigWriteLock((): ModelPipelineClearOutcome => {
-    const yaml = require('js-yaml');
-    const yamlPath = getConfigYamlPath();
-    if (!fs.existsSync(yamlPath)) return { kind: 'config-absent' };
-    const document: unknown = yaml.load(fs.readFileSync(yamlPath, 'utf8'));
-    if (unloadableModelPipelineReason(document) === null) return { kind: 'block-loadable' };
-    const { model_pipeline: block, ...remaining } = document as Record<string, unknown>;
-    writeConfigYamlContentWithLockHeld(
-      yaml.dump(remaining, { indent: 2, lineWidth: -1, quotingType: '"' })
-    );
-    return { kind: 'cleared', cleared: describeClearedModelPipeline(block) };
-  });
-}
-
-/** One operator-facing line for a {@link ModelPipelineClearOutcome}. */
-export function describeModelPipelineClearOutcome(outcome: ModelPipelineClearOutcome): string {
-  switch (outcome.kind) {
-    case 'config-absent':
-      return 'config.yaml does not exist; nothing was changed';
-    case 'block-loadable':
-      return 'config.yaml has no unloadable model_pipeline block; nothing was changed';
-    case 'cleared':
-      return `Cleared unloadable model_pipeline from config.yaml: ${outcome.cleared}`;
-  }
-}
 
 /**
  * Check CCS config files exist and are valid
@@ -129,19 +56,7 @@ export class ConfigFilesChecker implements IHealthChecker {
       try {
         const yaml = require('js-yaml');
         const content = fs.readFileSync(configYamlPath, 'utf8');
-        const pipelineReason = unloadableModelPipelineReason(yaml.load(content));
-        if (pipelineReason !== null) {
-          spinner.fail();
-          console.log(`  ${fail('config.yaml'.padEnd(22))}  Unloadable model_pipeline`);
-          results.addCheck(
-            'config.yaml',
-            'error',
-            `Unloadable model_pipeline block: ${pipelineReason}`,
-            'Run: ccs doctor --fix-model-pipeline (clears only that block; republish afterwards)',
-            { status: 'ERROR', info: 'Unloadable model_pipeline' }
-          );
-          return;
-        }
+        yaml.load(content);
         spinner.succeed();
         console.log(`  ${ok('config.yaml'.padEnd(22))}  Valid`);
         results.addCheck('config.yaml', 'success', undefined, undefined, {
@@ -222,8 +137,6 @@ export class ConfigFilesChecker implements IHealthChecker {
     const settingsFiles = [
       { name: 'glm.settings.json', profile: 'glm', displayName: 'GLM Settings' },
       { name: 'kimi.settings.json', profile: 'kimi', displayName: 'Kimi Settings' },
-      { name: 'poolside.settings.json', profile: 'poolside', displayName: 'Poolside Settings' },
-      { name: 'opencode.settings.json', profile: 'opencode', displayName: 'OpenCode Settings' },
     ];
 
     for (const file of settingsFiles) {

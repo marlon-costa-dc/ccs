@@ -15,6 +15,7 @@ export interface DragOffset {
 
 export interface AccountData {
   id: string;
+  nickname?: string;
   email: string;
   tokenFile?: string;
   provider: string;
@@ -39,29 +40,18 @@ export interface ProviderData {
   accounts: AccountData[];
 }
 
-export interface ProviderOption {
-  provider: string;
-  displayName: string;
-  totalRequests: number;
-  successCount: number;
-  failureCount: number;
-}
-
 export interface AccountFlowVizProps {
   providerData: ProviderData;
   onBack?: () => void;
   onPauseToggle?: (accountIds: string[], paused: boolean) => void;
   isPausingAccount?: boolean;
-  providerName?: string;
-  currentProvider?: string;
-  providers?: ProviderOption[];
-  onProviderChange?: (provider: string) => void;
 }
 
 export interface ConnectionEvent {
   id: string;
   timestamp: Date;
   accountEmail: string;
+  accountNickname?: string;
   status: 'success' | 'failed' | 'pending';
   latencyMs?: number;
 }

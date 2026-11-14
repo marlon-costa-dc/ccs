@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { CLIPROXY_DEFAULT_PORT } from '../../../src/cliproxy/config/port-manager';
 import {
   CodexRawConfigConflictError,
   CodexRawConfigValidationError,
@@ -92,7 +91,7 @@ describe('codex-dashboard-service', () => {
   it('summarizes model providers with auth and header metadata', () => {
     const summary = summarizeCodexModelProviders({
       cliproxy: {
-        base_url: `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}/api/provider/codex`,
+        base_url: 'http://127.0.0.1:8317/api/provider/codex',
         env_key: 'CLIPROXY_API_KEY',
         wire_api: 'responses',
         http_headers: { 'x-test': '1' },
@@ -231,7 +230,7 @@ runtime_metrics = true
 
 [model_providers.cliproxy]
 name = "CLIProxyAPI"
-base_url = "http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}/api/provider/codex"
+base_url = "http://127.0.0.1:8317/api/provider/codex"
 env_key = "CLIPROXY_API_KEY"
 wire_api = "responses"
 
@@ -514,7 +513,7 @@ bearer_token = "secret"
       name: 'cliproxy',
       values: {
         displayName: 'CLIProxy',
-        baseUrl: `http://127.0.0.1:${CLIPROXY_DEFAULT_PORT}/api/provider/codex`,
+        baseUrl: 'http://127.0.0.1:8317/api/provider/codex',
         envKey: 'CLIPROXY_API_KEY',
         wireApi: 'responses',
       },

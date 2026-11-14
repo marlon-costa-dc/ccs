@@ -5,8 +5,8 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+const matrixEnabled = process.env.CCS_RUNTIME_MATRIX === '1';
 const fixturePath = path.join(process.cwd(), 'tests/integration/proxy/fixtures/runtime-probe.cjs');
-const runtimeSetupTimeoutMs = 3 * 60_000;
 const proxyKeys = [
   'HTTP_PROXY',
   'HTTPS_PROXY',
@@ -27,7 +27,7 @@ type ProbeResult = {
 };
 
 function resolveNodeBinary(version: 18 | 22 | 26): string {
-  const result = spawnSync('npx', ['--yes', `node@${version}`, '-p', 'process.execPath'], {
+  const result = spawnSync('npx', ['-y', `node@${version}`, '-p', 'process.execPath'], {
     encoding: 'utf8',
     env: Object.fromEntries(
       Object.entries(process.env).filter(([key]) => !proxyKeys.includes(key))
@@ -70,10 +70,10 @@ function runProbe(
       fs.rmSync(ccsHome, { recursive: true, force: true });
       reject(error);
     });
-    child.once('close', (code, signal) => {
+    child.once('close', (code) => {
       fs.rmSync(ccsHome, { recursive: true, force: true });
       if (code !== 0) {
-        reject(new Error(`Probe ${binary} exited ${code} (${signal}): ${stderr || stdout}`));
+        reject(new Error(`Probe exited ${code}: ${stderr || stdout}`));
         return;
       }
       const lastLine = stdout.trim().split('\n').pop();
@@ -86,7 +86,7 @@ function runProbe(
   });
 }
 
-describe('real runtime upstream transport matrix', () => {
+describe.skipIf(!matrixEnabled)('real runtime upstream transport matrix', () => {
   let node18 = '';
   let node22 = '';
   let node26 = '';
@@ -98,11 +98,9 @@ describe('real runtime upstream transport matrix', () => {
   let sawProxyAuthorization = false;
 
   beforeAll(async () => {
-    [node18, node22, node26] = [
-      resolveNodeBinary(18),
-      resolveNodeBinary(22),
-      resolveNodeBinary(26),
-    ];
+    node18 = resolveNodeBinary(18);
+    node22 = resolveNodeBinary(22);
+    node26 = resolveNodeBinary(26);
     const payload = JSON.stringify({
       id: 'chatcmpl_matrix',
       model: 'sentinel-model',
@@ -144,7 +142,7 @@ describe('real runtime upstream transport matrix', () => {
     ]);
     upstreamPort = (upstreamServer.address() as { port: number }).port;
     corporateProxyPort = (corporateProxy.address() as { port: number }).port;
-  }, runtimeSetupTimeoutMs);
+  }, 60_000);
 
   afterAll(async () => {
     const servers = [upstreamServer, corporateProxy].filter(

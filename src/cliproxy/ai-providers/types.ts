@@ -102,7 +102,7 @@ export interface AiProvidersSourceSummary {
   mode: 'local' | 'remote';
   label: string;
   target: string;
-  managementAuth: 'configured' | 'missing';
+  managementAuth: 'configured' | 'missing' | 'fallback';
 }
 
 export interface ListAiProvidersResult {

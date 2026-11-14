@@ -13,6 +13,7 @@ const JSON_REPORT_PATH = path.join(REPORT_DIR, 'hardening-inventory.json');
 const MD_REPORT_PATH = path.join(REPORT_DIR, 'hardening-inventory.md');
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
+const EXCLUDED_DIRECTORIES = new Set(['generated', 'node_modules', 'dist']);
 const HOTPATH_PATTERNS = [
   /^src\/web-server\//,
   /^src\/commands\//,
@@ -107,6 +108,10 @@ function walkFiles(dirPath) {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
 
   for (const entry of entries) {
+    if (entry.isDirectory() && EXCLUDED_DIRECTORIES.has(entry.name)) {
+      continue;
+    }
+
     const fullPath = path.join(dirPath, entry.name);
     if (entry.isDirectory()) {
       output.push(...walkFiles(fullPath));

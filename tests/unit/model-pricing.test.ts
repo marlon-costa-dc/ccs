@@ -66,6 +66,8 @@ describe('model-pricing', () => {
     });
 
     it('should price current provider preset defaults without fallback rates', () => {
+      const fallback = getModelPricing('unknown-model-xyz');
+
       expect(getModelPricing('glm-5.2')).toMatchObject({
         inputPerMillion: 1.4,
         outputPerMillion: 4.4,
@@ -82,32 +84,31 @@ describe('model-pricing', () => {
         cacheReadPerMillion: 0.09,
       });
 
-      expect(hasCustomPricing('glm-5.2')).toBe(true);
-      expect(hasCustomPricing('MiniMax-M3')).toBe(true);
-      expect(hasCustomPricing('kimi-for-coding')).toBe(true);
+      expect(getModelPricing('glm-5.2')).not.toEqual(fallback);
+      expect(getModelPricing('MiniMax-M3')).not.toEqual(fallback);
+      expect(getModelPricing('kimi-for-coding')).not.toEqual(fallback);
     });
 
     it('should not use fallback pricing for known Qwen catalog IDs', () => {
+      const fallback = getModelPricing('unknown-model-xyz');
       const catalogIds = ['qwen3-235b', 'qwen3-vl-plus', 'qwen3-32b'];
 
       for (const model of catalogIds) {
-        expect(hasCustomPricing(model)).toBe(true);
+        const pricing = getModelPricing(model);
+        expect(pricing).not.toEqual(fallback);
       }
     });
 
     it('should map qwen3-coder to deterministic custom pricing', () => {
       const pricing = getModelPricing('qwen3-coder');
+      const canonical = getModelPricing('qwen3-coder-plus');
 
-      expect(pricing).toMatchObject({
-        inputPerMillion: 1,
-        outputPerMillion: 5,
-        cacheCreationPerMillion: 1,
-        cacheReadPerMillion: 0.2,
-      });
-      expect(hasCustomPricing('qwen3-coder')).toBe(true);
+      expect(pricing).toEqual(canonical);
+      expect(pricing).not.toEqual(getModelPricing('unknown-model-xyz'));
     });
 
     it('should map Gemini 3 and 3.1 Flash preview variants to flash pricing', () => {
+      const canonical = getModelPricing('gemini-2.5-flash');
       const aliases = [
         'gemini-3-flash-preview',
         'gemini-3-flash-preview-customtools',
@@ -118,12 +119,7 @@ describe('model-pricing', () => {
       ];
 
       for (const model of aliases) {
-        expect(getModelPricing(model)).toMatchObject({
-          inputPerMillion: 0.3,
-          outputPerMillion: 2.5,
-          cacheCreationPerMillion: 0,
-          cacheReadPerMillion: 0.075,
-        });
+        expect(getModelPricing(model)).toEqual(canonical);
       }
     });
 
@@ -280,13 +276,148 @@ describe('model-pricing', () => {
       expect(fable5.cacheCreationPerMillion).toBe(12.5);
       expect(fable5.cacheReadPerMillion).toBe(1.0);
     });
+    it('should return correct pricing for GPT-6 Astra and apply fast service tier', () => {
+      const astra = getModelPricing('gpt-6-astra');
+      expect(astra.inputPerMillion).toBe(10.0);
+      expect(astra.outputPerMillion).toBe(50.0);
+      expect(astra.cacheCreationPerMillion).toBe(12.5);
+      expect(astra.cacheReadPerMillion).toBe(1.0);
+
+      const astraFast = getModelPricing('gpt-6-astra-fast');
+      expect(astraFast.inputPerMillion).toBe(20.0);
+      expect(astraFast.outputPerMillion).toBe(100.0);
+      expect(astraFast.cacheCreationPerMillion).toBe(25.0);
+      expect(astraFast.cacheReadPerMillion).toBe(2.0);
+
+      const astraMax = getModelPricing('gpt-6-astra-max');
+      expect(astraMax.inputPerMillion).toBe(10.0);
+      expect(astraMax.outputPerMillion).toBe(50.0);
+
+      const astraMaxFast = getModelPricing('gpt-6-astra-max-fast');
+      expect(astraMaxFast.inputPerMillion).toBe(20.0);
+      expect(astraMaxFast.outputPerMillion).toBe(100.0);
+
+      const legacyMax = getModelPricing('gpt-5.1-codex-max');
+      const gpt54 = getModelPricing('gpt-5.4');
+      expect(legacyMax).toEqual(gpt54);
+    });
+    it('should return correct pricing for GPT-6.1 Sol, GPT-6 Sol, and GPT-6 Luna with tuning and fast mode', () => {
+      const sol61 = getModelPricing('gpt-6.1-sol');
+      expect(sol61.inputPerMillion).toBe(2.0);
+      expect(sol61.outputPerMillion).toBe(10.0);
+      expect(sol61.cacheCreationPerMillion).toBe(2.5);
+      expect(sol61.cacheReadPerMillion).toBe(0.1);
+
+      const sol61Fast = getModelPricing('gpt-6.1-sol-fast');
+      expect(sol61Fast.inputPerMillion).toBe(4.0);
+      expect(sol61Fast.outputPerMillion).toBe(20.0);
+      expect(sol61Fast.cacheCreationPerMillion).toBe(5.0);
+      expect(sol61Fast.cacheReadPerMillion).toBe(0.2);
+
+      const sol61MaxFast = getModelPricing('gpt-6.1-sol-max-fast');
+      expect(sol61MaxFast.inputPerMillion).toBe(4.0);
+      expect(sol61MaxFast.outputPerMillion).toBe(20.0);
+
+      const sol6 = getModelPricing('gpt-6-sol');
+      expect(sol6.inputPerMillion).toBe(2.0);
+      expect(sol6.outputPerMillion).toBe(10.0);
+      expect(sol6.cacheCreationPerMillion).toBe(2.5);
+      expect(sol6.cacheReadPerMillion).toBe(0.2);
+
+      const sol6None = getModelPricing('gpt-6-sol-none');
+      expect(sol6None.inputPerMillion).toBe(2.0);
+      expect(sol6None.outputPerMillion).toBe(10.0);
+
+      const sol6Fast = getModelPricing('gpt-6-sol-fast');
+      expect(sol6Fast.inputPerMillion).toBe(4.0);
+      expect(sol6Fast.outputPerMillion).toBe(20.0);
+
+      const luna6 = getModelPricing('gpt-6-luna');
+      expect(luna6.inputPerMillion).toBe(0.1);
+      expect(luna6.outputPerMillion).toBe(0.5);
+      expect(luna6.cacheCreationPerMillion).toBeCloseTo(0.125);
+      expect(luna6.cacheReadPerMillion).toBeCloseTo(0.01);
+
+      const luna6NoneFast = getModelPricing('gpt-6-luna-none-fast');
+      expect(luna6NoneFast.inputPerMillion).toBe(0.2);
+      expect(luna6NoneFast.outputPerMillion).toBe(1.0);
+    });
+    it('does not strip tuning suffixes from non-Codex models', () => {
+      const fallback = getModelPricing('unknown-model-xyz');
+      const geminiFlash = getModelPricing('gemini-2.5-flash');
+      expect(getModelPricing('gemini-2.5-flash-high')).toEqual(fallback);
+      expect(getModelPricing('gemini-2.5-flash-high')).not.toEqual(geminiFlash);
+      expect(getModelPricing('custom-provider-model-max')).toEqual(fallback);
+    });
+    it('should return correct pricing for Claude Fable 5.1', () => {
+      // Same base rates as Fable 5, but cache hits bill at 0.025x base input
+      // ($0.25/MTok) rather than the standard 0.1x multiplier.
+      const fable51 = getModelPricing('claude-fable-5-1');
+      expect(fable51.inputPerMillion).toBe(10.0);
+      expect(fable51.outputPerMillion).toBe(50.0);
+      expect(fable51.cacheCreationPerMillion).toBe(12.5);
+      expect(fable51.cacheReadPerMillion).toBe(0.25);
+    });
 
     it('should return correct pricing for Claude Sonnet 5', () => {
+      // The $2/$10 launch introductory rate became the standard price; the
+      // scheduled 2026-09-01 increase to $3/$15 was cancelled.
       const sonnet5 = getModelPricing('claude-sonnet-5');
-      expect(sonnet5.inputPerMillion).toBe(3.0);
-      expect(sonnet5.outputPerMillion).toBe(15.0);
-      expect(sonnet5.cacheCreationPerMillion).toBe(3.75);
-      expect(sonnet5.cacheReadPerMillion).toBe(0.3);
+      expect(sonnet5.inputPerMillion).toBe(2.0);
+      expect(sonnet5.outputPerMillion).toBe(10.0);
+      expect(sonnet5.cacheCreationPerMillion).toBe(2.5);
+      expect(sonnet5.cacheReadPerMillion).toBe(0.2);
+    });
+    it('should return Sonnet 5 rates for every Claude Sonnet 5.5 id variant', () => {
+      // Sonnet 5.5 keeps Sonnet 5's $2/$10 pricing; none of these ids may fall
+      // through to the $3/$15 unknown-model fallback.
+      for (const id of ['claude-sonnet-5-5', 'claude-sonnet-5-5-thinking', 'claude-sonnet-5.5']) {
+        const sonnet55 = getModelPricing(id);
+        expect(sonnet55.inputPerMillion).toBe(2.0);
+        expect(sonnet55.outputPerMillion).toBe(10.0);
+        expect(sonnet55.cacheCreationPerMillion).toBe(2.5);
+        expect(sonnet55.cacheReadPerMillion).toBe(0.2);
+        expect(sonnet55.serviceTiers).toBeUndefined();
+        expect(hasCustomPricing(id)).toBe(true);
+      }
+      // Date-stamped ids resolve via stripDateSuffix.
+      expect(getModelPricing('claude-sonnet-5-5-20260928').inputPerMillion).toBe(2.0);
+    });
+    it('should return the <=100K-prompt rates for every Claude Haiku 5.5 id variant', () => {
+      // Haiku 5.5 is $0.10/$0.50 up to 100K prompt tokens; none of these ids may
+      // fall through to Haiku 4.5's $1/$5 or the $3/$15 unknown-model fallback.
+      for (const id of ['claude-haiku-5-5', 'claude-haiku-5-5-thinking', 'claude-haiku-5.5']) {
+        const haiku55 = getModelPricing(id);
+        expect(haiku55.inputPerMillion).toBe(0.1);
+        expect(haiku55.outputPerMillion).toBe(0.5);
+        expect(haiku55.cacheCreationPerMillion).toBe(0.125);
+        expect(haiku55.cacheReadPerMillion).toBe(0.01);
+        expect(haiku55.serviceTiers).toBeUndefined();
+        expect(hasCustomPricing(id)).toBe(true);
+      }
+      expect(getModelPricing('claude-haiku-4-5').inputPerMillion).toBe(1.0);
+    });
+    it('should return correct pricing for Claude Opus 5.5 and fast mode', () => {
+      const opus55 = getModelPricing('claude-opus-5-5');
+      expect(opus55.inputPerMillion).toBe(4.0);
+      expect(opus55.outputPerMillion).toBe(20.0);
+      expect(opus55.cacheCreationPerMillion).toBe(5.0);
+      expect(opus55.cacheReadPerMillion).toBe(0.2);
+
+      const opus55Dot = getModelPricing('claude-opus-5.5');
+      expect(opus55Dot.inputPerMillion).toBe(4.0);
+      expect(opus55Dot.outputPerMillion).toBe(20.0);
+      expect(opus55Dot.cacheCreationPerMillion).toBe(5.0);
+      expect(opus55Dot.cacheReadPerMillion).toBe(0.2);
+      expect(opus55Dot.serviceTiers).toBeUndefined();
+      // Dotted GHCP ID does not have fast mode and falls through to base rates
+      expect(getModelPricing('claude-opus-5.5', { serviceTier: 'fast' })).toEqual(opus55Dot);
+
+      const opus55Fast = getModelPricing('claude-opus-5-5', { serviceTier: 'fast' });
+      expect(opus55Fast.inputPerMillion).toBe(8.0);
+      expect(opus55Fast.outputPerMillion).toBe(40.0);
+      expect(opus55Fast.cacheCreationPerMillion).toBe(10.0);
+      expect(opus55Fast.cacheReadPerMillion).toBe(0.4);
     });
 
     it('should return Opus-tier pricing for Claude Opus 5', () => {
@@ -306,8 +437,10 @@ describe('model-pricing', () => {
     });
 
     it('should not map unknown future model families onto known family pricing', () => {
-      expect(hasCustomPricing('claude-opus-6-20270101')).toBe(false);
-      expect(hasCustomPricing('gemini-3.2-pro')).toBe(false);
+      const fallback = getModelPricing('unknown-model-xyz');
+
+      expect(getModelPricing('claude-opus-6-20270101')).toEqual(fallback);
+      expect(getModelPricing('gemini-3.2-pro')).toEqual(fallback);
     });
   });
 
@@ -432,7 +565,7 @@ describe('model-pricing', () => {
         cacheReadTokens: 1_000_000,
       };
       const cost = calculateCost(usage, 'claude-sonnet-5');
-      expect(cost).toBe(22.05); // 3 + 15 + 3.75 + 0.3
+      expect(cost).toBe(14.7); // 2 + 10 + 2.5 + 0.2
     });
 
     it('should calculate fast-tier Claude Opus 4.8 cost (2x premium)', () => {
@@ -469,6 +602,11 @@ describe('model-pricing', () => {
       // unknown-model fallback that happens to share Sonnet's $3/$15 rates.
       const models = getKnownModels();
       expect(models).toContain('claude-sonnet-5');
+      expect(models).toContain('claude-sonnet-5-5');
+      expect(models).toContain('claude-haiku-5-5');
+      expect(models).toContain('gpt-6.1-sol');
+      expect(models).toContain('gpt-6-sol');
+      expect(models).toContain('gpt-6-luna');
     });
   });
 
@@ -615,38 +753,39 @@ describe('model-pricing', () => {
 
     it('keeps CCS compatibility aliases ahead of provider-aware models.dev matches', () => {
       const pricing = getModelPricing('gemini-3-flash-preview', { provider: 'google' });
+      const canonical = getModelPricing('gemini-2.5-flash');
 
-      expect(pricing).toMatchObject({
-        inputPerMillion: 0.3,
-        outputPerMillion: 2.5,
-        cacheCreationPerMillion: 0,
-        cacheReadPerMillion: 0.075,
-      });
+      expect(pricing).toEqual(canonical);
       expect(pricing.inputPerMillion).not.toBe(99);
     });
 
     it('falls back to CCS static pricing when provider-aware models.dev lookup misses a known model', () => {
-      expect(getModelPricing('anthropic/claude-sonnet-4-5')).toMatchObject({
-        inputPerMillion: 3.0,
-        outputPerMillion: 15.0,
-      });
-      expect(getModelPricing('claude-sonnet-4-5', { provider: 'anthropic' })).toMatchObject({
-        inputPerMillion: 3.0,
-        outputPerMillion: 15.0,
-      });
+      const staticPricing = getModelPricing('claude-sonnet-4-5');
+
+      expect(getModelPricing('anthropic/claude-sonnet-4-5')).toEqual(staticPricing);
+      expect(getModelPricing('claude-sonnet-4-5', { provider: 'anthropic' })).toEqual(
+        staticPricing
+      );
       expect(hasCustomPricing('anthropic/claude-sonnet-4-5')).toBe(true);
     });
 
     it('does not use ambiguous model-only models.dev matches', () => {
+      const pricing = getModelPricing('gpt-5.5');
+      expect(pricing).toEqual(getModelPricing('unknown-model-xyz'));
       expect(hasCustomPricing('gpt-5.5')).toBe(false);
       expect(hasCustomPricing('gpt-5.5', { provider: 'openai' })).toBe(true);
     });
 
     it('does not use another provider pricing when explicit provider lookup misses', () => {
+      const fallback = getModelPricing('unknown-model-xyz');
+
+      expect(getModelPricing('openai-exclusive-model', { provider: 'github-copilot' })).toEqual(
+        fallback
+      );
+      expect(getModelPricing('github-copilot/openai-exclusive-model')).toEqual(fallback);
       expect(hasCustomPricing('openai-exclusive-model', { provider: 'github-copilot' })).toBe(
         false
       );
-      expect(hasCustomPricing('github-copilot/openai-exclusive-model')).toBe(false);
     });
 
     it('calculates cost with provider-aware models.dev pricing', () => {
