@@ -1,3 +1,9 @@
+## [8.9.0-fd.30](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.29...v8.9.0-fd.30) (2026-11-14)
+
+### Bug Fixes
+
+* **cliproxy:** add opencode base model configs ([4f094fc](https://github.com/marlon-costa-dc/ccs/commit/4f094fced15a0fea2410eec4f0ef6a17a83a547f))
+
 ## [8.9.0-fd.29](https://github.com/marlon-costa-dc/ccs/compare/v8.9.0-fd.28...v8.9.0-fd.29) (2026-11-14)
 
 ### Documentation
