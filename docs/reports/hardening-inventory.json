@@ -1,7 +1,7 @@
 {
   "scope": "src/**/*.{ts,tsx,js,jsx,mjs,cjs}",
   "syncFs": {
-    "totalOccurrences": 2667,
+    "totalOccurrences": 2669,
     "filesAffected": 282,
     "hotpathOccurrences": 1220,
     "hotpathFilesAffected": 163,
@@ -304,8 +304,8 @@
     ]
   },
   "legacyShim": {
-    "totalMarkers": 494,
-    "filesAffected": 185,
+    "totalMarkers": 495,
+    "filesAffected": 186,
     "topFiles": [
       {
         "file": "src/auth/profile-detector.ts",
@@ -500,11 +500,11 @@
   },
   "maintainability": {
     "typedErrors": {
-      "totalThrows": 484,
-      "typedThrows": 120,
-      "plainThrows": 304,
+      "totalThrows": 492,
+      "typedThrows": 134,
+      "plainThrows": 298,
       "otherThrows": 60,
-      "adoptionRatio": 0.2479,
+      "adoptionRatio": 0.2724,
       "topSubdomainsByThrows": [
         {
           "subdomain": "web-server",
@@ -555,15 +555,15 @@
           "plain": 17
         },
         {
+          "subdomain": "cliproxy/ai-providers",
+          "count": 20,
+          "typed": 14,
+          "plain": 6
+        },
+        {
           "subdomain": "cliproxy/auth",
           "count": 16,
           "typed": 16,
-          "plain": 0
-        },
-        {
-          "subdomain": "auth",
-          "count": 12,
-          "typed": 12,
           "plain": 0
         }
       ]
@@ -582,8 +582,8 @@
     },
     "loggerCoverage": {
       "filesWithCreateLogger": 68,
-      "totalSourceFiles": 780,
-      "coverageRatio": 0.0872,
+      "totalSourceFiles": 781,
+      "coverageRatio": 0.0871,
       "subdomainsWithZeroCreateLogger": [
         "api",
         "bin",
@@ -597,6 +597,7 @@
         "cliproxy/types",
         "config",
         "dispatcher",
+        "generated",
         "shared",
         "types"
       ],
@@ -722,7 +723,7 @@
       ]
     },
     "largeFiles": {
-      "countOver400": 96,
+      "countOver400": 98,
       "countOver600": 44,
       "topOver400": [
         {
@@ -736,6 +737,10 @@
         {
           "file": "src/cliproxy/auth/oauth-handler.ts",
           "loc": 1510
+        },
+        {
+          "file": "src/cliproxy/model-catalog.ts",
+          "loc": 1298
         },
         {
           "file": "src/cliproxy/config/generator.ts",
@@ -764,10 +769,6 @@
         {
           "file": "src/commands/cliproxy/variant-subcommand.ts",
           "loc": 1003
-        },
-        {
-          "file": "src/cliproxy/model-catalog.ts",
-          "loc": 1001
         },
         {
           "file": "src/cliproxy/proxy/tool-sanitization-proxy.ts",
