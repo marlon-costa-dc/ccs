@@ -582,8 +582,8 @@
     },
     "loggerCoverage": {
       "filesWithCreateLogger": 68,
-      "totalSourceFiles": 781,
-      "coverageRatio": 0.0871,
+      "totalSourceFiles": 780,
+      "coverageRatio": 0.0872,
       "subdomainsWithZeroCreateLogger": [
         "api",
         "bin",
@@ -597,7 +597,6 @@
         "cliproxy/types",
         "config",
         "dispatcher",
-        "generated",
         "shared",
         "types"
       ],
